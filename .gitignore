@@ -1,0 +1,54 @@
+# Environment files (contain secrets)
+.env
+.env.local
+.env.*.local
+.env.server-backup
+
+# ── Foundry ──
+out/
+cache/
+broadcast/
+
+# ── Node / TypeScript ──
+node_modules/
+dist/
+.turbo/
+coverage/
+
+# ── Python (scripts/tooling) ──
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+*.egg-info/
+.venv/
+
+# ── Logs ──
+*.log
+
+# ── IDE ──
+.vscode/
+.idea/
+
+# ── OS ──
+.DS_Store
+Thumbs.db
+
+# ── DeFi Specific ──
+# Fork cache (anvil/hardhat)
+fork-cache/
+
+# ── Claude Code local settings (user-specific) ──
+.claude/settings.local.json
+
+# ── Session context (local only) ──
+STICKYNOTE.md
+
+# ── Beads sync local state ──
+.beads/.sync.lock
+.beads/sync_base.jsonl
+.beads/*.db
+.beads/export/
+
+# ── Cognee local data ──
+cognee_data/

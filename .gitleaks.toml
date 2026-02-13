@@ -1,0 +1,30 @@
+title = "flashloaner gitleaks config"
+
+[extend]
+# Use the default gitleaks config as a base
+useDefault = true
+
+[allowlist]
+description = "Allowlisted files and patterns"
+
+# Allow .env.example files (they should only contain placeholders)
+# Allow broadcast/ logs (Foundry deployment logs contain public addresses, not secrets)
+paths = [
+    '''\.env\.example$''',
+    '''\.env\.sample$''',
+    '''\.env\.template$''',
+    '''\.rules/patterns/env-security\.md$''',
+    '''broadcast/''',
+]
+
+# Allow placeholder patterns that are obviously fake
+regexes = [
+    '''YOUR_\w+_HERE''',
+    '''YOUR_\w+_KEY''',
+    '''CHANGE_ME''',
+    '''changeme''',
+    '''your-\w+-here''',
+    '''example\.com''',
+    '''\*\*\*REMOVED\*\*\*''',
+    '''0x0{39}[0-9a-fA-F]''',
+]
