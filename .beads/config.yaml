@@ -1,0 +1,13 @@
+issue_prefix: flashloaner
+no_db: true
+
+auto_sync:
+  export_to_jsonl: true
+  debounce_seconds: 5
+
+auto_import:
+  from_jsonl: true
+  when_newer: true
+
+daemon:
+  auto_start: true
