@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     if: inputs.network == 'sepolia'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
           submodules: recursive
@@ -59,7 +59,7 @@ jobs:
     if: inputs.network == 'mainnet'
     environment: production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
           submodules: recursive
