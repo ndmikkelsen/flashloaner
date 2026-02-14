@@ -31,7 +31,7 @@ jobs:
         run: forge build
 
       - name: Run Slither
-        uses: crytic/slither-action@v0.4.0
+        uses: crytic/slither-action@v0.4.2
         with:
           sarif: results.sarif
           slither-args: --filter-paths "lib/|node_modules/|contracts/test/"
