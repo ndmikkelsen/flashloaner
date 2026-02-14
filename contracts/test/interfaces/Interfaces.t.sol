@@ -34,9 +34,6 @@ contract InterfacesCompilationTest is Test {
         selector = IFlashloanExecutor.setMinProfit.selector;
         assertTrue(selector != bytes4(0), "setMinProfit selector should be non-zero");
 
-        selector = IFlashloanExecutor.owner.selector;
-        assertTrue(selector != bytes4(0), "owner selector should be non-zero");
-
         selector = IFlashloanExecutor.botWallet.selector;
         assertTrue(selector != bytes4(0), "botWallet selector should be non-zero");
 

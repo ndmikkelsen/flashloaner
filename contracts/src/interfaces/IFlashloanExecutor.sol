@@ -39,12 +39,6 @@ interface IFlashloanExecutor {
     /// @notice No swap steps were provided.
     error EmptySwapSteps();
 
-    /// @notice Flash loan amount must be greater than zero.
-    error ZeroAmount();
-
-    /// @notice Invalid address (zero address provided).
-    error ZeroAddress();
-
     // ──────────────────────────────────────────────
     // Events
     // ──────────────────────────────────────────────
@@ -130,10 +124,6 @@ interface IFlashloanExecutor {
     // ──────────────────────────────────────────────
     // View Functions
     // ──────────────────────────────────────────────
-
-    /// @notice Returns the contract owner.
-    /// @return The owner address
-    function owner() external view returns (address);
 
     /// @notice Returns the authorized bot wallet address.
     /// @return The bot wallet address
