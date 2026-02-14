@@ -12,9 +12,31 @@
 
 **Status**: Production-ready system with complete deployment infrastructure
 
-**Merged**: 2026-02-14T18:56:38Z
-**Commit**: 3acacb9
-**Branch**: main
+**Released**: 2026-02-14T18:56:38Z
+**Commit**: 3acacb9 (main branch)
+**Latest**: a35aa93 (feat/flash-framework)
+
+### What's Included in v0.1.0
+
+**Core System:**
+- 6 Smart contracts (1,497 lines, 230 tests passing)
+- 5 Bot modules (268 tests passing)
+- 498 total tests (100% passing)
+- 33 fork tests on real protocols
+
+**Deployment Infrastructure (NEW):**
+- Deploy.s.sol - Production deployment (416 lines)
+- Verify.s.sol - Post-deployment verification (261 lines)
+- Helper scripts - Address extraction & bot config
+- DEPLOYMENT.md - Complete deployment guide (417 lines)
+- Environment templates - Verified Sepolia addresses
+
+**Verified Protocol Addresses (Sepolia):**
+- Aave V3 Pool: `0x6Ae43d3271ff6888e7Fc43Fd7321a503ff738951`
+- Balancer Vault: `0xBA12222222228d8Ba445958a75a0704d566BF2C8`
+- Uniswap V2/V3: All addresses verified against official docs
+
+**Ready for:** Sepolia testnet deployment
 
 ### Completed This Session (32 tasks, 498 tests)
 
