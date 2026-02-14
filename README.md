@@ -1,168 +1,141 @@
 # Flashloaner
 
-Automated flashloan arbitrage bot for DeFi protocols. Detects and executes profitable arbitrage opportunities using flashloans across decentralized exchanges.
+[![CI](https://github.com/ndmikkelsen/feat.flash-framework/actions/workflows/ci.yml/badge.svg)](https://github.com/ndmikkelsen/feat.flash-framework/actions/workflows/ci.yml)
+[![Security](https://github.com/ndmikkelsen/feat.flash-framework/actions/workflows/security.yml/badge.svg)](https://github.com/ndmikkelsen/feat.flash-framework/actions/workflows/security.yml)
 
-## Architecture
+A flashloan arbitrage framework with on-chain Solidity smart contracts for atomic execution and an off-chain TypeScript bot for opportunity detection.
 
-Flashloaner is a two-layer system:
+## How It Works
 
 ```
-Off-chain Bot (TypeScript)          On-chain Contracts (Solidity)
-+---------------------------+       +---------------------------+
-| Opportunity Detection     |       | Flashloan Executor        |
-| - Monitor DEX prices      |  -->  | - Borrow via flashloan    |
-| - Calculate profitability  |       | - Execute DEX swaps       |
-| - Submit transactions      |       | - Repay loan + keep profit|
-+---------------------------+       +---------------------------+
+Price Monitor ──► Opportunity Detector ──► Transaction Builder ──► Execution Engine
+   (polls DEX        (calculates profit,       (encodes calldata      (submits via
+    reserves)          filters by costs)         for contracts)        Flashbots)
+                                                       │
+                                                       ▼
+                                              FlashloanExecutor
+                                               (on-chain: borrow
+                                                → swap → repay)
 ```
 
-- **On-chain**: Solidity smart contracts handle flashloan borrowing, multi-hop DEX swaps, and profit extraction
-- **Off-chain**: TypeScript bot monitors prices, detects arbitrage opportunities, and submits transactions
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Smart Contracts | Solidity |
-| Contract Framework | Foundry (forge, cast, anvil) |
-| Off-chain Bot | TypeScript |
-| Ethereum Library | ethers.js v6 |
-| TS Testing | Vitest |
-| Runtime | Node.js |
-
-## Getting Started
-
-### Prerequisites
-
-- [Foundry](https://getfoundry.sh/) (Solidity toolchain)
-- Node.js 18+ and pnpm
-- An RPC endpoint (Alchemy, Infura, etc.)
-
-### Installation
-
-```bash
-# Clone the repository
-git clone <repo-url>
-cd flashloaner
-
-# Install Foundry
-curl -L https://foundry.paradigm.xyz | bash
-foundryup
-
-# Install Node.js dependencies
-pnpm install
-
-# Copy environment template
-cp .env.example .env
-# Edit .env with your RPC URLs and configuration
-```
-
-### Run Tests
-
-```bash
-# Run Solidity tests
-forge test
-
-# Run Solidity tests with gas report
-forge test --gas-report
-
-# Run Solidity tests against mainnet fork
-forge test --fork-url $MAINNET_RPC_URL
-
-# Run TypeScript tests
-pnpm test
-```
-
-### Deploy
-
-Deployment follows a gated process: fork test -> testnet -> mainnet.
-
-```bash
-# Step 1: Test on local fork (always do this first)
-forge script script/Deploy.s.sol --fork-url $MAINNET_RPC_URL
-
-# Step 2: Deploy to testnet
-forge script script/Deploy.s.sol --fork-url $TESTNET_RPC_URL --broadcast
-
-# Step 3: Deploy to mainnet (after testnet verification)
-forge script script/Deploy.s.sol --fork-url $MAINNET_RPC_URL --broadcast --verify
-```
-
-## Development
-
-### Workflow
-
-This project uses a BDD (Behavior-Driven Development) pipeline:
-
-1. Define the feature as a Beads issue
-2. Write a Gherkin `.feature` spec
-3. Create a plan from the spec
-4. Break the plan into trackable tasks
-5. Implement using TDD (red-green-refactor)
-
-### Branching Strategy
-
-All work follows the PR pipeline: `feature -> dev -> main`
-
-- Create feature branches for all work
-- Never commit directly to `main` or `dev`
-- All PRs require security review
-
-## Security
-
-This project uses pre-commit hooks and gitleaks to prevent secrets from being committed:
-
-```bash
-# Install pre-commit hooks
-pre-commit install
-
-# Manually scan for secrets
-gitleaks detect --source . --no-git
-```
-
-**Important**:
-- `.env.example` contains only placeholders -- never commit real secrets
-- `.env` files are gitignored -- your real credentials stay local
-- Pre-commit hooks automatically scan for secrets before each commit
-- See [environment security guide](.rules/patterns/env-security.md) for details
+1. The **bot** monitors prices across DEXes (Uniswap, SushiSwap, Curve, Balancer)
+2. When a price discrepancy exceeds costs (gas + fees + slippage), the bot builds a transaction
+3. The **smart contract** takes a flash loan, executes swaps atomically, and repays the loan
+4. If the trade isn't profitable after all costs, the transaction reverts — no funds at risk
 
 ## Project Structure
 
 ```
 flashloaner/
-├── contracts/              # Solidity smart contracts
-│   ├── src/                # Contract source files
-│   ├── test/               # Foundry test files
-│   └── script/             # Deployment scripts
-├── bot/                    # TypeScript off-chain bot
-│   ├── src/                # Bot source code
-│   └── __tests__/          # Vitest test files
-├── .rules/                 # Technical documentation
-│   ├── architecture/       # System design
-│   └── patterns/           # Workflows, best practices
-├── foundry.toml            # Foundry config
-├── package.json            # pnpm config
-├── vitest.config.ts        # Vitest config
-└── .env.example            # Environment template
+├── contracts/          # Solidity smart contracts (Foundry)
+│   ├── src/            # Contract source (interfaces, adapters, safety)
+│   ├── test/           # Foundry tests (unit, fuzz, invariant, fork)
+│   └── script/         # Deployment scripts
+├── bot/                # TypeScript off-chain bot
+│   ├── src/            # Bot source (monitor, detector, config)
+│   ├── __tests__/      # Vitest tests (unit, integration, performance)
+│   └── docs/           # Bot API reference
+├── .github/workflows/  # CI/CD pipelines
+└── .rules/             # Technical documentation
 ```
+
+## Quick Start
+
+### Prerequisites
+
+- [Foundry](https://book.getfoundry.sh/getting-started/installation) (forge, cast, anvil)
+- [Node.js](https://nodejs.org/) >= 20
+- [pnpm](https://pnpm.io/) >= 9
+
+### Setup
+
+```bash
+# Clone
+git clone https://github.com/ndmikkelsen/feat.flash-framework.git
+cd feat.flash-framework
+
+# Install dependencies
+pnpm install
+forge install
+
+# Copy environment template
+cp .env.example .env
+# Edit .env with your RPC URL
+```
+
+### Run Tests
+
+```bash
+# Solidity tests (1000 fuzz runs with CI profile)
+FOUNDRY_PROFILE=ci forge test -vvv
+
+# TypeScript tests
+pnpm test
+
+# Both
+forge test && pnpm test
+```
+
+### Run the Bot
+
+```bash
+# Set your RPC URL
+export RPC_URL="https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY"
+
+# Start in development mode
+pnpm dev
+```
+
+## Tech Stack
+
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| Smart Contracts | Solidity 0.8.24 | Flash loan execution, DEX swaps, safety checks |
+| Contract Framework | Foundry | Build, test, deploy, fuzz |
+| Off-chain Bot | TypeScript | Opportunity detection, transaction building |
+| Ethereum Library | ethers.js v6 | Blockchain interaction |
+| Testing | Foundry + Vitest | Dual-language test suites |
+| CI/CD | GitHub Actions | Automated testing, security scanning, deployment |
+| Secret Detection | gitleaks | Pre-commit and CI secret scanning |
 
 ## Documentation
 
-- **Architecture**: `.rules/architecture/` -- System design, contract architecture
-- **Patterns**: `.rules/patterns/` -- Git workflow, BDD, deployment, security
+| Document | Description |
+|----------|-------------|
+| [Architecture](ARCHITECTURE.md) | System design, data flow, component relationships |
+| [Getting Started](GETTING_STARTED.md) | Installation, configuration, first run |
+| [Testing](TESTING.md) | Test strategy, running tests, writing tests |
+| [Contributing](CONTRIBUTING.md) | Development workflow, PR process, code style |
+| [Bot API](bot/docs/API.md) | TypeScript module API reference |
+| [CI/CD](bot/docs/CI_CD.md) | Pipeline documentation |
 
-## Safety Disclaimer
+## Contract Architecture
 
-This software is provided for educational and research purposes. Flashloan arbitrage involves significant financial risk:
+```
+FlashloanExecutor (entry point)
+    ├── FlashloanReceiver (Aave, dYdX, Balancer callbacks)
+    ├── DEX Adapters (UniswapV2, UniswapV3, SushiSwap, Curve, Balancer)
+    └── Safety Module (CircuitBreaker, ProfitValidator, AccessControl)
+```
 
-- **Smart contract risk**: Bugs in contracts can lead to loss of funds
-- **Market risk**: Arbitrage opportunities can disappear between detection and execution
-- **Gas risk**: Failed transactions still cost gas
-- **MEV risk**: Other bots may front-run or sandwich your transactions
-- **Protocol risk**: DEX or lending protocol bugs can affect your transactions
+## Bot Architecture
 
-**This is not financial advice.** Use at your own risk. Always test thoroughly on forks and testnets before deploying to mainnet with real funds.
+```
+FlashloanBot (orchestrator)
+    ├── PriceMonitor      ── polls reserves, calculates prices, detects deltas
+    ├── OpportunityDetector ── analyzes profit, estimates costs, filters opportunities
+    ├── TransactionBuilder  ── encodes calldata, estimates gas          [planned]
+    └── ExecutionEngine     ── submits via Flashbots, monitors txns    [planned]
+```
+
+## Security
+
+- Flash loan transactions are atomic — if unprofitable, they revert with no loss
+- On-chain circuit breakers enforce gas price, trade size, and slippage limits
+- Two-tier access control (owner + bot wallet)
+- Pre-commit hooks and CI scan for leaked secrets
+- Immutable contracts (no upgrade risk)
 
 ## License
 
-MIT License - See [LICENSE](LICENSE) for details.
+ISC
