@@ -3,6 +3,8 @@
 .env.local
 .env.*.local
 .env.server-backup
+.env.sepolia
+.env.mainnet
 
 # ── Foundry ──
 out/

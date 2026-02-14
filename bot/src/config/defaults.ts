@@ -25,6 +25,29 @@ export const MAINNET_TOKENS = {
   WBTC: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
 } as const;
 
+/** Well-known Sepolia testnet token addresses (WETH9 used by Uniswap) */
+export const SEPOLIA_TOKENS = {
+  WETH: "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14",
+  USDC: "0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8",
+  USDC_CIRCLE: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+} as const;
+
+/** Sepolia PriceMonitor settings (faster polling, lower thresholds) */
+export const SEPOLIA_MONITOR: MonitorConfig = {
+  deltaThresholdPercent: 0.01,
+  pollIntervalMs: 5_000,
+  maxRetries: 3,
+};
+
+/** Sepolia OpportunityDetector settings (lower profit bar, smaller loans) */
+export const SEPOLIA_DETECTOR: DetectorConfig = {
+  minProfitThreshold: 0.0001,
+  maxSlippage: 0.005,
+  defaultInputAmount: 1,
+  gasPriceGwei: 5,
+  gasPerSwap: 150_000,
+};
+
 /** Default full bot config (requires network.rpcUrl to be overridden) */
 export const DEFAULT_CONFIG: BotConfig = {
   network: {
