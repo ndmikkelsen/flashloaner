@@ -51,6 +51,10 @@ STICKYNOTE.md
 .beads/sync_base.jsonl
 .beads/*.db
 .beads/export/
+.beads/.gitignore
+.beads/README.md
+.beads/interactions.jsonl
+.beads/metadata.json
 
 # ── Cognee local data ──
 cognee_data/
