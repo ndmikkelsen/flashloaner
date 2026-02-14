@@ -7,7 +7,9 @@
 # ── Foundry ──
 out/
 cache/
-broadcast/
+# broadcast/ — Deployment logs are committed for auditability.
+# Exclude sensitive run-latest symlinks but keep actual broadcast records.
+broadcast/**/run-latest/
 
 # ── Node / TypeScript ──
 node_modules/
