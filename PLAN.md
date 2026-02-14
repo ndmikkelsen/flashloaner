@@ -4,12 +4,17 @@
 
 **Last Updated**: 2026-02-14
 **Current Branch**: feat/flash-framework
+**Release**: v0.1.0 - Production-ready deployment system
 
 ---
 
-## Current Milestone: Core Implementation Complete ✅
+## 🎉 Release v0.1.0 - MERGED TO MAIN ✅
 
-**Status**: Production-ready execution pipeline implemented and tested
+**Status**: Production-ready system with complete deployment infrastructure
+
+**Merged**: 2026-02-14T18:56:38Z
+**Commit**: 3acacb9
+**Branch**: main
 
 ### Completed This Session (32 tasks, 498 tests)
 
