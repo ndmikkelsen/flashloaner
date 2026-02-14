@@ -3,7 +3,7 @@
 > **Working memory** - Major milestones and architectural changes
 
 **Last Updated**: 2026-02-14
-**Current Branch**: feat/flash-framework
+**Current Branch**: feat/test-net-deploy
 
 ---
 
@@ -37,11 +37,16 @@
 
 ### Next Steps
 
-**Immediate (Ready for testnet):**
-- Deploy contracts to testnet (Sepolia/Goerli)
-- Run live bot with testnet funds
-- Monitor real arbitrage opportunities
-- Validate gas costs and profitability
+**Immediate (Testnet deployment prep complete):**
+- ✅ Sepolia pool discovery (3 WETH/USDC pools: V2 + V3 0.3% + V3 1%)
+- ✅ Testnet bot config + report-only entry point (run-testnet.ts)
+- ✅ Price query/skew scripts for manual arb testing
+- ✅ Deployment preflight script + .env.sepolia.example
+- ⬜ Set up wallets + fund with Sepolia ETH
+- ⬜ Deploy contracts to Sepolia
+- ⬜ Run live bot in report-only mode
+- ⬜ Test with price-skew script
+- ⬜ Validate gas costs and profitability
 
 **Medium Term (Security & Optimization):**
 - Fuzz testing campaign (Echidna/Foundry fuzz)
@@ -64,7 +69,7 @@
 - **Smart Contracts**: Solidity 0.8.24 / Foundry ✅
 - **Bot**: TypeScript / ethers.js v6 / Node.js ✅
 - **Testing**: Forge test (230 passing) + Vitest (268 passing) ✅
-- **Deployment**: Foundry scripts (stub ready)
+- **Deployment**: Foundry scripts (complete: Deploy.s.sol, Verify.s.sol, QueryPrices, TestSkewPrice, preflight-check.sh)
 - **Issue Tracking**: Beads (8/72 issues closed, 52 open)
 
 ---
