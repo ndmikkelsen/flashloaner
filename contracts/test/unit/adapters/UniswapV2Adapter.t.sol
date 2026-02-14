@@ -315,7 +315,8 @@ contract UniswapV2AdapterTest is Test {
     // ---------------------------------------------------------------
 
     function testFuzz_swap_variousAmounts(uint256 amountIn) public {
-        amountIn = bound(amountIn, 1, 1_000_000 ether);
+        // Min 10_000 wei to avoid rounding to zero with 0.3% fee
+        amountIn = bound(amountIn, 10_000, 1_000_000 ether);
 
         tokenA.mint(caller, amountIn);
         vm.startPrank(caller);
@@ -330,7 +331,8 @@ contract UniswapV2AdapterTest is Test {
     }
 
     function testFuzz_getAmountOut_matchesSwap(uint256 amountIn) public {
-        amountIn = bound(amountIn, 1, 1_000_000 ether);
+        // Min 10_000 wei to avoid rounding to zero with 0.3% fee
+        amountIn = bound(amountIn, 10_000, 1_000_000 ether);
 
         // Get quote
         uint256 quote = adapter.getAmountOut(address(tokenA), address(tokenB), amountIn, "");
