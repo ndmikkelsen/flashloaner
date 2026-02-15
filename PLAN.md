@@ -37,16 +37,17 @@
 
 ### Next Steps
 
-**Immediate (Testnet deployment prep complete):**
-- ✅ Sepolia pool discovery (3 WETH/USDC pools: V2 + V3 0.3% + V3 1%)
+**Immediate (Testnet deployment complete):**
+- ✅ Sepolia pool discovery (2 WETH/USDC V3 pools: 0.3% + 1%)
 - ✅ Testnet bot config + report-only entry point (run-testnet.ts)
 - ✅ Price query/skew scripts for manual arb testing
 - ✅ Deployment preflight script + .env.sepolia.example
-- ⬜ Set up wallets + fund with Sepolia ETH
-- ⬜ Deploy contracts to Sepolia
-- ⬜ Run live bot in report-only mode
+- ✅ Set up wallets + fund with Sepolia ETH
+- ✅ Deploy 5 contracts to Sepolia (~0.0166 ETH)
+- ✅ Run live bot in report-only mode (0.59% spread detected)
 - ⬜ Test with price-skew script
 - ⬜ Validate gas costs and profitability
+- ⬜ Extended bot monitoring run
 
 **Medium Term (Security & Optimization):**
 - Fuzz testing campaign (Echidna/Foundry fuzz)
@@ -78,14 +79,19 @@
 
 > Active issues tracked in `.beads/issues.jsonl` - Use `bd ready` to see unblocked work
 
-**Closed (8):**
+**Closed (13):**
 - flashloaner-4ap: FlashloanReceiver ✅
 - flashloaner-37z: FlashloanExecutor ✅
 - flashloaner-752: CircuitBreaker ✅
 - flashloaner-148: ProfitValidator ✅
 - flashloaner-o7s: UniswapV2/V3Adapters ✅
 - flashloaner-5jf: Fork testing ✅
+- flashloaner-hf3: Install Foundry toolchain ✅
+- flashloaner-ehi: Initialize TypeScript project ✅
+- flashloaner-n53: Write FlashloanExecutor unit tests ✅
+- flashloaner-swt: Write safety contract tests ✅
+- flashloaner-52i: Complete Deploy.s.sol deployment ✅
 
-**Open (52):** Security, multi-chain, deployment, advanced features
+**Open (47):** Security, multi-chain, advanced features
 
-**Progress:** ~50% project completion
+**Progress:** ~60% project completion
