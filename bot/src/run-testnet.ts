@@ -82,7 +82,6 @@ async function main(): Promise<void> {
   const pools = loadPools();
 
   const bot = FlashloanBot.fromEnv({
-    network: { rpcUrl: "", chainId: 11155111 },
     pools,
     monitor: SEPOLIA_MONITOR,
     detector: SEPOLIA_DETECTOR,

@@ -40,20 +40,30 @@ V2_ADAPTER=$(jq -r '.contracts.UniswapV2Adapter' "$DEPLOYMENT_JSON")
 V3_ADAPTER=$(jq -r '.contracts.UniswapV3Adapter' "$DEPLOYMENT_JSON")
 NETWORK=$(jq -r '.network' "$DEPLOYMENT_JSON")
 
-# Create or update .env file
+# Remove old contract address lines if present, then append new ones
+if [ -f "$ENV_FILE" ]; then
+    # Strip existing contract address lines to avoid duplicates
+    grep -v '^FLASHLOAN_EXECUTOR_ADDRESS=' "$ENV_FILE" | \
+    grep -v '^UNISWAP_V2_ADAPTER_ADDRESS=' | \
+    grep -v '^UNISWAP_V3_ADAPTER_ADDRESS=' | \
+    grep -v '^# Deployed Contract Addresses' | \
+    grep -v '^# Generated:' | \
+    grep -v '^# Deployment:' | \
+    grep -v '^NETWORK=' > "${ENV_FILE}.tmp" || true
+    mv "${ENV_FILE}.tmp" "$ENV_FILE"
+fi
+
+# Append contract addresses
 {
+    echo ""
     echo "# Deployed Contract Addresses - $NETWORK (Chain ID: $CHAIN_ID)"
     echo "# Generated: $(date)"
     echo "# Deployment: $DEPLOYMENT_JSON"
-    echo ""
     echo "NETWORK=$NETWORK"
-    echo "CHAIN_ID=$CHAIN_ID"
-    echo ""
-    echo "# Core Contracts"
     echo "FLASHLOAN_EXECUTOR_ADDRESS=$EXECUTOR"
     echo "UNISWAP_V2_ADAPTER_ADDRESS=$V2_ADAPTER"
     echo "UNISWAP_V3_ADAPTER_ADDRESS=$V3_ADAPTER"
-} > "$ENV_FILE"
+} >> "$ENV_FILE"
 
 echo "✓ Environment file updated successfully"
 echo ""
