@@ -44,7 +44,13 @@ regexes = [
     '''0xfFf9976782d46CC05630D1f6eBAb18b2324d6B''',     # WETH Sepolia
     # Public token addresses on L2 chains (not secrets)
     '''0x82aF49447D8a07e3bd95BD0d56f35241523fBab1''',  # WETH Arbitrum
+    '''0x82af49447d8a07e3bd95bd0d56f35241523fbab1''',  # WETH Arbitrum (lowercase)
     '''0xaf88d065e77c8cC2239327C5EDb3A432268e5831''',  # USDC Arbitrum
+    '''0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8''',  # USDC Arbitrum (native)
+    '''0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9''',  # USDT Arbitrum
+    # Public pool addresses on L2 chains (not secrets)
+    '''0xC31E54c7a869B9FcBEcc14363CF510d1c41fa443''',  # WETH/USDC UniV3 0.05% Arbitrum
+    '''0x641c00a822e8b671738d32a431a4fb6074e5c79d''',  # WETH/USDT UniV3 0.05% Arbitrum
     # Well-known Hardhat/Foundry default test private keys (NOT real secrets)
     '''0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a''',  # Hardhat account #2
 ]

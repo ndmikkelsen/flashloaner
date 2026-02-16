@@ -1,0 +1,79 @@
+import type { ChainConfig } from "./types.js";
+import { ARBITRUM_MAINNET_POOLS } from "./pools/arbitrum-mainnet.js";
+
+/**
+ * Arbitrum One (mainnet) configuration.
+ *
+ * Chain ID: 42161
+ * Use case: Primary deployment target for v1 (optimal success rate, lower MEV competition)
+ *
+ * Key characteristics:
+ * - 0.25s block time (requires faster polling than Ethereum)
+ * - FCFS sequencer ordering (latency > gas bidding)
+ * - No Flashbots (centralized sequencer, private mempool)
+ * - Dual-component gas (L2 execution + L1 data posting)
+ */
+export const ARBITRUM_CONFIG: ChainConfig = {
+  chainId: 42161,
+  chainName: "Arbitrum One",
+
+  // RPC loaded from environment at runtime
+  rpcUrl: process.env.RPC_URL || "",
+  fallbackRpcUrl: process.env.FALLBACK_RPC_URL,
+
+  // Flash loan and DeFi protocol addresses
+  protocols: {
+    aaveV3Pool: "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
+    balancerVault: "0x0000000000000000000000000000000000000000", // TBD - resolve during Phase 3
+  },
+
+  // DEX router and factory addresses
+  dexes: {
+    uniswapV3: {
+      factory: "0x1F98431c8aD98523631AE4a59f267346ea31F984",
+      router: "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45", // SwapRouter02
+      quoter: "0x61fFE014bA17989E743c5F6cB21bF9697530B21e", // QuoterV2
+    },
+    sushiswapV2: {
+      router: "0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506",
+      factory: "0xc35DADB65012eC5796536bD9864eD8773aBc74C4",
+    },
+  },
+
+  // Token addresses (Arbitrum mainnet)
+  tokens: {
+    WETH: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1",
+    USDC: "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8", // Native USDC (Circle-issued)
+    USDT: "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9",
+  },
+
+  // Gas configuration (Arbitrum-specific)
+  gas: {
+    maxGasPriceGwei: 0.1, // Arbitrum gas is much cheaper than Ethereum
+    gasPerSwap: 150_000,
+  },
+
+  // Monitor configuration (0.25s blocks = faster polling)
+  monitor: {
+    deltaThresholdPercent: 0.3, // Same as Ethereum
+    pollIntervalMs: 1_000, // 1s polling (Arbitrum has 0.25s blocks)
+    maxRetries: 3,
+  },
+
+  // Detector configuration (Arbitrum thresholds)
+  detector: {
+    minProfitThreshold: 0.01, // Same as Ethereum (0.01 ETH)
+    maxSlippage: 0.005, // 0.5%
+    defaultInputAmount: 10, // 10 ETH flash loan
+    gasPriceGwei: 0.1, // Arbitrum typical gas price
+    gasPerSwap: 150_000,
+  },
+
+  // MEV protection (none - FCFS sequencer, no Flashbots on Arbitrum)
+  mev: {
+    mode: "none",
+  },
+
+  // Pre-configured pools (WETH/USDC and WETH/USDT on Uniswap V3)
+  pools: ARBITRUM_MAINNET_POOLS,
+};

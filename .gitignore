@@ -3,6 +3,10 @@
 .env.local
 .env.*.local
 .env.server-backup
+.env.arbitrum-sepolia
+.env.arbitrum
+.env.base-sepolia
+.env.base
 
 # ── Foundry ──
 out/
