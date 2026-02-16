@@ -6,10 +6,14 @@
   "main": "dist/src/index.js",
   "scripts": {
     "build": "tsc",
+    "start": "node --import tsx bot/src/index.ts",
+    "start:dry-run": "DRY_RUN=true node --import tsx bot/src/index.ts",
+    "start:testnet": "node --import tsx bot/src/run-testnet.ts",
+    "dev": "LOG_LEVEL=debug node --import tsx bot/src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "dev": "node --import tsx bot/src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "preflight": "pnpm run typecheck && pnpm run test && gitleaks detect --source . --no-git"
   },
   "keywords": [],
   "author": "",
@@ -20,6 +24,7 @@
   },
   "devDependencies": {
     "@types/node": "^25.2.3",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
   }

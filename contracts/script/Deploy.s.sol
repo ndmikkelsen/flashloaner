@@ -142,7 +142,7 @@ contract Deploy is Script {
         ChainConfig memory chain,
         DeploymentConfig memory config
     ) internal returns (DeployedContracts memory) {
-        console2.log("\n━━━ Step 1: Deploy Safety Contracts ━━━");
+        console2.log(unicode"\n━━━ Step 1: Deploy Safety Contracts ━━━");
 
         CircuitBreaker circuitBreaker = new CircuitBreaker(
             config.maxGasPrice,
@@ -150,12 +150,12 @@ contract Deploy is Script {
             config.failureThreshold,
             deployer
         );
-        console2.log("✓ CircuitBreaker deployed:", address(circuitBreaker));
+        console2.log(unicode"✓ CircuitBreaker deployed:", address(circuitBreaker));
 
         ProfitValidator profitValidator = new ProfitValidator();
-        console2.log("✓ ProfitValidator deployed:", address(profitValidator));
+        console2.log(unicode"✓ ProfitValidator deployed:", address(profitValidator));
 
-        console2.log("\n━━━ Step 2: Deploy FlashloanExecutor ━━━");
+        console2.log(unicode"\n━━━ Step 2: Deploy FlashloanExecutor ━━━");
 
         FlashloanExecutor executor = new FlashloanExecutor(
             chain.aavePool,
@@ -164,28 +164,28 @@ contract Deploy is Script {
             config.botWallet,
             config.minProfit
         );
-        console2.log("✓ FlashloanExecutor deployed:", address(executor));
+        console2.log(unicode"✓ FlashloanExecutor deployed:", address(executor));
 
-        console2.log("\n━━━ Step 3: Deploy DEX Adapters ━━━");
+        console2.log(unicode"\n━━━ Step 3: Deploy DEX Adapters ━━━");
 
         UniswapV2Adapter uniswapV2Adapter = new UniswapV2Adapter(chain.uniswapV2Router);
-        console2.log("✓ UniswapV2Adapter deployed:", address(uniswapV2Adapter));
+        console2.log(unicode"✓ UniswapV2Adapter deployed:", address(uniswapV2Adapter));
 
         UniswapV3Adapter uniswapV3Adapter = new UniswapV3Adapter(
             chain.uniswapV3Router,
             chain.uniswapV3Quoter
         );
-        console2.log("✓ UniswapV3Adapter deployed:", address(uniswapV3Adapter));
+        console2.log(unicode"✓ UniswapV3Adapter deployed:", address(uniswapV3Adapter));
 
-        console2.log("\n━━━ Step 4: Register Adapters ━━━");
+        console2.log(unicode"\n━━━ Step 4: Register Adapters ━━━");
 
         executor.registerAdapter(address(uniswapV2Adapter));
-        console2.log("✓ Registered UniswapV2Adapter");
+        console2.log(unicode"✓ Registered UniswapV2Adapter");
 
         executor.registerAdapter(address(uniswapV3Adapter));
-        console2.log("✓ Registered UniswapV3Adapter");
+        console2.log(unicode"✓ Registered UniswapV3Adapter");
 
-        console2.log("\n━━━ Step 5: Verify Configuration ━━━");
+        console2.log(unicode"\n━━━ Step 5: Verify Configuration ━━━");
 
         require(executor.owner() == deployer, "Deploy: Executor owner mismatch");
         require(executor.botWallet() == config.botWallet, "Deploy: Bot wallet mismatch");
@@ -193,7 +193,7 @@ contract Deploy is Script {
         require(executor.approvedAdapters(address(uniswapV2Adapter)), "Deploy: V2 adapter not approved");
         require(executor.approvedAdapters(address(uniswapV3Adapter)), "Deploy: V3 adapter not approved");
         require(!executor.paused(), "Deploy: Executor should not be paused");
-        console2.log("✓ All configuration checks passed");
+        console2.log(unicode"✓ All configuration checks passed");
 
         return DeployedContracts({
             executor: executor,
@@ -235,9 +235,9 @@ contract Deploy is Script {
         ChainConfig memory chain,
         DeploymentConfig memory config
     ) internal view {
-        console2.log("\n╔══════════════════════════════════════════════════════════════════════════════╗");
-        console2.log("║           FLASHLOAN ARBITRAGE BOT - DEPLOYMENT CONFIGURATION                ║");
-        console2.log("╚══════════════════════════════════════════════════════════════════════════════╝");
+        console2.log(unicode"\n╔══════════════════════════════════════════════════════════════════════════════╗");
+        console2.log(unicode"║           FLASHLOAN ARBITRAGE BOT - DEPLOYMENT CONFIGURATION                ║");
+        console2.log(unicode"╚══════════════════════════════════════════════════════════════════════════════╝");
         console2.log("");
         console2.log("Network Information:");
         console2.log("  Chain ID:      ", chain.chainId);
@@ -268,9 +268,9 @@ contract Deploy is Script {
         internal
         view
     {
-        console2.log("\n╔══════════════════════════════════════════════════════════════════════════════╗");
-        console2.log("║                        DEPLOYMENT SUCCESSFUL ✓                               ║");
-        console2.log("╚══════════════════════════════════════════════════════════════════════════════╝");
+        console2.log(unicode"\n╔══════════════════════════════════════════════════════════════════════════════╗");
+        console2.log(unicode"║                        DEPLOYMENT SUCCESSFUL ✓                               ║");
+        console2.log(unicode"╚══════════════════════════════════════════════════════════════════════════════╝");
         console2.log("");
         console2.log("Deployed Addresses:");
         console2.log("  FlashloanExecutor:  ", address(contracts.executor));
@@ -304,56 +304,35 @@ contract Deploy is Script {
     // ══════════════════════════════════════════════════════════════════════════════
 
     function exportDeploymentAddresses(ChainConfig memory chain, DeployedContracts memory contracts) internal {
-        string memory json = string.concat(
+        string memory header = string.concat(
             '{\n',
-            '  "chainId": ',
-            vm.toString(chain.chainId),
-            ',\n',
-            '  "network": "',
-            chain.name,
-            '",\n',
-            '  "deployedAt": "',
-            vm.toString(block.timestamp),
-            '",\n',
-            '  "blockNumber": ',
-            vm.toString(block.number),
-            ',\n',
-            '  "contracts": {\n',
-            '    "FlashloanExecutor": "',
-            vm.toString(address(contracts.executor)),
-            '",\n',
-            '    "CircuitBreaker": "',
-            vm.toString(address(contracts.circuitBreaker)),
-            '",\n',
-            '    "ProfitValidator": "',
-            vm.toString(address(contracts.profitValidator)),
-            '",\n',
-            '    "UniswapV2Adapter": "',
-            vm.toString(address(contracts.uniswapV2Adapter)),
-            '",\n',
-            '    "UniswapV3Adapter": "',
-            vm.toString(address(contracts.uniswapV3Adapter)),
-            '"\n',
-            '  },\n',
-            '  "configuration": {\n',
-            '    "aavePool": "',
-            vm.toString(chain.aavePool),
-            '",\n',
-            '    "balancerVault": "',
-            vm.toString(chain.balancerVault),
-            '",\n',
-            '    "uniswapV2Router": "',
-            vm.toString(chain.uniswapV2Router),
-            '",\n',
-            '    "uniswapV3Router": "',
-            vm.toString(chain.uniswapV3Router),
-            '",\n',
-            '    "uniswapV3Quoter": "',
-            vm.toString(chain.uniswapV3Quoter),
-            '"\n',
-            '  }\n',
-            '}\n'
+            '  "chainId": ', vm.toString(chain.chainId), ',\n',
+            '  "network": "', chain.name, '",\n',
+            '  "deployedAt": "', vm.toString(block.timestamp), '",\n',
+            '  "blockNumber": ', vm.toString(block.number), ',\n'
         );
+
+        string memory contractAddrs = string.concat(
+            '  "contracts": {\n',
+            '    "FlashloanExecutor": "', vm.toString(address(contracts.executor)), '",\n',
+            '    "CircuitBreaker": "', vm.toString(address(contracts.circuitBreaker)), '",\n',
+            '    "ProfitValidator": "', vm.toString(address(contracts.profitValidator)), '",\n',
+            '    "UniswapV2Adapter": "', vm.toString(address(contracts.uniswapV2Adapter)), '",\n',
+            '    "UniswapV3Adapter": "', vm.toString(address(contracts.uniswapV3Adapter)), '"\n',
+            '  },\n'
+        );
+
+        string memory config = string.concat(
+            '  "configuration": {\n',
+            '    "aavePool": "', vm.toString(chain.aavePool), '",\n',
+            '    "balancerVault": "', vm.toString(chain.balancerVault), '",\n',
+            '    "uniswapV2Router": "', vm.toString(chain.uniswapV2Router), '",\n',
+            '    "uniswapV3Router": "', vm.toString(chain.uniswapV3Router), '",\n',
+            '    "uniswapV3Quoter": "', vm.toString(chain.uniswapV3Quoter), '"\n',
+            '  }\n'
+        );
+
+        string memory json = string.concat(header, contractAddrs, config, '}\n');
 
         string memory filename = string.concat("deployments/", vm.toString(chain.chainId), ".json");
         vm.writeFile(filename, json);

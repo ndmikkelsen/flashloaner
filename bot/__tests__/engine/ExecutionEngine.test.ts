@@ -90,6 +90,7 @@ function createMockSigner(overrides: Partial<ExecutionSigner> = {}): ExecutionSi
       wait: defaultWait,
     }),
     getNonce: vi.fn().mockResolvedValue(5),
+    call: vi.fn().mockResolvedValue("0x"),
     ...overrides,
   };
 }
@@ -98,6 +99,7 @@ function createFailingSigner(error: Error): ExecutionSigner {
   return {
     sendTransaction: vi.fn().mockRejectedValue(error),
     getNonce: vi.fn().mockResolvedValue(0),
+    call: vi.fn().mockResolvedValue("0x"),
   };
 }
 
@@ -406,6 +408,103 @@ describe("ExecutionEngine", () => {
         await failEngine.executeTransaction(makePreparedTx());
       }
       expect(failEngine.paused).toBe(false);
+    });
+  });
+
+  // ─────────────────────────────────────────────
+  // Pre-flight Simulation Tests
+  // ─────────────────────────────────────────────
+
+  describe("pre-flight simulation", () => {
+    it("calls signer.call before sendTransaction", async () => {
+      const tx = makePreparedTx();
+      await engine.executeTransaction(tx);
+
+      expect(signer.call).toHaveBeenCalledWith({
+        to: tx.to,
+        data: tx.data,
+        value: tx.value,
+      });
+      // call should happen before sendTransaction
+      const callOrder = (signer.call as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0];
+      const sendOrder = (signer.sendTransaction as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0];
+      expect(callOrder).toBeLessThan(sendOrder);
+    });
+
+    it("skips submission when simulation reverts", async () => {
+      const simFailSigner = createMockSigner({
+        call: vi.fn().mockRejectedValue(new Error("execution reverted: InsufficientProfit")),
+      });
+      const simEngine = new ExecutionEngine(simFailSigner);
+
+      const result = await simEngine.executeTransaction(makePreparedTx());
+
+      expect(result.status).toBe("failed");
+      expect(result.error).toContain("Simulation reverted");
+      expect(simFailSigner.sendTransaction).not.toHaveBeenCalled();
+    });
+
+    it("emits simulationFailed event with revert reason", async () => {
+      const simFailed = vi.fn();
+      const simFailSigner = createMockSigner({
+        call: vi.fn().mockRejectedValue(new Error("execution reverted: InsufficientProfit")),
+      });
+      const simEngine = new ExecutionEngine(simFailSigner);
+      simEngine.on("simulationFailed", simFailed);
+
+      await simEngine.executeTransaction(makePreparedTx());
+
+      expect(simFailed).toHaveBeenCalled();
+    });
+
+    it("parses InsufficientProfit from simulation revert data", async () => {
+      const revertData = executorIface.encodeErrorResult("InsufficientProfit", [
+        parseUnits("9.99", 18),
+        parseUnits("10.01", 18),
+      ]);
+      const simFailSigner = createMockSigner({
+        call: vi.fn().mockRejectedValue({ data: revertData }),
+      });
+      const simEngine = new ExecutionEngine(simFailSigner);
+
+      const result = await simEngine.executeTransaction(makePreparedTx());
+
+      expect(result.status).toBe("failed");
+      expect(result.revertReason).toContain("InsufficientProfit");
+      expect(simFailSigner.sendTransaction).not.toHaveBeenCalled();
+    });
+
+    it("proceeds to submit when simulation succeeds", async () => {
+      const tx = makePreparedTx();
+      await engine.executeTransaction(tx);
+
+      expect(signer.call).toHaveBeenCalled();
+      expect(signer.sendTransaction).toHaveBeenCalled();
+    });
+
+    it("skips simulation when signer.call is not available", async () => {
+      const noCallSigner = createMockSigner();
+      delete (noCallSigner as any).call;
+      const noCallEngine = new ExecutionEngine(noCallSigner);
+
+      const result = await noCallEngine.executeTransaction(makePreparedTx());
+
+      expect(result.status).toBe("confirmed");
+      expect(noCallSigner.sendTransaction).toHaveBeenCalled();
+    });
+
+    it("does not count simulation failure as consecutive failure", async () => {
+      const simFailSigner = createMockSigner({
+        call: vi.fn().mockRejectedValue(new Error("revert")),
+      });
+      const simEngine = new ExecutionEngine(simFailSigner);
+
+      await simEngine.executeTransaction(makePreparedTx());
+
+      // Simulation failures should not trip the circuit breaker —
+      // they saved us gas, not cost us anything
+      expect(simEngine.consecutiveFailures).toBe(0);
+      expect(simEngine.paused).toBe(false);
     });
   });
 

@@ -88,4 +88,5 @@ export interface ExecutionEngineEvents {
   paused: (reason: string) => void;
   profit: (record: ProfitRecord) => void;
   error: (error: Error) => void;
+  simulationFailed: (reason: string, tx: PreparedTransaction) => void;
 }

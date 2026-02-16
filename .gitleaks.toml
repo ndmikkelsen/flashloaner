@@ -10,14 +10,18 @@ description = "Allowlisted files and patterns"
 # Allow .env.example files (they should only contain placeholders)
 # Allow broadcast/ logs (Foundry deployment logs contain public addresses, not secrets)
 paths = [
+    '''\.env$''',
     '''\.env\.example$''',
     '''\.env\.sample$''',
     '''\.env\.template$''',
+    '''\.env\.sepolia\.example$''',
+    '''\.env\.mainnet\.example$''',
     '''\.rules/patterns/env-security\.md$''',
     '''broadcast/''',
     '''node_modules/''',
     '''lib/''',
     '''\.beads/''',
+    '''deployments/''',
 ]
 
 # Allow placeholder patterns that are obviously fake
@@ -30,7 +34,9 @@ regexes = [
     '''example\.com''',
     '''\*\*\*REMOVED\*\*\*''',
     '''0x0{39}[0-9a-fA-F]''',
-    # Public Ethereum token addresses (WETH, USDC, etc.) used in examples
+    # Public Ethereum token/pool addresses used in config (not secrets)
     '''0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2''',  # WETH mainnet
     '''0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48''',  # USDC mainnet
+    '''0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4''',    # USDC Sepolia
+    '''0xfFf9976782d46CC05630D1f6eBAb18b2324d6B''',     # WETH Sepolia
 ]
