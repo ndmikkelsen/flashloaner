@@ -9,9 +9,9 @@ Requirements for Arbitrum testnet validation milestone.
 
 ### Chain Research
 
-- [ ] **CHAIN-01**: Research identifies optimal chain for small-capital arb with data-backed ranking
-- [ ] **CHAIN-02**: Selected chain has Aave V3 flash loan support confirmed with pool addresses
-- [ ] **CHAIN-03**: Selected chain has Uniswap V2/V3 fork DEXs with sufficient liquidity for arb
+- [x] **CHAIN-01**: Research identifies optimal chain for small-capital arb with data-backed ranking
+- [x] **CHAIN-02**: Selected chain has Aave V3 flash loan support confirmed with pool addresses
+- [x] **CHAIN-03**: Selected chain has Uniswap V2/V3 fork DEXs with sufficient liquidity for arb
 
 ### Contract Deployment
 
@@ -82,9 +82,9 @@ Deferred to future milestones. Not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CHAIN-01 | Phase 1 | Pending |
-| CHAIN-02 | Phase 1 | Pending |
-| CHAIN-03 | Phase 1 | Pending |
+| CHAIN-01 | Phase 1 | Complete |
+| CHAIN-02 | Phase 1 | Complete |
+| CHAIN-03 | Phase 1 | Complete |
 | DEPLOY-01 | Phase 2 | Pending |
 | DEPLOY-02 | Phase 2 | Pending |
 | DEPLOY-03 | Phase 2 | Pending |
