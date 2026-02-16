@@ -42,11 +42,13 @@ Plans:
   3. Existing UniswapV2 and UniswapV3 adapters work with Arbitrum DEX forks (SushiSwap, Uniswap V3)
   4. Monorepo has chain-specific config files (Arbitrum config exists alongside Ethereum config)
   5. Adding a new chain requires only config files, not code changes to shared bot modules
-**Plans**: 2 plans in 1 wave
+**Plans**: 4 plans in 2 waves
 
 Plans:
-- [ ] 02-01-PLAN.md — Create chain-specific config system (ChainConfig types, Arbitrum/Ethereum configs, config loader)
-- [ ] 02-02-PLAN.md — Prepare Foundry deployment infrastructure for Arbitrum Sepolia (foundry.toml, env template, gitignore)
+- [x] 02-01-PLAN.md — Create chain-specific config system (ChainConfig types, Arbitrum/Ethereum configs, config loader)
+- [x] 02-02-PLAN.md — Prepare Foundry deployment infrastructure for Arbitrum Sepolia (foundry.toml, env template, gitignore)
+- [ ] 02-03-PLAN.md — Fix Balancer Vault placeholder addresses in Arbitrum chain configs (gap closure)
+- [ ] 02-04-PLAN.md — Deploy all contracts to Arbitrum Sepolia testnet and record artifacts (gap closure)
 
 ### Phase 3: Bot Adaptation
 **Goal**: Adapt bot to connect to Arbitrum Sepolia and detect arbitrage opportunities with Arbitrum-accurate gas estimates
@@ -86,6 +88,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Chain Research | 0/1 | Complete    | 2026-02-16 |
-| 2. Infrastructure Setup | 0/2 | Not started | - |
+| 2. Infrastructure Setup | 2/4 | In progress (gap closure) | - |
 | 3. Bot Adaptation | 0/2 | Not started | - |
 | 4. Testnet Validation | 0/1 | Not started | - |
