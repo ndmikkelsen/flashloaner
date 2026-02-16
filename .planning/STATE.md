@@ -10,29 +10,29 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 ## Current Position
 
 Phase: 2 of 4 (Infrastructure Setup)
-Plan: 1 of TBD
-Status: In progress (plan 02-01 complete)
-Last activity: 2026-02-16 — Completed plan 02-01 (Chain Config System)
+Plan: 2 of TBD
+Status: In progress (plan 02-02 complete)
+Last activity: 2026-02-16 — Completed plan 02-02 (Arbitrum Deployment Config)
 
-Progress: [███░░░░░░░] 30%
+Progress: [████░░░░░░] 35%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2
-- Average duration: 4.5 minutes
-- Total execution time: 0.15 hours
+- Total plans completed: 3
+- Average duration: 4.3 minutes
+- Total execution time: 0.22 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | Phase 1 - Chain Research | 1 | 5 min | 5 min |
-| Phase 2 - Infrastructure Setup | 1 | 4 min | 4 min |
+| Phase 2 - Infrastructure Setup | 2 | 8 min | 4 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (5 min), 02-01 (4 min)
-- Trend: Consistent velocity (~4-5 min/plan)
+- Last 5 plans: 01-01 (5 min), 02-01 (4 min), 02-02 (4 min)
+- Trend: Consistent velocity (~4 min/plan in Phase 2)
 
 *Updated after each plan completion*
 
@@ -53,6 +53,9 @@ Recent decisions affecting current work:
 - **FCFS sequencer ordering strategy** (latency > gas bidding, no Flashbots) — Phase 1, Plan 1
 - **Chain config system uses switch statement on chainId** (extensible, type-safe) — Phase 2, Plan 1
 - **Arbitrum gas params: 0.1 gwei max, 1s polling** (0.25s blocks require faster monitoring) — Phase 2, Plan 1
+- **Balancer Vault uses same CREATE2 address across chains** (0xBA12...2C8) — Phase 2, Plan 2
+- **SushiSwap V2 as Uniswap V2 equivalent on Arbitrum** (same interface) — Phase 2, Plan 2
+- **Chain-specific env files gitignored** (.env.arbitrum-sepolia, etc.) — Phase 2, Plan 2
 
 ### Pending Todos
 
@@ -65,5 +68,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-16
-Stopped at: Completed 02-01-PLAN.md (Chain Config System)
-Resume file: .planning/phases/02-infrastructure-setup/02-01-SUMMARY.md
+Stopped at: Completed 02-02-PLAN.md (Arbitrum Deployment Config)
+Resume file: .planning/phases/02-infrastructure-setup/02-02-SUMMARY.md
