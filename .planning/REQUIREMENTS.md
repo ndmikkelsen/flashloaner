@@ -109,4 +109,4 @@ Deferred to future milestones. Not in current roadmap.
 
 ---
 *Requirements defined: 2026-02-16*
-*Last updated: 2026-02-16 after initial definition*
+*Last updated: 2026-02-16 after roadmap creation*
