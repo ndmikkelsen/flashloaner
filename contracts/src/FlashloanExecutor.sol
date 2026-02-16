@@ -126,10 +126,16 @@ contract FlashloanExecutor is FlashloanReceiver, IFlashloanExecutor {
         }
         _pendingToken = flashLoanToken;
 
+        // Set flash loan active flag (guards uniswapV3FlashCallback / callFunction)
+        _setFlashLoanActive(true);
+
         // Request flash loan from Aave V3
         // Aave will call executeOperation() on this contract
         bytes memory params = ""; // Steps are stored in contract storage
         _requestAaveFlashLoan(flashLoanProvider, flashLoanToken, flashLoanAmount, params);
+
+        // Clear flash loan active flag after completion
+        _setFlashLoanActive(false);
     }
 
     /// @dev Request a flash loan from Aave V3 Pool.
@@ -223,6 +229,13 @@ contract FlashloanExecutor is FlashloanReceiver, IFlashloanExecutor {
             0, // amountOutMin = 0; profit is validated at the end atomically
             step.extraData
         );
+
+        // Clear any residual allowance to prevent a compromised adapter from draining tokens.
+        // Only reset if there is a remaining allowance (avoids unnecessary SSTORE).
+        uint256 remaining = IERC20(step.tokenIn).allowance(address(this), step.adapter);
+        if (remaining > 0) {
+            IERC20(step.tokenIn).forceApprove(step.adapter, 0);
+        }
     }
 
     // ──────────────────────────────────────────────
@@ -271,7 +284,7 @@ contract FlashloanExecutor is FlashloanReceiver, IFlashloanExecutor {
     }
 
     /// @inheritdoc IFlashloanExecutor
-    function withdrawToken(address token, uint256 amount) external onlyOwner {
+    function withdrawToken(address token, uint256 amount) external onlyOwner nonReentrant {
         if (token == address(0)) revert ZeroAddress();
         if (amount == 0) revert ZeroAmount();
         IERC20(token).safeTransfer(msg.sender, amount);
@@ -279,7 +292,7 @@ contract FlashloanExecutor is FlashloanReceiver, IFlashloanExecutor {
     }
 
     /// @inheritdoc IFlashloanExecutor
-    function withdrawETH(uint256 amount) external onlyOwner {
+    function withdrawETH(uint256 amount) external onlyOwner nonReentrant {
         if (amount == 0) revert ZeroAmount();
         (bool success,) = msg.sender.call{value: amount}("");
         if (!success) revert ETHTransferFailed();

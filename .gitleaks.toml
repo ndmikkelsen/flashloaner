@@ -39,4 +39,6 @@ regexes = [
     '''0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48''',  # USDC mainnet
     '''0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4''',    # USDC Sepolia
     '''0xfFf9976782d46CC05630D1f6eBAb18b2324d6B''',     # WETH Sepolia
+    # Well-known Hardhat/Foundry default test private keys (NOT real secrets)
+    '''0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a''',  # Hardhat account #2
 ]

@@ -513,7 +513,7 @@ contract CircuitBreakerFuzzTest is Test {
     function testFuzz_autoPauseAtExactThreshold(uint256 threshold) public {
         threshold = bound(threshold, 1, 100);
 
-        vm.prank(owner);
+        vm.startPrank(owner);
         breaker.setConsecutiveFailureThreshold(threshold);
 
         for (uint256 i = 0; i < threshold - 1; i++) {
@@ -522,6 +522,7 @@ contract CircuitBreakerFuzzTest is Test {
         }
 
         breaker.recordFailure();
+        vm.stopPrank();
         assertTrue(breaker.paused(), "Should auto-pause at threshold");
         assertEq(breaker.consecutiveFailures(), threshold);
     }
@@ -531,7 +532,7 @@ contract CircuitBreakerFuzzTest is Test {
         failureCount = bound(failureCount, 1, 100);
 
         // Disable auto-pause so we can accumulate failures
-        vm.prank(owner);
+        vm.startPrank(owner);
         breaker.setConsecutiveFailureThreshold(0);
 
         for (uint256 i = 0; i < failureCount; i++) {
@@ -540,6 +541,7 @@ contract CircuitBreakerFuzzTest is Test {
         assertEq(breaker.consecutiveFailures(), failureCount);
 
         breaker.recordSuccess();
+        vm.stopPrank();
         assertEq(breaker.consecutiveFailures(), 0);
     }
 
@@ -548,6 +550,7 @@ contract CircuitBreakerFuzzTest is Test {
         // Sequence of random failures/successes, each less than threshold
         uint256 ops = bound(seed, 10, 50);
 
+        vm.startPrank(owner);
         for (uint256 i = 0; i < ops; i++) {
             // Record 1 to (threshold-1) failures, then a success
             uint256 failures = (uint256(keccak256(abi.encodePacked(seed, i))) % (FAILURE_THRESHOLD - 1)) + 1;
@@ -558,6 +561,7 @@ contract CircuitBreakerFuzzTest is Test {
             assertFalse(breaker.paused(), "Should never auto-pause with interleaved success");
             assertEq(breaker.consecutiveFailures(), 0);
         }
+        vm.stopPrank();
     }
 
     /// @notice Fuzz: combined gas and trade size limits with random parameters

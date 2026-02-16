@@ -1,4 +1,5 @@
 import type { BotConfig, DetectorConfig, MonitorConfig } from "./types.js";
+import type { MEVProtectionConfig } from "../mev/types.js";
 
 /** Default PriceMonitor settings */
 export const DEFAULT_MONITOR: MonitorConfig = {
@@ -46,6 +47,30 @@ export const SEPOLIA_DETECTOR: DetectorConfig = {
   defaultInputAmount: 1,
   gasPriceGwei: 5,
   gasPerSwap: 150_000,
+};
+
+/** Default MEV protection: disabled (transactions go to public mempool) */
+export const DEFAULT_MEV_CONFIG: MEVProtectionConfig = {
+  mode: "none",
+};
+
+/** Mainnet MEV protection: Flashbots relay (authKeyHex must be set from env) */
+export const MAINNET_MEV_CONFIG: MEVProtectionConfig = {
+  mode: "flashbots",
+  flashbots: {
+    relayUrl: "https://relay.flashbots.net",
+    authKeyHex: "", // Must be set from FLASHBOTS_AUTH_KEY env var
+    maxBlocksToWait: 5,
+    simulateBeforeSend: true,
+  },
+};
+
+/** Alternative mainnet MEV protection: MEV Blocker RPC (no auth key needed) */
+export const MEV_BLOCKER_CONFIG: MEVProtectionConfig = {
+  mode: "mev_blocker",
+  mevBlocker: {
+    rpcUrl: "https://rpc.mevblocker.io",
+  },
 };
 
 /** Default full bot config (requires network.rpcUrl to be overridden) */

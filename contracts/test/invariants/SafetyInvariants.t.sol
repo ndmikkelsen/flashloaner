@@ -132,11 +132,13 @@ contract CircuitBreakerHandler is Test {
 
     function recordFailure() external {
         if (breaker.paused()) return;
+        vm.prank(owner);
         breaker.recordFailure();
         ghost_failureCount++;
     }
 
     function recordSuccess() external {
+        vm.prank(owner);
         breaker.recordSuccess();
         ghost_successCount++;
     }

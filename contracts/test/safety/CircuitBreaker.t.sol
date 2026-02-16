@@ -275,15 +275,18 @@ contract CircuitBreakerTest is Test {
 
     /// @notice Verify auto-pause after consecutive failures exceed threshold
     function test_autoPauseOnConsecutiveFailures() public {
+        vm.startPrank(owner);
         for (uint256 i = 0; i < DEFAULT_FAILURE_THRESHOLD; i++) {
             breaker.recordFailure();
         }
+        vm.stopPrank();
         assertTrue(breaker.paused());
         assertEq(breaker.consecutiveFailures(), DEFAULT_FAILURE_THRESHOLD);
     }
 
     /// @notice Verify AutoPaused event is emitted
     function test_emitsAutoPausedEvent() public {
+        vm.startPrank(owner);
         // Record failures up to threshold - 1
         for (uint256 i = 0; i < DEFAULT_FAILURE_THRESHOLD - 1; i++) {
             breaker.recordFailure();
@@ -294,20 +297,24 @@ contract CircuitBreakerTest is Test {
         vm.expectEmit(false, false, false, true);
         emit CircuitBreaker.AutoPaused(DEFAULT_FAILURE_THRESHOLD, DEFAULT_FAILURE_THRESHOLD);
         breaker.recordFailure();
+        vm.stopPrank();
     }
 
     /// @notice Verify failure counter resets on successful trade
     function test_failureCounterResetsOnSuccess() public {
+        vm.startPrank(owner);
         breaker.recordFailure();
         breaker.recordFailure();
         assertEq(breaker.consecutiveFailures(), 2);
 
         breaker.recordSuccess();
         assertEq(breaker.consecutiveFailures(), 0);
+        vm.stopPrank();
     }
 
     /// @notice Verify unpause also resets failure counter
     function test_unpauseResetsFailureCounter() public {
+        vm.startPrank(owner);
         // Auto-pause via failures
         for (uint256 i = 0; i < DEFAULT_FAILURE_THRESHOLD; i++) {
             breaker.recordFailure();
@@ -316,20 +323,21 @@ contract CircuitBreakerTest is Test {
         assertEq(breaker.consecutiveFailures(), DEFAULT_FAILURE_THRESHOLD);
 
         // Unpause resets counter
-        vm.prank(owner);
         breaker.unpause();
         assertEq(breaker.consecutiveFailures(), 0);
+        vm.stopPrank();
     }
 
     /// @notice Verify auto-pause disabled when threshold is 0
     function test_autoPauseDisabledWhenThresholdZero() public {
-        vm.prank(owner);
+        vm.startPrank(owner);
         breaker.setConsecutiveFailureThreshold(0);
 
         // Record many failures - should not auto-pause
         for (uint256 i = 0; i < 100; i++) {
             breaker.recordFailure();
         }
+        vm.stopPrank();
         assertFalse(breaker.paused());
         assertEq(breaker.consecutiveFailures(), 100);
     }
@@ -339,6 +347,83 @@ contract CircuitBreakerTest is Test {
         vm.prank(owner);
         breaker.setConsecutiveFailureThreshold(10);
         assertEq(breaker.consecutiveFailureThreshold(), 10);
+    }
+
+    // ---------------------------------------------------------------
+    // Authorized Caller Access Control Tests (P1)
+    // ---------------------------------------------------------------
+
+    /// @notice Verify owner can set authorized callers
+    function test_ownerCanSetAuthorizedCaller() public {
+        vm.prank(owner);
+        vm.expectEmit(true, false, false, true);
+        emit CircuitBreaker.AuthorizedCallerUpdated(bot, true);
+        breaker.setAuthorizedCaller(bot, true);
+        assertTrue(breaker.authorizedCallers(bot));
+    }
+
+    /// @notice Verify owner can revoke authorized callers
+    function test_ownerCanRevokeAuthorizedCaller() public {
+        vm.startPrank(owner);
+        breaker.setAuthorizedCaller(bot, true);
+        breaker.setAuthorizedCaller(bot, false);
+        vm.stopPrank();
+        assertFalse(breaker.authorizedCallers(bot));
+    }
+
+    /// @notice Verify non-owner cannot set authorized callers
+    function test_revertWhen_nonOwnerSetsAuthorizedCaller() public {
+        vm.prank(attacker);
+        vm.expectRevert();
+        breaker.setAuthorizedCaller(bot, true);
+    }
+
+    /// @notice Verify authorized caller can call recordFailure
+    function test_authorizedCallerCanRecordFailure() public {
+        vm.prank(owner);
+        breaker.setAuthorizedCaller(bot, true);
+
+        vm.prank(bot);
+        breaker.recordFailure();
+        assertEq(breaker.consecutiveFailures(), 1);
+    }
+
+    /// @notice Verify authorized caller can call recordSuccess
+    function test_authorizedCallerCanRecordSuccess() public {
+        vm.prank(owner);
+        breaker.setAuthorizedCaller(bot, true);
+
+        vm.startPrank(bot);
+        breaker.recordFailure();
+        breaker.recordSuccess();
+        vm.stopPrank();
+        assertEq(breaker.consecutiveFailures(), 0);
+    }
+
+    /// @notice Verify unauthorized caller cannot call recordFailure
+    function test_revertWhen_unauthorizedCallerRecordsFailure() public {
+        vm.prank(attacker);
+        vm.expectRevert(CircuitBreaker.NotAuthorizedCaller.selector);
+        breaker.recordFailure();
+    }
+
+    /// @notice Verify unauthorized caller cannot call recordSuccess
+    function test_revertWhen_unauthorizedCallerRecordsSuccess() public {
+        vm.prank(attacker);
+        vm.expectRevert(CircuitBreaker.NotAuthorizedCaller.selector);
+        breaker.recordSuccess();
+    }
+
+    /// @notice Verify revoked caller can no longer call recordFailure
+    function test_revertWhen_revokedCallerRecordsFailure() public {
+        vm.startPrank(owner);
+        breaker.setAuthorizedCaller(bot, true);
+        breaker.setAuthorizedCaller(bot, false);
+        vm.stopPrank();
+
+        vm.prank(bot);
+        vm.expectRevert(CircuitBreaker.NotAuthorizedCaller.selector);
+        breaker.recordFailure();
     }
 
     // ---------------------------------------------------------------

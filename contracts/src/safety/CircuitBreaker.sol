@@ -16,6 +16,9 @@ contract CircuitBreaker is ICircuitBreaker, Ownable {
     /// @notice Parameter must be greater than zero.
     error ZeroValue();
 
+    /// @notice The caller is not an authorized caller for failure/success recording.
+    error NotAuthorizedCaller();
+
     // ──────────────────────────────────────────────
     // Events (implementation-specific)
     // ──────────────────────────────────────────────
@@ -31,6 +34,9 @@ contract CircuitBreaker is ICircuitBreaker, Ownable {
 
     /// @notice Emitted when the failure counter is reset after a success.
     event FailureCounterReset();
+
+    /// @notice Emitted when an authorized caller is added or removed.
+    event AuthorizedCallerUpdated(address indexed caller, bool authorized);
 
     // ──────────────────────────────────────────────
     // State
@@ -50,6 +56,9 @@ contract CircuitBreaker is ICircuitBreaker, Ownable {
 
     /// @notice Threshold of consecutive failures that triggers auto-pause.
     uint256 public consecutiveFailureThreshold;
+
+    /// @notice Addresses authorized to call recordFailure/recordSuccess.
+    mapping(address => bool) public authorizedCallers;
 
     // ──────────────────────────────────────────────
     // Constructor
@@ -86,6 +95,12 @@ contract CircuitBreaker is ICircuitBreaker, Ownable {
     /// @notice Reverts if the contract is not paused.
     modifier whenPaused() {
         if (!_paused) revert ContractNotPaused();
+        _;
+    }
+
+    /// @notice Reverts if the caller is not an authorized caller or the owner.
+    modifier onlyAuthorizedCaller() {
+        if (!authorizedCallers[msg.sender] && msg.sender != owner()) revert NotAuthorizedCaller();
         _;
     }
 
@@ -134,6 +149,14 @@ contract CircuitBreaker is ICircuitBreaker, Ownable {
         emit ConsecutiveFailureThresholdUpdated(old, newThreshold);
     }
 
+    /// @notice Add or remove an authorized caller for recordFailure/recordSuccess (owner only).
+    /// @param caller The address to authorize or revoke
+    /// @param authorized Whether the address should be authorized
+    function setAuthorizedCaller(address caller, bool authorized) external onlyOwner {
+        authorizedCallers[caller] = authorized;
+        emit AuthorizedCallerUpdated(caller, authorized);
+    }
+
     // ──────────────────────────────────────────────
     // Limit Checks
     // ──────────────────────────────────────────────
@@ -164,8 +187,8 @@ contract CircuitBreaker is ICircuitBreaker, Ownable {
     // ──────────────────────────────────────────────
 
     /// @notice Record a trade failure. Auto-pauses if threshold is reached.
-    /// @dev Called by the executor after a failed trade.
-    function recordFailure() external {
+    /// @dev Called by the executor after a failed trade. Only authorized callers or the owner can call this.
+    function recordFailure() external onlyAuthorizedCaller {
         uint256 failures = ++consecutiveFailures;
         emit FailureRecorded(failures);
 
@@ -177,8 +200,8 @@ contract CircuitBreaker is ICircuitBreaker, Ownable {
     }
 
     /// @notice Record a successful trade, resetting the failure counter.
-    /// @dev Called by the executor after a successful trade.
-    function recordSuccess() external {
+    /// @dev Called by the executor after a successful trade. Only authorized callers or the owner can call this.
+    function recordSuccess() external onlyAuthorizedCaller {
         if (consecutiveFailures > 0) {
             consecutiveFailures = 0;
             emit FailureCounterReset();
