@@ -24,7 +24,7 @@ export const ARBITRUM_CONFIG: ChainConfig = {
   // Flash loan and DeFi protocol addresses
   protocols: {
     aaveV3Pool: "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
-    balancerVault: "0x0000000000000000000000000000000000000000", // TBD - resolve during Phase 3
+    balancerVault: "0xBA12222222228d8Ba445958a75a0704d566BF2C8", // Balancer V2 Vault (same on all chains via CREATE2)
   },
 
   // DEX router and factory addresses
