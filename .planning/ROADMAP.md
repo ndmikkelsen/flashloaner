@@ -42,11 +42,11 @@ Plans:
   3. Existing UniswapV2 and UniswapV3 adapters work with Arbitrum DEX forks (SushiSwap, Uniswap V3)
   4. Monorepo has chain-specific config files (Arbitrum config exists alongside Ethereum config)
   5. Adding a new chain requires only config files, not code changes to shared bot modules
-**Plans**: TBD
+**Plans**: 2 plans in 1 wave
 
 Plans:
-- [ ] 02-01: TBD
-- [ ] 02-02: TBD
+- [ ] 02-01-PLAN.md — Create chain-specific config system (ChainConfig types, Arbitrum/Ethereum configs, config loader)
+- [ ] 02-02-PLAN.md — Prepare Foundry deployment infrastructure for Arbitrum Sepolia (foundry.toml, env template, gitignore)
 
 ### Phase 3: Bot Adaptation
 **Goal**: Adapt bot to connect to Arbitrum Sepolia and detect arbitrage opportunities with Arbitrum-accurate gas estimates
