@@ -22,11 +22,11 @@ Requirements for Arbitrum testnet validation milestone.
 
 ### Bot Adaptation
 
-- [ ] **BOT-01**: Bot connects to Arbitrum Sepolia via RPC and reads on-chain data
-- [ ] **BOT-02**: Chain-specific configuration (RPC endpoint, contract addresses, token addresses, pool configs)
-- [ ] **BOT-03**: Bot detects arbitrage opportunities on Arbitrum testnet DEX pools
-- [ ] **BOT-04**: L2 gas estimation accounts for Arbitrum's gas model (L2 execution cost)
-- [ ] **BOT-05**: Dry-run mode reports opportunities with Arbitrum-accurate gas estimates
+- [x] **BOT-01**: Bot connects to Arbitrum Sepolia via RPC and reads on-chain data
+- [x] **BOT-02**: Chain-specific configuration (RPC endpoint, contract addresses, token addresses, pool configs)
+- [x] **BOT-03**: Bot detects arbitrage opportunities on Arbitrum testnet DEX pools
+- [x] **BOT-04**: L2 gas estimation accounts for Arbitrum's gas model (L2 execution cost)
+- [x] **BOT-05**: Dry-run mode reports opportunities with Arbitrum-accurate gas estimates
 
 ### Testnet Validation
 
@@ -89,11 +89,11 @@ Deferred to future milestones. Not in current roadmap.
 | DEPLOY-02 | Phase 2 | Complete |
 | DEPLOY-03 | Phase 2 | Complete |
 | DEPLOY-04 | Phase 2 | Complete |
-| BOT-01 | Phase 3 | Pending |
-| BOT-02 | Phase 3 | Pending |
-| BOT-03 | Phase 3 | Pending |
-| BOT-04 | Phase 3 | Pending |
-| BOT-05 | Phase 3 | Pending |
+| BOT-01 | Phase 3 | Complete |
+| BOT-02 | Phase 3 | Complete |
+| BOT-03 | Phase 3 | Complete |
+| BOT-04 | Phase 3 | Complete |
+| BOT-05 | Phase 3 | Complete |
 | TEST-01 | Phase 4 | Pending |
 | TEST-02 | Phase 4 | Pending |
 | TEST-03 | Phase 4 | Pending |

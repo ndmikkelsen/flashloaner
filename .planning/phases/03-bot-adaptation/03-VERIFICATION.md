@@ -1,38 +1,46 @@
 ---
 phase: 03-bot-adaptation
-verified: 2026-02-17T20:10:00Z
-status: gaps_found
-score: 4/5 success criteria verified
-re_verification: false
-gaps:
-  - truth: "Bot detects arbitrage opportunities on Arbitrum testnet DEX pools (monitors prices, identifies spreads)"
-    status: partial
-    reason: "Pool infrastructure and detection logic are complete, but both pool entries in ARBITRUM_SEPOLIA_POOLS have poolAddress: 'TBD_DISCOVER_ON_CHAIN' — not valid Ethereum addresses. The PriceMonitor will attempt RPC calls to these, receive errors, mark pools stale, and never detect opportunities. The code path is wired but cannot function until real pool addresses are discovered and populated."
-    artifacts:
-      - path: "bot/src/config/chains/pools/arbitrum-sepolia.ts"
-        issue: "Both PoolDefinition entries have poolAddress: 'TBD_DISCOVER_ON_CHAIN' — a string placeholder, not a valid 0x address"
-    missing:
-      - "Real Uniswap V3 Arbitrum Sepolia pool addresses discovered via factory.getPool(WETH, token1, feeTier)"
-      - "Populated poolAddress fields in ARBITRUM_SEPOLIA_POOLS array"
-      - "At least 2 pools with valid addresses so the monitor can fetch prices and the detector can find spreads"
+verified: 2026-02-17T21:30:00Z
+status: human_needed
+score: 5/5 success criteria verified
+re_verification:
+  previous_status: gaps_found
+  previous_score: 4/5
+  gaps_closed:
+    - "Both ARBITRUM_SEPOLIA_POOLS entries now have real 42-char hex poolAddress values (0.3% and 1% fee pools)"
+    - "token1 fake address 0x...0001 replaced with real Aave testnet USDC 0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d"
+    - "USDC zero-address in chain config tokens replaced with real Aave testnet USDC address"
+    - "USDT zero-address placeholder removed entirely from chain config tokens"
+  gaps_remaining: []
+  regressions: []
 human_verification:
   - test: "Run bot with RPC_URL set and verify block number read"
-    expected: "Bot starts, connects to Arbitrum Sepolia, startup header shows RPC configured, first poll logs block number in price update or error"
+    expected: "Bot starts, connects to Arbitrum Sepolia, startup header shows RPC configured, 2 pools listed. On first poll, price updates fire for WETH/USDC-0.3% and WETH/USDC-1% pools."
     why_human: "Requires live Arbitrum Sepolia RPC endpoint — cannot verify programmatically without network access"
   - test: "Run bot after pool addresses are populated and verify opportunity detection"
-    expected: "Bot polls pools at 1s interval, emits priceUpdate events with block numbers, detects spread when present"
-    why_human: "Requires both live RPC and valid pool addresses with real liquidity"
+    expected: "Bot polls pools at 1s interval, emits priceUpdate events with block numbers, detects spread when present or emits opportunityRejected with reason"
+    why_human: "Requires both live RPC and valid pool addresses with real liquidity (pools are populated now, but RPC still required)"
   - test: "Verify L1 data fee appears in dry-run report when opportunity is detected"
-    expected: "formatOpportunityReport output shows Gas cost, L1 data fee, Slippage, Total costs as separate lines"
-    why_human: "Requires a live opportunity detection event — cannot trigger programmatically without real pool data"
+    expected: "formatOpportunityReport output shows 'Gas (L2):', 'L1 data fee:', 'Slippage:', 'Total cost:' as separate lines"
+    why_human: "Requires a live opportunity detection event — cannot trigger programmatically without real pool data and price spread"
 ---
 
 # Phase 3: Bot Adaptation Verification Report
 
 **Phase Goal:** Adapt bot to connect to Arbitrum Sepolia and detect arbitrage opportunities with Arbitrum-accurate gas estimates
-**Verified:** 2026-02-17T20:10:00Z
-**Status:** gaps_found
-**Re-verification:** No — initial verification
+**Verified:** 2026-02-17T21:30:00Z
+**Status:** human_needed
+**Re-verification:** Yes — after gap closure Plan 03-04
+
+## Re-verification Summary
+
+Previous status was `gaps_found` (4/5 truths verified). The single blocking gap was both pool entries in `ARBITRUM_SEPOLIA_POOLS` using `"TBD_DISCOVER_ON_CHAIN"` as their `poolAddress` field, which would cause `PriceMonitor` to error on every RPC call and never detect opportunities.
+
+Plan 03-04 queried the Uniswap V3 factory on Arbitrum Sepolia via `cast call`, discovered three WETH/USDC pools, selected the two with meaningful liquidity (0.3% and 1% fee tiers), and populated all placeholder fields with real addresses. Commit `7e5eaa5` confirmed in git log.
+
+All previously-failing items now pass. No regressions introduced. All automated checks pass. Three human verification items remain (live RPC, live pool polling, live opportunity report) and are unchanged from the initial verification.
+
+---
 
 ## Goal Achievement
 
@@ -40,13 +48,13 @@ human_verification:
 
 | # | Truth | Status | Evidence |
 |---|-------|--------|----------|
-| 1 | Bot connects to Arbitrum Sepolia via RPC and reads on-chain data (block number, pool reserves, balances) | VERIFIED | `run-arb-sepolia.ts` constructs `FlashloanBot` with `loadChainConfig(421614)` RPC URL; `PriceMonitor.fetchPrice()` calls `provider.getBlockNumber()` each poll; RPC guard exits if URL missing |
-| 2 | Chain-specific configuration loaded from config file includes RPC endpoint, contract addresses, token addresses, pool configs | VERIFIED | `loadChainConfig(421614)` returns `ARBITRUM_SEPOLIA_CONFIG` with correct WETH (`0x980B62...`), factory (`0x248AB7...`), Aave V3 pool (`0x794a61...`), monitor/detector config; 18 unit tests confirm all values |
-| 3 | Bot detects arbitrage opportunities on Arbitrum testnet DEX pools (monitors prices, identifies spreads) | PARTIAL | Detection logic is fully implemented (`OpportunityDetector`, `PriceMonitor`), and pool stubs exist, but both pool entries have `poolAddress: "TBD_DISCOVER_ON_CHAIN"` — PriceMonitor will error on every RPC call to these invalid addresses and mark pools stale |
-| 4 | L2 gas estimation accounts for Arbitrum's gas model (L2 execution cost, not just L1 data cost) | VERIFIED | `ArbitrumGasEstimator.ts` calls `gasEstimateComponents` on NodeInterface at `0x00...C8`; returns L1Gas + L2Gas breakdown; `setGasEstimator()` injected in `run-arb-sepolia.ts`; `estimateCostsWithL1()` in `OpportunityDetector` uses it; 9 unit tests verify correctness |
-| 5 | Dry-run mode reports opportunities with Arbitrum-accurate gas estimates and profitability calculations | PARTIAL | Reporting infrastructure complete: `formatOpportunityReport()` shows L1 data fee as separate line; `run-arb-sepolia.ts` logs Gas (L2), L1 data fee, Total cost. Cannot be exercised until SC-3 is unblocked (no real pool addresses) |
+| 1 | Bot connects to Arbitrum Sepolia via RPC and reads on-chain data (block number, pool reserves, balances) | VERIFIED | `run-arb-sepolia.ts` constructs `FlashloanBot` with `loadChainConfig(421614)` RPC URL; `PriceMonitor.fetchPrice()` calls `provider.getBlockNumber()` each poll; RPC guard exits if URL missing. Unchanged from initial verification. |
+| 2 | Chain-specific configuration loaded from config file includes RPC endpoint, contract addresses, token addresses, pool configs | VERIFIED | `loadChainConfig(421614)` returns `ARBITRUM_SEPOLIA_CONFIG` with correct WETH (`0x980B62...`), factory (`0x248AB79...`), Aave V3 pool (`0x794a61...`), USDC (`0x75faf1...4d`), monitor/detector config, and 2 real pool entries. 18 unit tests pass. |
+| 3 | Bot detects arbitrage opportunities on Arbitrum testnet DEX pools (monitors prices, identifies spreads) | VERIFIED | Detection logic fully implemented (`OpportunityDetector`, `PriceMonitor`). Pool config now has 2 real pool addresses: `0x66EEAB70aC52459Dd74C6AD50D578Ef76a441bbf` (0.3% fee, liquidity 4.575e10) and `0x3eCedaB7E9479E29B694d8590dc34e0Ce6059868` (1% fee, liquidity 3.225e12). Zero `TBD_DISCOVER_ON_CHAIN` strings remain. `PriceMonitor` can now make valid RPC calls to these addresses. |
+| 4 | L2 gas estimation accounts for Arbitrum's gas model (L2 execution cost, not just L1 data cost) | VERIFIED | `ArbitrumGasEstimator.ts` calls `gasEstimateComponents` on NodeInterface at `0x00...C8`; returns L1Gas + L2Gas breakdown; `setGasEstimator()` injected in `run-arb-sepolia.ts`; `estimateCostsWithL1()` in `OpportunityDetector` uses it; 9 unit tests pass. Unchanged from initial verification. |
+| 5 | Dry-run mode reports opportunities with Arbitrum-accurate gas estimates and profitability calculations | VERIFIED | Reporting infrastructure complete: `formatOpportunityReport()` shows L1 data fee as separate line; `run-arb-sepolia.ts` logs Gas (L2), L1 data fee, Total cost. SC-3 blocker is now resolved — pool addresses are real, so the detection pipeline can fire. Human verification still required to confirm a live opportunity report. |
 
-**Score:** 3/5 truths fully verified, 2/5 partial (SC-3 blocks SC-5)
+**Score:** 5/5 truths verified
 
 ---
 
@@ -54,17 +62,17 @@ human_verification:
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `bot/src/config/chains/arbitrum-sepolia.ts` | Corrected Arbitrum Sepolia config with real factory, router, quoter, WETH | VERIFIED | Factory `0x248AB79...`, WETH `0x980B62...`, all corrected from Ethereum mainnet addresses |
-| `bot/src/config/chains/pools/arbitrum-sepolia.ts` | Pool definitions for Arbitrum Sepolia testnet | PARTIAL | Exists, exports `ARBITRUM_SEPOLIA_POOLS` with 2 entries, but `poolAddress` is `"TBD_DISCOVER_ON_CHAIN"` in both |
-| `bot/src/run-arb-sepolia.ts` | Arbitrum Sepolia entry point using `loadChainConfig(421614)` | VERIFIED | File exists, imports `loadChainConfig`, `FlashloanBot`, `estimateArbitrumGas`, `gasComponentsToEth`; wires all events |
-| `package.json` | `bot:arb-sepolia` script command | VERIFIED | `"bot:arb-sepolia": "node --import tsx bot/src/run-arb-sepolia.ts"` present |
-| `bot/src/gas/ArbitrumGasEstimator.ts` | Arbitrum NodeInterface gas estimation wrapper with `gasEstimateComponents` | VERIFIED | Exports `estimateArbitrumGas`, `gasComponentsToEth`, `ArbitrumGasComponents`; NodeInterface at `0x00...C8` |
-| `bot/src/gas/index.ts` | Gas module barrel export | VERIFIED | Barrel-exports `estimateArbitrumGas`, `gasComponentsToEth`, `ArbitrumGasComponents` |
-| `bot/src/detector/types.ts` | Extended `CostEstimate` with `l1DataFee` and `OpportunityDetectorConfig.gasEstimatorFn` | VERIFIED | `l1DataFee?: number` on `CostEstimate`; `gasEstimatorFn` on `OpportunityDetectorConfig` |
-| `bot/src/detector/OpportunityDetector.ts` | `setGasEstimator()` public method, `analyzeDeltaAsync()`, `estimateCostsWithL1()` | VERIFIED | All three methods present; `handleDelta()` dispatches to async path when `gasEstimatorFn` is set |
-| `bot/src/reporting.ts` | Opportunity report with L1 data fee line | VERIFIED | Conditional `lines.push()` for `l1DataFee` between Gas cost and Slippage |
-| `bot/__tests__/gas/ArbitrumGasEstimator.test.ts` | Unit tests for ArbitrumGasEstimator | VERIFIED | 9 tests covering `gasComponentsToEth`, `estimateArbitrumGas` (mocked), NodeInterface address; all pass |
-| `bot/__tests__/config/chain-config.test.ts` | Unit tests for Arbitrum Sepolia chain config | VERIFIED | 18 tests verifying chainId, WETH, factory, Aave, polling interval, MEV mode; all pass |
+| `bot/src/config/chains/pools/arbitrum-sepolia.ts` | Pool definitions with real addresses | VERIFIED | 2 entries: WETH/USDC 0.3% at `0x66EEAB70...` and WETH/USDC 1% at `0x3eCedaB7...`; `decimals1: 6`; `token1: 0x75faf1...4d`; zero placeholder strings |
+| `bot/src/config/chains/arbitrum-sepolia.ts` | Updated token addresses; no zero-address placeholders | VERIFIED | `tokens.USDC = "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d"`; USDT entry removed; WETH unchanged |
+| `bot/src/run-arb-sepolia.ts` | Arbitrum Sepolia entry point | VERIFIED | Unchanged. Imports `loadChainConfig`, `FlashloanBot`, `estimateArbitrumGas`, `gasComponentsToEth`; wires all events |
+| `package.json` | `bot:arb-sepolia` script | VERIFIED | Unchanged. `"bot:arb-sepolia": "node --import tsx bot/src/run-arb-sepolia.ts"` present |
+| `bot/src/gas/ArbitrumGasEstimator.ts` | NodeInterface gas estimation wrapper | VERIFIED | Unchanged. Exports `estimateArbitrumGas`, `gasComponentsToEth`, `ArbitrumGasComponents` |
+| `bot/src/gas/index.ts` | Gas module barrel export | VERIFIED | Unchanged. Barrel-exports gas estimator functions |
+| `bot/src/detector/types.ts` | Extended `CostEstimate` with `l1DataFee` | VERIFIED | Unchanged. `l1DataFee?: number` on `CostEstimate` |
+| `bot/src/detector/OpportunityDetector.ts` | `setGasEstimator()`, `analyzeDeltaAsync()`, `estimateCostsWithL1()` | VERIFIED | Unchanged. All three methods present |
+| `bot/src/reporting.ts` | Opportunity report with L1 data fee line | VERIFIED | Unchanged. Conditional `lines.push()` for `l1DataFee` |
+| `bot/__tests__/gas/ArbitrumGasEstimator.test.ts` | Unit tests for ArbitrumGasEstimator | VERIFIED | 9 tests, all pass |
+| `bot/__tests__/config/chain-config.test.ts` | Unit tests for Arbitrum Sepolia chain config | VERIFIED | 18 tests, all pass |
 
 ---
 
@@ -73,71 +81,110 @@ human_verification:
 | From | To | Via | Status | Details |
 |------|----|-----|--------|---------|
 | `run-arb-sepolia.ts` | `config/chains/index.ts` | `loadChainConfig(421614)` | WIRED | Line 53: `const chain = loadChainConfig(421614)` |
-| `run-arb-sepolia.ts` | `index.ts` | `new FlashloanBot(config)` | WIRED | Lines 76-82: direct `FlashloanBot` construction with chain config |
-| `run-arb-sepolia.ts` | `gas/ArbitrumGasEstimator.ts` | `estimateArbitrumGas` import + injection | WIRED | Line 5: import; line 96: `await estimateArbitrumGas(...)`; line 108: `bot.detector.setGasEstimator(arbGasEstimator)` |
-| `config/chains/arbitrum-sepolia.ts` | `pools/arbitrum-sepolia.ts` | `import ARBITRUM_SEPOLIA_POOLS` | WIRED | Line 2: `import { ARBITRUM_SEPOLIA_POOLS } from "./pools/arbitrum-sepolia.js"` |
-| `OpportunityDetector.ts` | `detector/types.ts` | `CostEstimate.l1DataFee` populated | WIRED | `estimateCostsWithL1()` populates `l1DataFee` from `gasEstimatorFn` result; included in `totalCost` |
-| `reporting.ts` | `detector/types.ts` | reads `CostEstimate.l1DataFee` | WIRED | Lines 52-54: conditional `lines.push` for `l1DataFee` |
+| `run-arb-sepolia.ts` | `index.ts` | `new FlashloanBot(config)` | WIRED | Direct `FlashloanBot` construction with chain config |
+| `run-arb-sepolia.ts` | `gas/ArbitrumGasEstimator.ts` | `estimateArbitrumGas` import + injection | WIRED | Import line 5; `bot.detector.setGasEstimator(arbGasEstimator)` |
+| `config/chains/arbitrum-sepolia.ts` | `pools/arbitrum-sepolia.ts` | `import ARBITRUM_SEPOLIA_POOLS` | WIRED | `import { ARBITRUM_SEPOLIA_POOLS } from "./pools/arbitrum-sepolia.js"` — confirmed |
+| `OpportunityDetector.ts` | `detector/types.ts` | `CostEstimate.l1DataFee` populated | WIRED | `estimateCostsWithL1()` populates `l1DataFee`; included in `totalCost` |
+| `reporting.ts` | `detector/types.ts` | reads `CostEstimate.l1DataFee` | WIRED | Conditional `lines.push` for `l1DataFee` |
 | `ArbitrumGasEstimator.ts` | NodeInterface precompile | `ethers.Contract` at `0xC8` | WIRED | `NODE_INTERFACE_ADDRESS = "0x00000000000000000000000000000000000000C8"` |
+
+---
+
+## Re-verification: Gap Items
+
+### Previously Failed — Now Verified
+
+**Truth 3:** "Bot detects arbitrage opportunities on Arbitrum testnet DEX pools (monitors prices, identifies spreads)"
+
+**Previous status:** PARTIAL — both pool entries had `poolAddress: "TBD_DISCOVER_ON_CHAIN"`
+
+**Current status:** VERIFIED
+
+| Check | Result |
+|-------|--------|
+| `TBD_DISCOVER_ON_CHAIN` strings in pools file | 0 (grep count = 0) |
+| `0x...0001` fake token1 address in pools file | 0 (grep count = 0) |
+| `0x000...000` zero-address in chain config tokens | 0 (grep count = 0) |
+| Pool addresses are valid 42-char hex | PASS — `0x66EEAB70aC52459Dd74C6AD50D578Ef76a441bbf`, `0x3eCedaB7E9479E29B694d8590dc34e0Ce6059868` |
+| Token addresses are valid 42-char hex | PASS — WETH `0x980B62...`, USDC `0x75faf1...4d` |
+| `decimals1` updated to 6 for USDC | PASS — both entries have `decimals1: 6` |
+| USDT entry removed from chain config | PASS — no `USDT:` key in tokens object |
+| TypeScript compiles cleanly | PASS — `npx tsc --noEmit` no output |
+| All tests pass | PASS — 450/450 (19 test files) |
+| Commit `7e5eaa5` in git log | PASS — `fix(03-04): replace TBD_DISCOVER_ON_CHAIN placeholders with real pool addresses` |
+
+### Previously Passed — Regression Check
+
+| SC | Quick Check | Result |
+|----|------------|--------|
+| SC-1 (RPC connection, block read) | `run-arb-sepolia.ts` unmodified; 450 tests pass | No regression |
+| SC-2 (chain config) | `arbitrum-sepolia.ts` modified (USDC address + USDT removal); 18 chain-config tests pass | No regression |
+| SC-4 (L2 gas estimation) | `ArbitrumGasEstimator.ts` unmodified; 9 gas tests pass | No regression |
 
 ---
 
 ## Requirements Coverage
 
-| Requirement | Status | Blocking Issue |
-|-------------|--------|----------------|
-| BOT-01: Bot connects to Arbitrum Sepolia via RPC and reads on-chain data | SATISFIED | Entry point and RPC guard implemented; block number read per poll cycle |
-| BOT-02: Chain-specific configuration (RPC endpoint, contract addresses, token addresses, pool configs) | SATISFIED | `loadChainConfig(421614)` returns complete, correct Arbitrum Sepolia config |
-| BOT-03: Bot detects arbitrage opportunities on Arbitrum testnet DEX pools | BLOCKED | Detection logic complete but pool addresses are `TBD_DISCOVER_ON_CHAIN` — no real pools to monitor |
-| BOT-04: L2 gas estimation accounts for Arbitrum's gas model | SATISFIED | `ArbitrumGasEstimator` with NodeInterface precompile; wired into `OpportunityDetector` |
-| BOT-05: Dry-run mode reports opportunities with Arbitrum-accurate gas estimates | PARTIALLY SATISFIED | Reporting infrastructure complete; cannot be exercised until BOT-03 is unblocked |
+| Requirement | Status | Notes |
+|-------------|--------|-------|
+| BOT-01: Bot connects to Arbitrum Sepolia via RPC | SATISFIED | Entry point and RPC guard implemented |
+| BOT-02: Chain-specific configuration | SATISFIED | `loadChainConfig(421614)` returns complete config with real addresses |
+| BOT-03: Bot detects arbitrage opportunities on Arbitrum testnet DEX pools | SATISFIED | Detection logic wired to 2 real pool addresses with confirmed liquidity |
+| BOT-04: L2 gas estimation accounts for Arbitrum's gas model | SATISFIED | `ArbitrumGasEstimator` with NodeInterface precompile |
+| BOT-05: Dry-run mode reports opportunities with Arbitrum-accurate gas estimates | SATISFIED | Reporting infrastructure complete; SC-3 blocker resolved |
 
 ---
 
 ## Anti-Patterns Found
 
-| File | Line | Pattern | Severity | Impact |
-|------|------|---------|----------|--------|
-| `bot/src/config/chains/pools/arbitrum-sepolia.ts` | 41, 53 | `poolAddress: "TBD_DISCOVER_ON_CHAIN"` | Blocker | Prevents opportunity detection — `PriceMonitor` will error on every RPC call and mark pools stale |
-| `bot/src/config/chains/pools/arbitrum-sepolia.ts` | 43, 55 | `token1: "0x0000000000000000000000000000000000000001"` | Warning | token1 is a non-standard address (zero address + 1), not a real testnet token |
+No blockers or warnings remain. The two anti-patterns from the initial verification have been resolved:
 
-The plan explicitly anticipated and documented the `TBD_DISCOVER_ON_CHAIN` placeholder pattern (with factory query instructions in comments), so it is a known limitation rather than a mistake. However, it blocks SC-3 and prevents end-to-end opportunity detection.
+| File | Previous Pattern | Resolution |
+|------|-----------------|------------|
+| `bot/src/config/chains/pools/arbitrum-sepolia.ts` | `poolAddress: "TBD_DISCOVER_ON_CHAIN"` (2 instances) | Replaced with real addresses |
+| `bot/src/config/chains/pools/arbitrum-sepolia.ts` | `token1: "0x...0001"` (2 instances) | Replaced with `USDC_ARB_SEPOLIA` |
+
+No new anti-patterns introduced.
 
 ---
 
 ## Human Verification Required
 
-### 1. RPC Connection Test
+All automated checks pass. The following items require a live Arbitrum Sepolia RPC endpoint to verify.
+
+### 1. RPC Connection and Pool Polling
 
 **Test:** Set `RPC_URL=https://arb-sepolia.g.alchemy.com/v2/YOUR_KEY` in environment, run `pnpm bot:arb-sepolia`
-**Expected:** Startup header shows chain name "Arbitrum Sepolia", RPC status "configured", 2 pools. On first poll, two error events fire (TBD addresses fail), two STALE warnings appear.
+**Expected:** Startup header shows chain name "Arbitrum Sepolia", RPC status "configured", 2 pools listed. On first poll, `priceUpdate` events fire for `WETH/USDC-0.3%-UniV3-ArbSepolia` and `WETH/USDC-1%-UniV3-ArbSepolia` with real prices from on-chain slot0 data.
 **Why human:** Requires live Arbitrum Sepolia RPC endpoint — network not available in sandbox.
 
-### 2. Pool Discovery and Opportunity Detection
+### 2. Opportunity Detection with Real Pool Data
 
-**Test:** Run `factory.getPool(WETH, token, 500)` using documented factory address, populate `poolAddress` fields in `arbitrum-sepolia.ts` pools file, then run `pnpm bot:arb-sepolia`
-**Expected:** Bot polls real pools at 1s intervals, logs price updates with block numbers, emits `opportunityFound` or `opportunityRejected` events
-**Why human:** Requires on-chain pool discovery, RPC access, and real testnet pool liquidity.
+**Test:** Run `pnpm bot:arb-sepolia` with live RPC and observe event logs over several poll cycles
+**Expected:** Bot polls real pools at 1s intervals, logs price updates with block numbers, emits `opportunityFound` or `opportunityRejected` events depending on whether a spread exceeds `deltaThresholdPercent: 0.01`
+**Why human:** Requires on-chain pool data and real testnet pool liquidity dynamics.
 
 ### 3. L1 Gas Fee in Opportunity Report
 
-**Test:** Trigger an opportunity detection (requires populated pools + price spread), verify console output
+**Test:** Trigger an opportunity detection (requires price spread between the two WETH/USDC pools), verify console output
 **Expected:** Opportunity log shows `Gas (L2):`, `L1 data fee:`, `Total cost:` as separate lines; `formatOpportunityReport` output shows L1 data fee line between Gas cost and Slippage
-**Why human:** Requires a real opportunity event — cannot trigger without live RPC and real pool spread.
+**Why human:** Requires a real `opportunityFound` event — cannot trigger without live RPC and real price spread.
 
 ---
 
-## Gaps Summary
+## Summary
 
-Phase 3 is 80% complete. All infrastructure for Arbitrum gas estimation (SC-4) and dry-run reporting (SC-5) is fully implemented and tested. The chain config system (SC-2) is correct and verified by 18 unit tests. The entry point (SC-1) correctly connects via RPC and reads block numbers.
+Phase 3 goal achievement is confirmed at the code level. All 5 success criteria are structurally verified:
 
-The single blocking gap is **pool address discovery** for SC-3. Both pool entries in `ARBITRUM_SEPOLIA_POOLS` use the placeholder string `"TBD_DISCOVER_ON_CHAIN"` instead of real Ethereum addresses. This prevents `PriceMonitor` from reading pool reserves, which in turn prevents `OpportunityDetector` from finding price spreads.
+- **SC-1** (RPC connection): Entry point correctly loads chain config and reads block numbers per poll
+- **SC-2** (chain config): Complete, correct Arbitrum Sepolia config with real factory, WETH, USDC, Aave V3, Camelot, and pool entries
+- **SC-3** (opportunity detection): Detection logic is fully wired to 2 real WETH/USDC pool addresses discovered on-chain with confirmed liquidity — gap is closed
+- **SC-4** (L2 gas estimation): ArbitrumGasEstimator with NodeInterface precompile wired into OpportunityDetector
+- **SC-5** (dry-run reporting): Reporting infrastructure complete with L1 data fee line; SC-3 blocker is now resolved
 
-This gap was known at plan creation time (the plan explicitly instructs using `TBD_DISCOVER_ON_CHAIN` and documents factory.getPool() discovery queries in comments). It was deferred on the assumption that pool discovery would occur during Phase 4 testnet validation. However, this means **Phase 3's SC-3 ("Bot detects arbitrage opportunities") cannot be verified until real pool addresses are found and populated**.
-
-To close this gap: query the Uniswap V3 factory at `0x248AB79Bbb9bC29bB72f7Cd42F17e054Fc40188e` on Arbitrum Sepolia using `getPool(WETH, token1, feeTier)`, replace `TBD_DISCOVER_ON_CHAIN` in `bot/src/config/chains/pools/arbitrum-sepolia.ts`, and verify the bot successfully polls those pools.
+The 3 human verification items are infrastructure-level (live RPC required), not code defects. The codebase is ready for Phase 4 testnet validation.
 
 ---
 
-_Verified: 2026-02-17T20:10:00Z_
+_Verified: 2026-02-17T21:30:00Z_
 _Verifier: Claude (gsd-verifier)_
