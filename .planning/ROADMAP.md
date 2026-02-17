@@ -81,7 +81,7 @@ Waves:
   1. Bot runs on Arbitrum Sepolia for 1+ hours without crashes, connection failures, or uncaught errors
   2. Bot detects and reports at least 1 arbitrage opportunity during the test run (logs show spread, path, estimated profit)
   3. eth_call simulation works correctly on Arbitrum Sepolia (pre-flight checks pass, reverts are caught)
-  4. All existing tests (312 Solidity + 423 TypeScript = 735 total) continue to pass after Arbitrum changes
+  4. All existing tests (312 Solidity + 450 TypeScript = 762 total) continue to pass after Arbitrum changes
 **Plans**: 2 plans in 2 waves
 
 Plans:
