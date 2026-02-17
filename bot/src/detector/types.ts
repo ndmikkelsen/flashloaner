@@ -92,6 +92,10 @@ export interface OpportunityDetectorConfig {
   gasPerSwap?: number;
   /** Flash loan fee config. Defaults to Aave V3 rates */
   flashLoanFees?: Partial<FlashLoanFees>;
+  /** Optional async gas estimator. When provided, overrides the simple gasPriceGwei formula.
+   *  Returns the total gas cost in ETH including L1 data fees (for L2 chains like Arbitrum).
+   *  The function receives the number of swaps and should return { gasCost: number; l1DataFee?: number } */
+  gasEstimatorFn?: (numSwaps: number) => Promise<{ gasCost: number; l1DataFee?: number }>;
 }
 
 /** Events emitted by OpportunityDetector */

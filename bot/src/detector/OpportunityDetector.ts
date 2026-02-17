@@ -29,9 +29,10 @@ const DEFAULT_FLASH_LOAN_FEES: FlashLoanFees = {
  * gas costs, and slippage.
  */
 export class OpportunityDetector extends EventEmitter {
-  private readonly config: Required<Omit<OpportunityDetectorConfig, "flashLoanFees">> & {
+  private readonly config: Required<Omit<OpportunityDetectorConfig, "flashLoanFees" | "gasEstimatorFn">> & {
     flashLoanFees: FlashLoanFees;
   };
+  private gasEstimatorFn: ((numSwaps: number) => Promise<{ gasCost: number; l1DataFee?: number }>) | undefined;
   private monitor: PriceMonitor | null = null;
   private stalePools = new Set<string>();
 
@@ -48,6 +49,16 @@ export class OpportunityDetector extends EventEmitter {
         ...config.flashLoanFees,
       },
     };
+    this.gasEstimatorFn = config.gasEstimatorFn;
+  }
+
+  /**
+   * Set or replace the async gas estimator function.
+   * When set, the detector uses this function instead of the simple gasPriceGwei formula.
+   * Useful for L2 chains like Arbitrum where L1 data fees are a significant cost component.
+   */
+  public setGasEstimator(fn: (numSwaps: number) => Promise<{ gasCost: number; l1DataFee?: number }>): void {
+    this.gasEstimatorFn = fn;
   }
 
   /** Attach to a PriceMonitor and start listening for opportunities */
@@ -75,10 +86,17 @@ export class OpportunityDetector extends EventEmitter {
 
   /** Handle a price delta event from PriceMonitor */
   private handleDelta = (delta: PriceDelta): void => {
-    try {
-      this.analyzeDelta(delta);
-    } catch (err) {
-      this.emit("error", toError(err));
+    if (this.gasEstimatorFn) {
+      // Async path: use gas estimator for L1+L2 cost breakdown
+      void this.analyzeDeltaAsync(delta).catch((err) => {
+        this.emit("error", toError(err));
+      });
+    } else {
+      try {
+        this.analyzeDelta(delta);
+      } catch (err) {
+        this.emit("error", toError(err));
+      }
     }
   };
 
@@ -106,6 +124,81 @@ export class OpportunityDetector extends EventEmitter {
     const inputAmount = this.config.defaultInputAmount;
     const grossProfit = this.calculateGrossProfit(path, inputAmount);
     const costs = this.estimateCosts(path, inputAmount);
+    const netProfit = grossProfit - costs.totalCost;
+    const netProfitPercent = (netProfit / inputAmount) * 100;
+
+    if (netProfit < this.config.minProfitThreshold) {
+      this.emit(
+        "opportunityRejected",
+        `Net profit ${netProfit.toFixed(6)} below threshold ${this.config.minProfitThreshold}`,
+        delta,
+      );
+      return null;
+    }
+
+    const opportunity: ArbitrageOpportunity = {
+      id: randomUUID(),
+      path,
+      inputAmount,
+      grossProfit,
+      costs,
+      netProfit,
+      netProfitPercent,
+      priceDelta: delta,
+      blockNumber: delta.buyPool.blockNumber,
+      timestamp: Date.now(),
+    };
+
+    this.emit("opportunityFound", opportunity);
+    return opportunity;
+  }
+
+  /**
+   * Estimate costs for a path, calling the async gas estimator when available.
+   * Falls back to synchronous estimateCosts() if no gas estimator is set.
+   */
+  async estimateCostsWithL1(path: SwapPath, inputAmount: number): Promise<CostEstimate> {
+    if (!this.gasEstimatorFn) {
+      return this.estimateCosts(path, inputAmount);
+    }
+
+    const flashLoanFee = this.estimateFlashLoanFee(inputAmount);
+    const slippageCost = this.estimateSlippage(path, inputAmount);
+
+    const gasResult = await this.gasEstimatorFn(path.steps.length);
+    const gasCost = gasResult.gasCost;
+    const l1DataFee = gasResult.l1DataFee;
+
+    const totalCost = flashLoanFee + gasCost + (l1DataFee ?? 0) + slippageCost;
+
+    return {
+      flashLoanFee,
+      gasCost,
+      l1DataFee,
+      slippageCost,
+      totalCost,
+    };
+  }
+
+  /**
+   * Async version of analyzeDelta — used when gasEstimatorFn is set.
+   * Mirrors analyzeDelta but awaits the gas estimate for L1+L2 breakdown.
+   */
+  private async analyzeDeltaAsync(delta: PriceDelta): Promise<ArbitrageOpportunity | null> {
+    // Skip if either pool is stale
+    if (this.isPoolStale(delta.buyPool) || this.isPoolStale(delta.sellPool)) {
+      this.emit(
+        "opportunityRejected",
+        "Pool marked as stale",
+        delta,
+      );
+      return null;
+    }
+
+    const path = this.buildSwapPath(delta);
+    const inputAmount = this.config.defaultInputAmount;
+    const grossProfit = this.calculateGrossProfit(path, inputAmount);
+    const costs = await this.estimateCostsWithL1(path, inputAmount);
     const netProfit = grossProfit - costs.totalCost;
     const netProfitPercent = (netProfit / inputAmount) * 100;
 

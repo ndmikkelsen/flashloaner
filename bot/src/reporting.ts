@@ -48,6 +48,11 @@ export function formatOpportunityReport(
     `  Costs:`,
     `    Flash loan fee: ${costs.flashLoanFee.toFixed(6)}`,
     `    Gas cost:       ${costs.gasCost.toFixed(6)}`,
+  ];
+  if (costs.l1DataFee !== undefined && costs.l1DataFee > 0) {
+    lines.push(`    L1 data fee:    ${costs.l1DataFee.toFixed(6)}`);
+  }
+  lines.push(
     `    Slippage:       ${costs.slippageCost.toFixed(6)}`,
     `    Total costs:    ${costs.totalCost.toFixed(6)}`,
     `  Net profit:   ${opp.netProfit.toFixed(6)} (${opp.netProfitPercent.toFixed(3)}%)`,
@@ -55,7 +60,7 @@ export function formatOpportunityReport(
     `  Decision:     ${decision}`,
     `${"=".repeat(60)}`,
     ``,
-  ];
+  );
 
   return lines.join("\n");
 }

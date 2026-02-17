@@ -1,6 +1,8 @@
 import "dotenv/config";
+import { JsonRpcProvider } from "ethers";
 import { loadChainConfig } from "./config/index.js";
 import { FlashloanBot, BOT_VERSION } from "./index.js";
+import { estimateArbitrumGas, gasComponentsToEth } from "./gas/index.js";
 import type { ArbitrageOpportunity } from "./detector/types.js";
 import type { PriceSnapshot, PriceDelta } from "./monitor/types.js";
 
@@ -79,6 +81,32 @@ async function main(): Promise<void> {
     logLevel: (process.env.LOG_LEVEL as "debug" | "info" | "warn" | "error") ?? "debug",
   });
 
+  // ---- Inject Arbitrum gas estimator ----
+  // Uses NodeInterface precompile at 0xC8 for accurate L1+L2 cost breakdown.
+  // Falls back to zero/L2-only estimate if NodeInterface call fails (e.g., local fork).
+  const arbGasEstimator = async (numSwaps: number): Promise<{ gasCost: number; l1DataFee?: number }> => {
+    // Build approximate calldata size for a swap transaction
+    // Each swap step ~= 256 bytes calldata (conservative estimate)
+    const estimatedCalldataSize = 4 + 32 * 8 * numSwaps; // function selector + args per swap
+    const dummyData = "0x" + "00".repeat(estimatedCalldataSize);
+    const flashloanExecutor = chain.protocols.aaveV3Pool;
+
+    try {
+      const provider = new JsonRpcProvider(chain.rpcUrl);
+      const components = await estimateArbitrumGas(provider, flashloanExecutor, dummyData);
+      const ethCosts = gasComponentsToEth(components);
+      return { gasCost: ethCosts.l2CostEth, l1DataFee: ethCosts.l1CostEth };
+    } catch (err) {
+      // Fallback: use simple estimation if NodeInterface call fails (e.g., on local fork)
+      console.warn(
+        `[GAS] NodeInterface call failed, using L2-only estimate: ${err instanceof Error ? err.message : err}`,
+      );
+      return { gasCost: 0, l1DataFee: undefined };
+    }
+  };
+
+  bot.detector.setGasEstimator(arbGasEstimator);
+
   // ---- Event listeners ----
 
   // Price updates
@@ -98,9 +126,13 @@ async function main(): Promise<void> {
     console.log(`  Path:       ${opp.path.label}`);
     console.log(`  Input:      ${opp.inputAmount} ETH`);
     console.log(`  Gross:      ${opp.grossProfit.toFixed(8)} ETH`);
-    console.log(`  Gas cost:   ${opp.costs.gasCost.toFixed(8)} ETH`);
+    console.log(`  Gas (L2):   ${opp.costs.gasCost.toFixed(8)} ETH`);
+    if (opp.costs.l1DataFee !== undefined) {
+      console.log(`  L1 data fee:${opp.costs.l1DataFee.toFixed(8)} ETH`);
+    }
     console.log(`  Flash fee:  ${opp.costs.flashLoanFee.toFixed(8)} ETH`);
     console.log(`  Slippage:   ${opp.costs.slippageCost.toFixed(8)} ETH`);
+    console.log(`  Total cost: ${opp.costs.totalCost.toFixed(8)} ETH`);
     console.log(`  Net profit: ${opp.netProfit.toFixed(8)} ETH (${opp.netProfitPercent.toFixed(4)}%)`);
     console.log(`  Block:      ${opp.blockNumber}`);
     console.log(`  [REPORT-ONLY] No transaction sent`);
