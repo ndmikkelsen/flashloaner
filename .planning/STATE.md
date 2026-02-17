@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 ## Current Position
 
 Phase: 3 of 4 (Bot Adaptation)
-Plan: 2 of 3
-Status: In progress — Plans 01 and 02 complete
-Last activity: 2026-02-17 — Fixed Arbitrum Sepolia config addresses and created run-arb-sepolia.ts entry point (plan 03-01)
+Plan: 3 of 3 (COMPLETE)
+Status: Phase 3 complete — all 3 plans done
+Last activity: 2026-02-17 — Integrated Arbitrum gas estimator into detector pipeline, added unit tests (plan 03-03)
 
-Progress: [██████░░░░] 62%
+Progress: [████████░░] 81%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6
-- Average duration: 3.2 minutes
-- Total execution time: 0.32 hours
+- Total plans completed: 9
+- Average duration: 3.7 minutes
+- Total execution time: 0.56 hours
 
 **By Phase:**
 
@@ -29,11 +29,11 @@ Progress: [██████░░░░] 62%
 |-------|-------|-------|----------|
 | Phase 1 - Chain Research | 1 | 5 min | 5 min |
 | Phase 2 - Infrastructure Setup | 4 | 14 min | 3.5 min |
-| Phase 3 - Bot Adaptation | 1 (so far) | 2 min | 2 min |
+| Phase 3 - Bot Adaptation | 3 | 12 min | 4 min |
 
 **Recent Trend:**
-- Last 6 plans: 01-01 (5 min), 02-01 (4 min), 02-02 (4 min), 02-03 (1 min), 02-04 (5 min), 03-02 (2 min)
-- Trend: Consistent ~2-4 min/plan
+- Last 6 plans: 02-03 (1 min), 02-04 (5 min), 03-01 (3 min), 03-02 (2 min), 03-03 (7 min)
+- Trend: Consistent ~2-7 min/plan
 
 *Updated after each plan completion*
 
@@ -64,6 +64,9 @@ Recent decisions affecting current work:
 - **Uniswap V3 Arbitrum Sepolia factory is 0x248AB79...88e** (not the mainnet CREATE2 address 0x1F984...) — Phase 3, Plan 1
 - **run-arb-sepolia.ts uses loadChainConfig(421614) not fromEnv()** (avoids hardcoded Ethereum/Sepolia defaults) — Phase 3, Plan 1
 - **Pool addresses use TBD_DISCOVER_ON_CHAIN placeholder** until factory.getPool() discovery is run — Phase 3, Plan 1
+- **setGasEstimator() public method for post-construction injection** (avoids type plumbing through DetectorConfig/BotConfig) — Phase 3, Plan 3
+- **handleDelta() dispatches async path when gasEstimatorFn set** (backward compatible; sync path unchanged) — Phase 3, Plan 3
+- **vi.mock hoisting requires module-scope state objects** (local let vars cause TDZ errors in factory callbacks) — Phase 3, Plan 3
 
 ### Pending Todos
 
@@ -76,5 +79,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-17
-Stopped at: Phase 3 Plan 01 complete — Arbitrum Sepolia config fixed, run-arb-sepolia.ts entry point created.
-Resume file: .planning/phases/03-bot-adaptation/03-01-SUMMARY.md
+Stopped at: Phase 3 Plan 03 complete — Gas estimator integrated into detector pipeline, 27 new tests added. Phase 3 (Bot Adaptation) fully complete.
+Resume file: .planning/phases/03-bot-adaptation/03-03-SUMMARY.md
