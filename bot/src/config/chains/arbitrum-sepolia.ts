@@ -25,12 +25,12 @@ export const ARBITRUM_SEPOLIA_CONFIG: ChainConfig = {
     balancerVault: "0xBA12222222228d8Ba445958a75a0704d566BF2C8", // Balancer V2 Vault (same on all chains via CREATE2)
   },
 
-  // DEX router and factory addresses (same as mainnet via CREATE2, plus Camelot testnet)
+  // DEX router and factory addresses (Arbitrum Sepolia testnet - different from mainnet)
   dexes: {
     uniswapV3: {
-      factory: "0x1F98431c8aD98523631AE4a59f267346ea31F984",
-      router: "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45", // SwapRouter02
-      quoter: "0x61fFE014bA17989E743c5F6cB21bF9697530B21e", // QuoterV2
+      factory: "0x248AB79Bbb9bC29bB72f7Cd42F17e054Fc40188e", // Uniswap V3 Arbitrum Sepolia deployment docs
+      router: "0x101F443B4d1b059569D643917553c771E1b9663E", // SwapRouter02 — Uniswap V3 Arbitrum Sepolia deployment docs
+      quoter: "0x2779a0CC1c3e0E44D2542EC3e79e3864Ae93Ef0B", // QuoterV2 — Uniswap V3 Arbitrum Sepolia deployment docs
     },
     camelot: {
       router: "0x171B925C51565F5D2a7d8C494ba3188D304EFD93",
@@ -38,11 +38,11 @@ export const ARBITRUM_SEPOLIA_CONFIG: ChainConfig = {
     },
   },
 
-  // Token addresses (testnet tokens - will be discovered during deployment)
+  // Token addresses (testnet tokens)
   tokens: {
-    WETH: "0x0000000000000000000000000000000000000000", // TBD - discover during Phase 4
-    USDC: "0x0000000000000000000000000000000000000000", // TBD
-    USDT: "0x0000000000000000000000000000000000000000", // TBD
+    WETH: "0x980B62Da83eFf3D4576C647993b0c1D7faf17c73", // Verified — Uniswap V3 Arbitrum Sepolia deployment docs + Arbiscan Sepolia
+    USDC: "0x0000000000000000000000000000000000000000", // TBD — no canonical testnet address; discover via factory.getPool()
+    USDT: "0x0000000000000000000000000000000000000000", // TBD — no canonical testnet address; discover via factory.getPool()
   },
 
   // Gas configuration (testnet)
