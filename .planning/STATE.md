@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** The bot must never lose funds beyond gas costs — the 4-layer safety system (off-chain estimate, eth_call simulation, on-chain ProfitValidator, MEV protection) ensures every transaction either profits or reverts.
-**Current focus:** Phase 3 - Bot Adaptation
+**Current focus:** Phase 4 - Testnet Validation
 
 ## Current Position
 
-Phase: 3 of 4 (Bot Adaptation)
-Plan: 3 of 3 (COMPLETE)
-Status: Phase 3 complete — all 3 plans done
-Last activity: 2026-02-17 — Integrated Arbitrum gas estimator into detector pipeline, added unit tests (plan 03-03)
+Phase: 3 of 4 (Bot Adaptation) - COMPLETE (including gap closure)
+Plan: 4 of 4 (COMPLETE) — gap closure plan 03-04 done
+Status: Phase 3 fully complete — all plans including gap closure done; ready for Phase 4
+Last activity: 2026-02-17 — Discovered real Uniswap V3 WETH/USDC pool addresses on Arbitrum Sepolia, replaced TBD placeholders (plan 03-04 gap closure)
 
-Progress: [████████░░] 81%
+Progress: [████████░░] 85%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 9
-- Average duration: 3.7 minutes
-- Total execution time: 0.56 hours
+- Total plans completed: 10
+- Average duration: 3.3 minutes
+- Total execution time: 0.59 hours
 
 **By Phase:**
 
@@ -29,11 +29,11 @@ Progress: [████████░░] 81%
 |-------|-------|-------|----------|
 | Phase 1 - Chain Research | 1 | 5 min | 5 min |
 | Phase 2 - Infrastructure Setup | 4 | 14 min | 3.5 min |
-| Phase 3 - Bot Adaptation | 3 | 12 min | 4 min |
+| Phase 3 - Bot Adaptation | 4 | 13 min | 3.25 min |
 
 **Recent Trend:**
-- Last 6 plans: 02-03 (1 min), 02-04 (5 min), 03-01 (3 min), 03-02 (2 min), 03-03 (7 min)
-- Trend: Consistent ~2-7 min/plan
+- Last 6 plans: 02-04 (5 min), 03-01 (3 min), 03-02 (2 min), 03-03 (7 min), 03-04 (1 min)
+- Trend: Consistent ~1-7 min/plan
 
 *Updated after each plan completion*
 
@@ -63,10 +63,12 @@ Recent decisions affecting current work:
 - **l1DataFee optional on CostEstimate** (backward compatible; populated by ArbitrumGasEstimator in Plan 03-03) — Phase 3, Plan 2
 - **Uniswap V3 Arbitrum Sepolia factory is 0x248AB79...88e** (not the mainnet CREATE2 address 0x1F984...) — Phase 3, Plan 1
 - **run-arb-sepolia.ts uses loadChainConfig(421614) not fromEnv()** (avoids hardcoded Ethereum/Sepolia defaults) — Phase 3, Plan 1
-- **Pool addresses use TBD_DISCOVER_ON_CHAIN placeholder** until factory.getPool() discovery is run — Phase 3, Plan 1
 - **setGasEstimator() public method for post-construction injection** (avoids type plumbing through DetectorConfig/BotConfig) — Phase 3, Plan 3
 - **handleDelta() dispatches async path when gasEstimatorFn set** (backward compatible; sync path unchanged) — Phase 3, Plan 3
 - **vi.mock hoisting requires module-scope state objects** (local let vars cause TDZ errors in factory callbacks) — Phase 3, Plan 3
+- **WETH/USDC 0.3% and 1% pools selected on Arbitrum Sepolia** (0x66EEAB70...bbf and 0x3eCedaB7...868); 0.05% pool excluded (liquidity: 122) — Phase 3, Plan 4
+- **Aave testnet USDC (0x75faf1...4d) is canonical USDC on Arbitrum Sepolia** (confirmed via factory.getPool() returning real pools) — Phase 3, Plan 4
+- **USDT entry removed from tokens config** (no canonical testnet address found; zero-address placeholder eliminated) — Phase 3, Plan 4
 
 ### Pending Todos
 
@@ -79,5 +81,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-17
-Stopped at: Phase 3 Plan 03 complete — Gas estimator integrated into detector pipeline, 27 new tests added. Phase 3 (Bot Adaptation) fully complete.
-Resume file: .planning/phases/03-bot-adaptation/03-03-SUMMARY.md
+Stopped at: Phase 3 Plan 04 (gap closure) complete — Discovered real WETH/USDC Uniswap V3 pool addresses on Arbitrum Sepolia, replaced all TBD placeholders, 450 tests pass.
+Resume file: .planning/phases/03-bot-adaptation/03-04-SUMMARY.md
