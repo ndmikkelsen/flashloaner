@@ -11,8 +11,8 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 
 Phase: 3 of 4 (Bot Adaptation)
 Plan: 2 of 3
-Status: In progress — Plan 02 complete
-Last activity: 2026-02-17 — Created ArbitrumGasEstimator module and extended CostEstimate with l1DataFee (plan 03-02)
+Status: In progress — Plans 01 and 02 complete
+Last activity: 2026-02-17 — Fixed Arbitrum Sepolia config addresses and created run-arb-sepolia.ts entry point (plan 03-01)
 
 Progress: [██████░░░░] 62%
 
@@ -61,6 +61,9 @@ Recent decisions affecting current work:
 - **fs_permissions required in foundry.toml** for Deploy.s.sol artifact writes — Phase 2, Plan 4
 - **Raw ethers.js v6 Contract for NodeInterface** (avoids @arbitrum/sdk ethers v5/v6 conflict) — Phase 3, Plan 2
 - **l1DataFee optional on CostEstimate** (backward compatible; populated by ArbitrumGasEstimator in Plan 03-03) — Phase 3, Plan 2
+- **Uniswap V3 Arbitrum Sepolia factory is 0x248AB79...88e** (not the mainnet CREATE2 address 0x1F984...) — Phase 3, Plan 1
+- **run-arb-sepolia.ts uses loadChainConfig(421614) not fromEnv()** (avoids hardcoded Ethereum/Sepolia defaults) — Phase 3, Plan 1
+- **Pool addresses use TBD_DISCOVER_ON_CHAIN placeholder** until factory.getPool() discovery is run — Phase 3, Plan 1
 
 ### Pending Todos
 
@@ -73,5 +76,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-17
-Stopped at: Phase 3 Plan 02 complete — ArbitrumGasEstimator module created, CostEstimate extended with l1DataFee.
-Resume file: .planning/phases/03-bot-adaptation/03-02-SUMMARY.md
+Stopped at: Phase 3 Plan 01 complete — Arbitrum Sepolia config fixed, run-arb-sepolia.ts entry point created.
+Resume file: .planning/phases/03-bot-adaptation/03-01-SUMMARY.md
