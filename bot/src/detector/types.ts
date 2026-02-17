@@ -34,11 +34,13 @@ export interface SwapPath {
 export interface CostEstimate {
   /** Flash loan fee in base token units (e.g. 0.05% of borrow) */
   flashLoanFee: number;
-  /** Estimated gas cost in base token units (ETH) */
+  /** Estimated gas cost in base token units (ETH) — L2 execution cost only */
   gasCost: number;
+  /** Arbitrum L1 data posting cost in base token units (ETH). Only present on L2 chains. */
+  l1DataFee?: number;
   /** Expected slippage loss in base token units */
   slippageCost: number;
-  /** Total costs */
+  /** Total costs (includes l1DataFee when present) */
   totalCost: number;
 }
 
