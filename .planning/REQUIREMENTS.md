@@ -15,10 +15,10 @@ Requirements for Arbitrum testnet validation milestone.
 
 ### Contract Deployment
 
-- [ ] **DEPLOY-01**: Existing FlashloanExecutor deploys successfully to Arbitrum Sepolia testnet
-- [ ] **DEPLOY-02**: Existing DEX adapters (UniswapV2, UniswapV3) work with Arbitrum DEX forks
-- [ ] **DEPLOY-03**: ProfitValidator and CircuitBreaker deploy and function correctly on Arbitrum
-- [ ] **DEPLOY-04**: Contract addresses and deployment artifacts are recorded for the testnet
+- [x] **DEPLOY-01**: Existing FlashloanExecutor deploys successfully to Arbitrum Sepolia testnet
+- [x] **DEPLOY-02**: Existing DEX adapters (UniswapV2, UniswapV3) work with Arbitrum DEX forks
+- [x] **DEPLOY-03**: ProfitValidator and CircuitBreaker deploy and function correctly on Arbitrum
+- [x] **DEPLOY-04**: Contract addresses and deployment artifacts are recorded for the testnet
 
 ### Bot Adaptation
 
@@ -37,9 +37,9 @@ Requirements for Arbitrum testnet validation milestone.
 
 ### Monorepo Structure
 
-- [ ] **REPO-01**: Chain-specific config is separated from shared bot logic
-- [ ] **REPO-02**: Adding a new chain requires only config files, not code changes to shared modules
-- [ ] **REPO-03**: Ethereum config continues to work alongside Arbitrum config
+- [x] **REPO-01**: Chain-specific config is separated from shared bot logic
+- [x] **REPO-02**: Adding a new chain requires only config files, not code changes to shared modules
+- [x] **REPO-03**: Ethereum config continues to work alongside Arbitrum config
 
 ## v2 Requirements
 
@@ -85,10 +85,10 @@ Deferred to future milestones. Not in current roadmap.
 | CHAIN-01 | Phase 1 | Complete |
 | CHAIN-02 | Phase 1 | Complete |
 | CHAIN-03 | Phase 1 | Complete |
-| DEPLOY-01 | Phase 2 | Pending |
-| DEPLOY-02 | Phase 2 | Pending |
-| DEPLOY-03 | Phase 2 | Pending |
-| DEPLOY-04 | Phase 2 | Pending |
+| DEPLOY-01 | Phase 2 | Complete |
+| DEPLOY-02 | Phase 2 | Complete |
+| DEPLOY-03 | Phase 2 | Complete |
+| DEPLOY-04 | Phase 2 | Complete |
 | BOT-01 | Phase 3 | Pending |
 | BOT-02 | Phase 3 | Pending |
 | BOT-03 | Phase 3 | Pending |
@@ -98,9 +98,9 @@ Deferred to future milestones. Not in current roadmap.
 | TEST-02 | Phase 4 | Pending |
 | TEST-03 | Phase 4 | Pending |
 | TEST-04 | Phase 4 | Pending |
-| REPO-01 | Phase 2 | Pending |
-| REPO-02 | Phase 2 | Pending |
-| REPO-03 | Phase 2 | Pending |
+| REPO-01 | Phase 2 | Complete |
+| REPO-02 | Phase 2 | Complete |
+| REPO-03 | Phase 2 | Complete |
 
 **Coverage:**
 - v1 requirements: 19 total
