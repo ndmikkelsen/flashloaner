@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** The bot must never lose funds beyond gas costs — the 4-layer safety system (off-chain estimate, eth_call simulation, on-chain ProfitValidator, MEV protection) ensures every transaction either profits or reverts.
-**Current focus:** Phase 2 - Infrastructure Setup
+**Current focus:** Phase 3 - Bot Adaptation
 
 ## Current Position
 
-Phase: 2 of 4 (Infrastructure Setup)
-Plan: 4 of 4
-Status: All plans complete — awaiting verification
-Last activity: 2026-02-17 — Deployed all 5 contracts to Arbitrum Sepolia (plan 02-04)
+Phase: 3 of 4 (Bot Adaptation)
+Plan: 2 of 3
+Status: In progress — Plan 02 complete
+Last activity: 2026-02-17 — Created ArbitrumGasEstimator module and extended CostEstimate with l1DataFee (plan 03-02)
 
-Progress: [█████░░░░░] 50%
+Progress: [██████░░░░] 62%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
-- Average duration: 3.6 minutes
-- Total execution time: 0.30 hours
+- Total plans completed: 6
+- Average duration: 3.2 minutes
+- Total execution time: 0.32 hours
 
 **By Phase:**
 
@@ -29,10 +29,11 @@ Progress: [█████░░░░░] 50%
 |-------|-------|-------|----------|
 | Phase 1 - Chain Research | 1 | 5 min | 5 min |
 | Phase 2 - Infrastructure Setup | 4 | 14 min | 3.5 min |
+| Phase 3 - Bot Adaptation | 1 (so far) | 2 min | 2 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (5 min), 02-01 (4 min), 02-02 (4 min), 02-03 (1 min), 02-04 (5 min)
-- Trend: Consistent ~3-4 min/plan
+- Last 6 plans: 01-01 (5 min), 02-01 (4 min), 02-02 (4 min), 02-03 (1 min), 02-04 (5 min), 03-02 (2 min)
+- Trend: Consistent ~2-4 min/plan
 
 *Updated after each plan completion*
 
@@ -58,6 +59,8 @@ Recent decisions affecting current work:
 - **Chain-specific env files gitignored** (.env.arbitrum-sepolia, etc.) — Phase 2, Plan 2
 - **All 5 contracts deployed to Arbitrum Sepolia** (0.0001 ETH gas) — Phase 2, Plan 4
 - **fs_permissions required in foundry.toml** for Deploy.s.sol artifact writes — Phase 2, Plan 4
+- **Raw ethers.js v6 Contract for NodeInterface** (avoids @arbitrum/sdk ethers v5/v6 conflict) — Phase 3, Plan 2
+- **l1DataFee optional on CostEstimate** (backward compatible; populated by ArbitrumGasEstimator in Plan 03-03) — Phase 3, Plan 2
 
 ### Pending Todos
 
@@ -70,5 +73,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-17
-Stopped at: All Phase 2 plans complete. Deployed to Arbitrum Sepolia. Awaiting verification.
-Resume file: .planning/phases/02-infrastructure-setup/02-04-SUMMARY.md
+Stopped at: Phase 3 Plan 02 complete — ArbitrumGasEstimator module created, CostEstimate extended with l1DataFee.
+Resume file: .planning/phases/03-bot-adaptation/03-02-SUMMARY.md
