@@ -39,10 +39,11 @@ export const ARBITRUM_SEPOLIA_CONFIG: ChainConfig = {
   },
 
   // Token addresses (testnet tokens)
+  // USDC discovered 2026-02-17: factory.getPool(WETH, 0x75faf1...4d, 3000) returned real pool
+  // USDT: no canonical testnet address found — omitted to avoid zero-address errors
   tokens: {
     WETH: "0x980B62Da83eFf3D4576C647993b0c1D7faf17c73", // Verified — Uniswap V3 Arbitrum Sepolia deployment docs + Arbiscan Sepolia
-    USDC: "0x0000000000000000000000000000000000000000", // TBD — no canonical testnet address; discover via factory.getPool()
-    USDT: "0x0000000000000000000000000000000000000000", // TBD — no canonical testnet address; discover via factory.getPool()
+    USDC: "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d", // Aave testnet USDC on Arbitrum Sepolia (6 decimals, verified 2026-02-17)
   },
 
   // Gas configuration (testnet)
