@@ -60,16 +60,18 @@ Plans:
   3. Bot detects arbitrage opportunities on Arbitrum testnet DEX pools (monitors prices, identifies spreads)
   4. L2 gas estimation accounts for Arbitrum's gas model (L2 execution cost, not just L1 data cost)
   5. Dry-run mode reports opportunities with Arbitrum-accurate gas estimates and profitability calculations
-**Plans**: 3 plans in 2 waves
+**Plans**: 4 plans in 2 waves
 
 Plans:
-- [ ] 03-01-PLAN.md — Fix Arbitrum Sepolia config addresses and create run-arb-sepolia.ts entry point (BOT-01, BOT-02, BOT-03)
-- [ ] 03-02-PLAN.md — Create ArbitrumGasEstimator module with NodeInterface precompile wrapper (BOT-04)
-- [ ] 03-03-PLAN.md — Integrate gas estimator into detector, update reporting, add unit tests (BOT-04, BOT-05)
+- [x] 03-01-PLAN.md — Fix Arbitrum Sepolia config addresses and create run-arb-sepolia.ts entry point (BOT-01, BOT-02, BOT-03)
+- [x] 03-02-PLAN.md — Create ArbitrumGasEstimator module with NodeInterface precompile wrapper (BOT-04)
+- [x] 03-03-PLAN.md — Integrate gas estimator into detector, update reporting, add unit tests (BOT-04, BOT-05)
+- [ ] 03-04-PLAN.md — Discover real pool addresses on Arbitrum Sepolia and replace TBD placeholders (gap closure)
 
 Waves:
-- Wave 1: 03-01, 03-02 (parallel — config fixes + gas estimator module)
-- Wave 2: 03-03 (depends on 03-01 + 03-02 — integration + tests)
+- Wave 1: 03-01, 03-02 (parallel -- config fixes + gas estimator module)
+- Wave 2: 03-03 (depends on 03-01 + 03-02 -- integration + tests)
+- Wave 3: 03-04 (gap closure -- discover real pool addresses via factory queries)
 
 ### Phase 4: Testnet Validation
 **Goal**: Validate bot runs stably on Arbitrum Sepolia for 1+ hours and detects/simulates opportunities correctly
@@ -92,7 +94,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Chain Research | 0/1 | Complete    | 2026-02-16 |
-| 2. Infrastructure Setup | 2/4 | Complete    | 2026-02-17 |
-| 3. Bot Adaptation | 0/3 | Not started | - |
+| 1. Chain Research | 1/1 | Complete    | 2026-02-16 |
+| 2. Infrastructure Setup | 4/4 | Complete    | 2026-02-17 |
+| 3. Bot Adaptation | 3/4 | In progress | - |
 | 4. Testnet Validation | 0/1 | Not started | - |
