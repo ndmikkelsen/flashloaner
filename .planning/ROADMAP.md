@@ -67,6 +67,10 @@ Plans:
 - [ ] 03-02-PLAN.md — Create ArbitrumGasEstimator module with NodeInterface precompile wrapper (BOT-04)
 - [ ] 03-03-PLAN.md — Integrate gas estimator into detector, update reporting, add unit tests (BOT-04, BOT-05)
 
+Waves:
+- Wave 1: 03-01, 03-02 (parallel — config fixes + gas estimator module)
+- Wave 2: 03-03 (depends on 03-01 + 03-02 — integration + tests)
+
 ### Phase 4: Testnet Validation
 **Goal**: Validate bot runs stably on Arbitrum Sepolia for 1+ hours and detects/simulates opportunities correctly
 **Depends on**: Phase 3
