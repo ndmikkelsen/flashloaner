@@ -82,10 +82,15 @@ Waves:
   2. Bot detects and reports at least 1 arbitrage opportunity during the test run (logs show spread, path, estimated profit)
   3. eth_call simulation works correctly on Arbitrum Sepolia (pre-flight checks pass, reverts are caught)
   4. All existing tests (312 Solidity + 423 TypeScript = 735 total) continue to pass after Arbitrum changes
-**Plans**: TBD
+**Plans**: 2 plans in 2 waves
 
 Plans:
-- [ ] 04-01: TBD
+- [ ] 04-01-PLAN.md — Pre-run checks, eth_call smoke test, and 1-hour live bot run (TEST-01, TEST-02, TEST-03)
+- [ ] 04-02-PLAN.md — Regression test gate: full Solidity + TypeScript test suites (TEST-04)
+
+Waves:
+- Wave 1: 04-01 (human-action -- live RPC pre-checks + 1-hour bot run)
+- Wave 2: 04-02 (auto -- regression tests, depends on 04-01 for config reconciliation)
 
 ## Progress
 
@@ -97,4 +102,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Chain Research | 1/1 | Complete    | 2026-02-16 |
 | 2. Infrastructure Setup | 4/4 | Complete    | 2026-02-17 |
 | 3. Bot Adaptation | 3/4 | Complete    | 2026-02-17 |
-| 4. Testnet Validation | 0/1 | Not started | - |
+| 4. Testnet Validation | 0/2 | Not started | - |
