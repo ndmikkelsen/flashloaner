@@ -38,6 +38,9 @@ export const ARBITRUM_CONFIG: ChainConfig = {
       router: "0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506",
       factory: "0xc35DADB65012eC5796536bD9864eD8773aBc74C4",
     },
+    sushiswapV3: {
+      factory: "0x1af415a1EbA07a4986a52B6f2e7dE7003D82231e",
+    },
   },
 
   // Token addresses (Arbitrum mainnet)
@@ -45,6 +48,10 @@ export const ARBITRUM_CONFIG: ChainConfig = {
     WETH: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1",
     USDC: "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8", // Native USDC (Circle-issued)
     USDT: "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9",
+    ARB: "0x912ce59144191c1204e64559fe8253a0e49e6548",
+    GMX: "0xfc5a1a6eb076a2c7ad06ed22c90d7e710e35ad0a",
+    LINK: "0xf97f4df75117a78c1a5a0dbb814af92458539fb4",
+    MAGIC: "0x539bde0d7dbd336b79148aa742883198bbf60342",
   },
 
   // Gas configuration (Arbitrum-specific)

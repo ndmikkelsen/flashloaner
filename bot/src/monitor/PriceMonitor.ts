@@ -111,7 +111,7 @@ export class PriceMonitor extends EventEmitter {
     const blockNumber = await this.config.provider.getBlockNumber();
 
     let price: number;
-    if (pool.dex === "uniswap_v3") {
+    if (pool.dex === "uniswap_v3" || pool.dex === "sushiswap_v3") {
       price = await this.fetchV3Price(pool);
     } else {
       // uniswap_v2 and sushiswap use the same pair interface

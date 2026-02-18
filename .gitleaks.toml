@@ -48,6 +48,10 @@ regexes = [
     '''0xaf88d065e77c8cC2239327C5EDb3A432268e5831''',  # USDC Arbitrum
     '''0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8''',  # USDC Arbitrum (native)
     '''0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9''',  # USDT Arbitrum
+    '''0x912ce59144191c1204e64559fe8253a0e49e6548''',  # ARB Arbitrum
+    '''0xfc5a1a6eb076a2c7ad06ed22c90d7e710e35ad0a''',  # GMX Arbitrum
+    '''0xf97f4df75117a78c1a5a0dbb814af92458539fb4''',  # LINK Arbitrum
+    '''0x539bde0d7dbd336b79148aa742883198bbf60342''',  # MAGIC Arbitrum
     # Public pool addresses on L2 chains (not secrets)
     '''0xC31E54c7a869B9FcBEcc14363CF510d1c41fa443''',  # WETH/USDC UniV3 0.05% Arbitrum
     '''0x641c00a822e8b671738d32a431a4fb6074e5c79d''',  # WETH/USDT UniV3 0.05% Arbitrum

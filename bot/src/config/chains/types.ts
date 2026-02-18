@@ -47,6 +47,9 @@ export interface ChainConfig {
       router: string;
       factory: string;
     };
+    sushiswapV3?: {
+      factory: string;
+    };
     camelot?: {
       router: string;
       factory: string;
