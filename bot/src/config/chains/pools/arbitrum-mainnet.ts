@@ -71,7 +71,7 @@ export const ARBITRUM_MAINNET_POOLS: PoolDefinition[] = [
   {
     label: "ARB/WETH SushiV3 (0.3%)",
     dex: "sushiswap_v3",
-    poolAddress: "0xb3942c6bbe27e857b2e4e2e3a90e052a19ebc270",
+    poolAddress: "0xB3942c9FFA04efBC1Fa746e146bE7565c76E3dC1",
     token0: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH
     token1: "0x912ce59144191c1204e64559fe8253a0e49e6548", // ARB
     decimals0: 18,
@@ -82,7 +82,7 @@ export const ARBITRUM_MAINNET_POOLS: PoolDefinition[] = [
   {
     label: "ARB/WETH SushiV2",
     dex: "sushiswap",
-    poolAddress: "0x0a5601fe473deafa0ae0fa2ec283ce53571a4e7e",
+    poolAddress: "0xBF6CBb1F40a542aF50839CaD01b0dc1747F11e18",
     token0: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH
     token1: "0x912ce59144191c1204e64559fe8253a0e49e6548", // ARB
     decimals0: 18,
@@ -105,7 +105,7 @@ export const ARBITRUM_MAINNET_POOLS: PoolDefinition[] = [
   {
     label: "LINK/WETH SushiV3 (0.3%)",
     dex: "sushiswap_v3",
-    poolAddress: "0x55a7e06c57ccba96ca3e4e2edbb3c0c7e8772642",
+    poolAddress: "0x55A7E0ab34038D75d0E2118254Fd84FdedCd4E65",
     token0: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH
     token1: "0xf97f4df75117a78c1a5a0dbb814af92458539fb4", // LINK
     decimals0: 18,
@@ -118,7 +118,7 @@ export const ARBITRUM_MAINNET_POOLS: PoolDefinition[] = [
   {
     label: "GMX/WETH UniV3 (0.05%)",
     dex: "uniswap_v3",
-    poolAddress: "0xb435eb51a3cc4eb4e20e5283ebc5e2ad3caf7a0d",
+    poolAddress: "0xb435ebfE0BF4CE66810AA4d44e3a5CA875D40DB1",
     token0: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH
     token1: "0xfc5a1a6eb076a2c7ad06ed22c90d7e710e35ad0a", // GMX
     decimals0: 18,
