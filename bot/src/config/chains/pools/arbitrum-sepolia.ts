@@ -33,26 +33,28 @@ export const ARBITRUM_SEPOLIA_POOLS: PoolDefinition[] = [
     // WETH/USDC 0.3% fee pool on Uniswap V3 Arbitrum Sepolia
     // Discovered: factory.getPool(WETH, USDC, 3000) => 0x66EEAB70aC52459Dd74C6AD50D578Ef76a441bbf
     // Liquidity at discovery: 45752273629 (adequate for price monitoring)
+    // On-chain ordering: USDC (0x75fa...) < WETH (0x980B...) → USDC is token0
     label: "WETH/USDC-0.3%-UniV3-ArbSepolia",
     dex: "uniswap_v3",
     poolAddress: "0x66EEAB70aC52459Dd74C6AD50D578Ef76a441bbf",
-    token0: WETH_ARB_SEPOLIA,
-    token1: USDC_ARB_SEPOLIA,
-    decimals0: 18,
-    decimals1: 6, // USDC has 6 decimals
+    token0: USDC_ARB_SEPOLIA,
+    token1: WETH_ARB_SEPOLIA,
+    decimals0: 6, // USDC has 6 decimals
+    decimals1: 18,
     feeTier: 3000, // 0.3%
   },
   {
     // WETH/USDC 1% fee pool on Uniswap V3 Arbitrum Sepolia
     // Discovered: factory.getPool(WETH, USDC, 10000) => 0x3eCedaB7E9479E29B694d8590dc34e0Ce6059868
     // Liquidity at discovery: 3225673603183 (highest liquidity of the three pools)
+    // On-chain ordering: USDC (0x75fa...) < WETH (0x980B...) → USDC is token0
     label: "WETH/USDC-1%-UniV3-ArbSepolia",
     dex: "uniswap_v3",
     poolAddress: "0x3eCedaB7E9479E29B694d8590dc34e0Ce6059868",
-    token0: WETH_ARB_SEPOLIA,
-    token1: USDC_ARB_SEPOLIA,
-    decimals0: 18,
-    decimals1: 6, // USDC has 6 decimals
+    token0: USDC_ARB_SEPOLIA,
+    token1: WETH_ARB_SEPOLIA,
+    decimals0: 6, // USDC has 6 decimals
+    decimals1: 18,
     feeTier: 10000, // 1%
   },
 ];
