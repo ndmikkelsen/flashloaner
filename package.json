@@ -10,6 +10,7 @@
     "start:dry-run": "DRY_RUN=true node --import tsx bot/src/index.ts",
     "start:testnet": "node --import tsx bot/src/run-testnet.ts",
     "bot:arb-sepolia": "node --import tsx bot/src/run-arb-sepolia.ts",
+    "bot:arb-mainnet": "node --import tsx bot/src/run-arb-mainnet.ts",
     "dev": "LOG_LEVEL=debug node --import tsx bot/src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
