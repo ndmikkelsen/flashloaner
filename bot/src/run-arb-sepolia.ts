@@ -7,6 +7,18 @@ import type { ArbitrageOpportunity } from "./detector/types.js";
 import type { PriceSnapshot, PriceDelta } from "./monitor/types.js";
 
 // ---------------------------------------------------------------------------
+// ANSI color helpers (no dependencies)
+// ---------------------------------------------------------------------------
+const c = {
+  green: (s: string) => `\x1b[32m${s}\x1b[0m`,
+  red: (s: string) => `\x1b[31m${s}\x1b[0m`,
+  yellow: (s: string) => `\x1b[33m${s}\x1b[0m`,
+  cyan: (s: string) => `\x1b[36m${s}\x1b[0m`,
+  dim: (s: string) => `\x1b[2m${s}\x1b[0m`,
+  bold: (s: string) => `\x1b[1m${s}\x1b[0m`,
+};
+
+// ---------------------------------------------------------------------------
 // Stats tracking
 // ---------------------------------------------------------------------------
 interface Stats {
@@ -37,11 +49,13 @@ function logStats(): void {
   const mins = Math.floor(uptime / 60);
   const secs = uptime % 60;
   console.log(
-    `\n[${ts()}] [STATS] uptime=${mins}m${secs}s ` +
-      `prices=${stats.priceUpdates} ` +
-      `found=${stats.opportunitiesFound} ` +
-      `rejected=${stats.opportunitiesRejected} ` +
-      `errors=${stats.errors}\n`,
+    c.cyan(
+      `\n[${ts()}] [STATS] uptime=${mins}m${secs}s ` +
+        `prices=${stats.priceUpdates} ` +
+        `found=${stats.opportunitiesFound} ` +
+        `rejected=${stats.opportunitiesRejected} ` +
+        `errors=${stats.errors}\n`,
+    ),
   );
 }
 
@@ -54,14 +68,15 @@ async function main(): Promise<void> {
 
   const rpcStatus = chain.rpcUrl ? "configured" : "MISSING";
 
-  console.log(`\n========================================`);
-  console.log(`  Flashloan Bot v${BOT_VERSION} — ARBITRUM SEPOLIA`);
-  console.log(`  Report-only (no transactions)`);
-  console.log(`  Chain:    ${chain.chainName} (chainId ${chain.chainId})`);
-  console.log(`  RPC:      ${rpcStatus}`);
-  console.log(`  Pools:    ${chain.pools.length} configured`);
-  console.log(`  WETH:     ${chain.tokens.WETH}`);
-  console.log(`========================================\n`);
+  console.log(c.cyan(`\n========================================`));
+  console.log(c.cyan(`  Flashloan Bot v${BOT_VERSION} — ARBITRUM SEPOLIA`));
+  console.log(c.cyan(`  Report-only (no transactions)`));
+  console.log(c.cyan(`  Chain:    ${chain.chainName} (chainId ${chain.chainId})`));
+  console.log(c.cyan(`  RPC:      ${rpcStatus}`));
+  console.log(c.cyan(`  Pools:    ${chain.pools.length} configured`));
+  console.log(c.cyan(`  WETH:     ${chain.tokens.WETH}`));
+  console.log(c.cyan(`  Input:    ${chain.detector.defaultInputAmount} ETH`));
+  console.log(c.cyan(`========================================\n`));
 
   // Guard: RPC URL is required
   if (!chain.rpcUrl) {
@@ -109,57 +124,65 @@ async function main(): Promise<void> {
 
   // ---- Event listeners ----
 
-  // Price updates
+  // Price updates (dim — high volume, low priority)
   bot.monitor.on("priceUpdate", (snapshot: PriceSnapshot) => {
     stats.priceUpdates++;
     console.log(
-      `[${ts()}] [PRICE] ${snapshot.pool.label} ` +
-        `price=${snapshot.price.toFixed(8)} ` +
-        `block=${snapshot.blockNumber}`,
+      c.dim(
+        `[${ts()}] [PRICE] ${snapshot.pool.label} ` +
+          `price=${snapshot.price.toFixed(8)} ` +
+          `block=${snapshot.blockNumber}`,
+      ),
     );
   });
 
-  // Opportunities found
+  // Opportunities found (green = would execute, yellow = unprofitable)
   bot.detector.on("opportunityFound", (opp: ArbitrageOpportunity) => {
     stats.opportunitiesFound++;
-    console.log(`[${ts()}] [OPPORTUNITY] ================================`);
-    console.log(`  Path:       ${opp.path.label}`);
-    console.log(`  Input:      ${opp.inputAmount} ETH`);
-    console.log(`  Gross:      ${opp.grossProfit.toFixed(8)} ETH`);
-    console.log(`  Gas (L2):   ${opp.costs.gasCost.toFixed(8)} ETH`);
+    const profitable = opp.netProfit > 0;
+    const col = profitable ? c.green : c.yellow;
+    const tag = profitable ? "OPPORTUNITY" : "OPPORTUNITY (unprofitable)";
+    console.log(col(`[${ts()}] [${tag}] ================================`));
+    console.log(col(`  Path:       ${opp.path.label}`));
+    console.log(col(`  Input:      ${opp.inputAmount} ETH`));
+    console.log(col(`  Gross:      ${opp.grossProfit.toFixed(8)} ETH`));
+    console.log(col(`  Gas (L2):   ${opp.costs.gasCost.toFixed(8)} ETH`));
     if (opp.costs.l1DataFee !== undefined) {
-      console.log(`  L1 data fee:${opp.costs.l1DataFee.toFixed(8)} ETH`);
+      console.log(col(`  L1 data fee:${opp.costs.l1DataFee.toFixed(8)} ETH`));
     }
-    console.log(`  Flash fee:  ${opp.costs.flashLoanFee.toFixed(8)} ETH`);
-    console.log(`  Slippage:   ${opp.costs.slippageCost.toFixed(8)} ETH`);
-    console.log(`  Total cost: ${opp.costs.totalCost.toFixed(8)} ETH`);
-    console.log(`  Net profit: ${opp.netProfit.toFixed(8)} ETH (${opp.netProfitPercent.toFixed(4)}%)`);
-    console.log(`  Block:      ${opp.blockNumber}`);
-    console.log(`  [REPORT-ONLY] No transaction sent`);
-    console.log(`================================================`);
+    console.log(col(`  Flash fee:  ${opp.costs.flashLoanFee.toFixed(8)} ETH`));
+    console.log(col(`  Slippage:   ${opp.costs.slippageCost.toFixed(8)} ETH`));
+    console.log(col(`  Total cost: ${opp.costs.totalCost.toFixed(8)} ETH`));
+    console.log(col(`  Net profit: ${opp.netProfit.toFixed(8)} ETH (${opp.netProfitPercent.toFixed(4)}%)`));
+    console.log(col(`  Block:      ${opp.blockNumber}`));
+    const decision = profitable ? "WOULD EXECUTE (dry-run)" : "SKIP (costs exceed profit)";
+    console.log(col(`  [${decision}]`));
+    console.log(col(`================================================`));
   });
 
-  // Opportunities rejected
+  // Opportunities rejected (dim — noise)
   bot.detector.on("opportunityRejected", (reason: string, delta: PriceDelta) => {
     stats.opportunitiesRejected++;
     console.log(
-      `[${ts()}] [REJECTED] ${reason} | pair=${delta.pair} delta=${delta.deltaPercent.toFixed(4)}%`,
+      c.dim(
+        `[${ts()}] [REJECTED] ${reason} | pair=${delta.pair} delta=${delta.deltaPercent.toFixed(4)}%`,
+      ),
     );
   });
 
-  // Errors
+  // Errors (red)
   bot.monitor.on("error", (err: Error, pool) => {
     stats.errors++;
-    console.error(`[${ts()}] [ERROR] Pool ${pool.label}: ${err.message}`);
+    console.error(c.red(`[${ts()}] [ERROR] Pool ${pool.label}: ${err.message}`));
   });
 
   bot.monitor.on("stale", (pool) => {
-    console.warn(`[${ts()}] [STALE] Pool marked stale: ${pool.label}`);
+    console.warn(c.yellow(`[${ts()}] [STALE] Pool marked stale: ${pool.label}`));
   });
 
   bot.detector.on("error", (err: unknown) => {
     stats.errors++;
-    console.error(`[${ts()}] [ERROR] Detector: ${err instanceof Error ? err.message : String(err)}`);
+    console.error(c.red(`[${ts()}] [ERROR] Detector: ${err instanceof Error ? err.message : String(err)}`));
   });
 
   // ---- Stats interval (every 60s) ----
@@ -171,11 +194,11 @@ async function main(): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
 
-    console.log(`\n[${ts()}] [SHUTDOWN] Stopping Arbitrum Sepolia monitor...`);
+    console.log(c.bold(`\n[${ts()}] [SHUTDOWN] Stopping Arbitrum Sepolia monitor...`));
     clearInterval(statsInterval);
     await bot.stop();
 
-    console.log(`\n[${ts()}] [SHUTDOWN] Final stats:`);
+    console.log(c.bold(`\n[${ts()}] [SHUTDOWN] Final stats:`));
     logStats();
     process.exit(0);
   };

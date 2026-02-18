@@ -63,7 +63,7 @@ export const ARBITRUM_SEPOLIA_CONFIG: ChainConfig = {
   detector: {
     minProfitThreshold: 0.0001, // Much lower for testnet (0.0001 ETH)
     maxSlippage: 0.005, // 0.5%
-    defaultInputAmount: 1, // 1 ETH flash loan (smaller for testnet)
+    defaultInputAmount: 0.5, // 0.5 ETH flash loan (realistic for small capital)
     gasPriceGwei: 0.1, // Same as mainnet
     gasPerSwap: 150_000,
   },
