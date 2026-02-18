@@ -64,7 +64,7 @@ export const ARBITRUM_CONFIG: ChainConfig = {
   detector: {
     minProfitThreshold: 0.01, // Same as Ethereum (0.01 ETH)
     maxSlippage: 0.005, // 0.5%
-    defaultInputAmount: 10, // 10 ETH flash loan
+    defaultInputAmount: 0.5, // 0.5 ETH flash loan (conservative for dry-run)
     gasPriceGwei: 0.1, // Arbitrum typical gas price
     gasPerSwap: 150_000,
   },
