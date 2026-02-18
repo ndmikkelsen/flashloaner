@@ -30,10 +30,10 @@ Requirements for Arbitrum testnet validation milestone.
 
 ### Testnet Validation
 
-- [ ] **TEST-01**: Bot runs on Arbitrum Sepolia for 1+ hours without errors
-- [ ] **TEST-02**: Bot detects and reports at least 1 arb opportunity on testnet
-- [ ] **TEST-03**: eth_call simulation works correctly on Arbitrum Sepolia
-- [ ] **TEST-04**: All existing tests (Solidity + TypeScript) continue to pass after changes
+- [x] **TEST-01**: Bot runs on Arbitrum Sepolia for 1+ hours without errors
+- [x] **TEST-02**: Bot detects and reports at least 1 arb opportunity on testnet
+- [x] **TEST-03**: eth_call simulation works correctly on Arbitrum Sepolia
+- [x] **TEST-04**: All existing tests (Solidity + TypeScript) continue to pass after changes
 
 ### Monorepo Structure
 
@@ -94,10 +94,10 @@ Deferred to future milestones. Not in current roadmap.
 | BOT-03 | Phase 3 | Complete |
 | BOT-04 | Phase 3 | Complete |
 | BOT-05 | Phase 3 | Complete |
-| TEST-01 | Phase 4 | Pending |
-| TEST-02 | Phase 4 | Pending |
-| TEST-03 | Phase 4 | Pending |
-| TEST-04 | Phase 4 | Pending |
+| TEST-01 | Phase 4 | Complete |
+| TEST-02 | Phase 4 | Complete |
+| TEST-03 | Phase 4 | Complete |
+| TEST-04 | Phase 4 | Complete |
 | REPO-01 | Phase 2 | Complete |
 | REPO-02 | Phase 2 | Complete |
 | REPO-03 | Phase 2 | Complete |
@@ -109,4 +109,4 @@ Deferred to future milestones. Not in current roadmap.
 
 ---
 *Requirements defined: 2026-02-16*
-*Last updated: 2026-02-16 after roadmap creation*
+*Last updated: 2026-02-18 after Phase 4 completion*

@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** The bot must never lose funds beyond gas costs — the 4-layer safety system (off-chain estimate, eth_call simulation, on-chain ProfitValidator, MEV protection) ensures every transaction either profits or reverts.
-**Current focus:** Phase 4 - Testnet Validation
+**Current focus:** v1 Milestone COMPLETE
 
 ## Current Position
 
-Phase: 3 of 4 (Bot Adaptation) - COMPLETE (including gap closure)
-Plan: 4 of 4 (COMPLETE) — gap closure plan 03-04 done
-Status: Phase 3 fully complete — all plans including gap closure done; ready for Phase 4
-Last activity: 2026-02-17 — Discovered real Uniswap V3 WETH/USDC pool addresses on Arbitrum Sepolia, replaced TBD placeholders (plan 03-04 gap closure)
+Phase: 4 of 4 (Testnet Validation) - COMPLETE
+Plan: 2 of 2 (COMPLETE)
+Status: ALL PHASES COMPLETE — v1 milestone fully validated
+Last activity: 2026-02-18 — Bot ran 62m53s on Arbitrum Sepolia: 3,769 opportunities detected, 0 errors, 0 crashes. All 762 tests pass.
 
-Progress: [████████░░] 85%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 10
-- Average duration: 3.3 minutes
-- Total execution time: 0.59 hours
+- Total plans completed: 12
+- Average duration: 3.5 minutes
+- Total execution time: ~1.3 hours (including 63-min bot run)
 
 **By Phase:**
 
@@ -30,10 +30,7 @@ Progress: [████████░░] 85%
 | Phase 1 - Chain Research | 1 | 5 min | 5 min |
 | Phase 2 - Infrastructure Setup | 4 | 14 min | 3.5 min |
 | Phase 3 - Bot Adaptation | 4 | 13 min | 3.25 min |
-
-**Recent Trend:**
-- Last 6 plans: 02-04 (5 min), 03-01 (3 min), 03-02 (2 min), 03-03 (7 min), 03-04 (1 min)
-- Trend: Consistent ~1-7 min/plan
+| Phase 4 - Testnet Validation | 2 | 65 min | 32.5 min |
 
 *Updated after each plan completion*
 
@@ -80,6 +77,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-17
-Stopped at: Phase 3 Plan 04 (gap closure) complete — Discovered real WETH/USDC Uniswap V3 pool addresses on Arbitrum Sepolia, replaced all TBD placeholders, 450 tests pass.
-Resume file: .planning/phases/03-bot-adaptation/03-04-SUMMARY.md
+Last session: 2026-02-18
+Stopped at: v1 milestone COMPLETE — All 4 phases done. Bot validated on Arbitrum Sepolia (62m53s, 3769 opportunities, 0 errors). 19/19 requirements satisfied.
+Resume file: .planning/ROADMAP.md

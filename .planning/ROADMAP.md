@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Chain Research** - Validate Arbitrum as optimal chain for small-capital arb (completed 2026-02-16)
 - [x] **Phase 2: Infrastructure Setup** - Deploy contracts to Arbitrum Sepolia and configure monorepo (completed 2026-02-17)
 - [x] **Phase 3: Bot Adaptation** - Adapt bot for Arbitrum RPC, gas model, and DEX pools (completed 2026-02-17)
-- [ ] **Phase 4: Testnet Validation** - Run bot on Arbitrum Sepolia for 1+ hours, validate detection and execution
+- [x] **Phase 4: Testnet Validation** - Run bot on Arbitrum Sepolia for 1+ hours, validate detection and execution (completed 2026-02-18)
 
 ## Phase Details
 
@@ -85,8 +85,8 @@ Waves:
 **Plans**: 2 plans in 2 waves
 
 Plans:
-- [ ] 04-01-PLAN.md — Pre-run checks, eth_call smoke test, and 1-hour live bot run (TEST-01, TEST-02, TEST-03)
-- [ ] 04-02-PLAN.md — Regression test gate: full Solidity + TypeScript test suites (TEST-04)
+- [x] 04-01-PLAN.md — Pre-run checks, eth_call smoke test, and 1-hour live bot run (TEST-01, TEST-02, TEST-03)
+- [x] 04-02-PLAN.md — Regression test gate: full Solidity + TypeScript test suites (TEST-04)
 
 Waves:
 - Wave 1: 04-01 (human-action -- live RPC pre-checks + 1-hour bot run)
@@ -102,4 +102,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Chain Research | 1/1 | Complete    | 2026-02-16 |
 | 2. Infrastructure Setup | 4/4 | Complete    | 2026-02-17 |
 | 3. Bot Adaptation | 3/4 | Complete    | 2026-02-17 |
-| 4. Testnet Validation | 0/2 | Not started | - |
+| 4. Testnet Validation | 2/2 | Complete    | 2026-02-18 |
