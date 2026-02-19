@@ -72,16 +72,17 @@ export const ARBITRUM_CONFIG: ChainConfig = {
   // Monitor configuration (0.25s blocks = faster polling)
   monitor: {
     deltaThresholdPercent: 0.3, // Same as Ethereum
-    pollIntervalMs: 1_000, // 1s polling (Arbitrum has 0.25s blocks)
+    pollIntervalMs: 3_000, // 3s polling (still 12x Arbitrum's 0.25s block time)
     maxRetries: 3,
   },
 
-  // Detector configuration (Arbitrum thresholds)
+  // Detector configuration (Arbitrum thresholds — tuned from v1 dry-run analysis)
+  // Fee deduction is now handled in OpportunityDetector.calculateGrossProfit()
   detector: {
-    minProfitThreshold: 0.01, // Same as Ethereum (0.01 ETH)
-    maxSlippage: 0.005, // 0.5%
-    defaultInputAmount: 0.5, // 0.5 ETH flash loan (conservative for dry-run)
-    gasPriceGwei: 0.1, // Arbitrum typical gas price
+    minProfitThreshold: 0.005, // Lowered from 0.01 — catches marginal SPELL/WETH opps (~0.016 ETH net)
+    maxSlippage: 0.001, // 0.1% — tighter than 0.5% default; V2 pools handle moderate sizes well
+    defaultInputAmount: 5, // 5 ETH flash loan (minimum viable for SPELL/WETH profitability)
+    gasPriceGwei: 0.1, // Arbitrum typical gas price (L2 only; L1 via gasEstimatorFn)
     gasPerSwap: 150_000,
   },
 

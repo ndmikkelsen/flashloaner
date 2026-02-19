@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { Contract } from "ethers";
+import { Contract, Interface } from "ethers";
 import type {
   PoolConfig,
   PriceDelta,
@@ -27,6 +27,18 @@ const ALGEBRA_V3_POOL_ABI = [
   "function globalState() view returns (uint160 price, int24 tick, uint16 feeZto, uint16 feeOtz, uint16 timepointIndex, uint8 communityFeeToken0, uint8 communityFeeToken1)",
 ];
 
+// Pre-built Interface instances for encoding/decoding call data
+const v2Iface = new Interface(UNISWAP_V2_PAIR_ABI);
+const v3Iface = new Interface(UNISWAP_V3_POOL_ABI);
+const algebraIface = new Interface(ALGEBRA_V3_POOL_ABI);
+
+// Multicall3 — deployed at same address on all EVM chains
+const MULTICALL3_ADDRESS = "0xcA11bde05977b3631167028862bE2a173976CA11";
+const MULTICALL3_ABI = [
+  "function aggregate3(tuple(address target, bool allowFailure, bytes callData)[] calls) returns (tuple(bool success, bytes returnData)[])",
+];
+const multicallIface = new Interface(MULTICALL3_ABI);
+
 /**
  * Monitors DEX pool prices and detects cross-DEX arbitrage opportunities.
  *
@@ -49,6 +61,7 @@ export class PriceMonitor extends EventEmitter {
       deltaThresholdPercent: config.deltaThresholdPercent ?? 0.5,
       pollIntervalMs: config.pollIntervalMs ?? 12_000,
       maxRetries: config.maxRetries ?? 3,
+      useMulticall: config.useMulticall ?? true,
     };
   }
 
@@ -87,6 +100,22 @@ export class PriceMonitor extends EventEmitter {
 
   /** Single poll cycle: fetch all pools, detect deltas */
   async poll(): Promise<void> {
+    if (this.config.useMulticall) {
+      try {
+        await this.pollMulticall();
+        return;
+      } catch {
+        // Multicall failed entirely — fall back to individual calls
+      }
+    }
+
+    await this.pollIndividual();
+  }
+
+  /** Fetch all pools with individual RPC calls (fallback path) */
+  private async pollIndividual(): Promise<void> {
+    const freshPools = new Set<string>();
+
     await Promise.all(
       this.config.pools.map(async (pool) => {
         const key = pool.poolAddress.toLowerCase();
@@ -94,6 +123,7 @@ export class PriceMonitor extends EventEmitter {
           const snapshot = await this.fetchPrice(pool);
           this.consecutiveErrors.set(key, 0);
           this.snapshots.set(key, snapshot);
+          freshPools.add(key);
           this.emit("priceUpdate", snapshot);
         } catch (err) {
           const errCount = (this.consecutiveErrors.get(key) ?? 0) + 1;
@@ -107,7 +137,117 @@ export class PriceMonitor extends EventEmitter {
       }),
     );
 
-    this.detectOpportunities();
+    this.detectOpportunities(freshPools);
+  }
+
+  /** Batch all pool reads into a single Multicall3 aggregate3() call */
+  private async pollMulticall(): Promise<void> {
+    const blockNumber = await this.config.provider.getBlockNumber();
+    const freshPools = new Set<string>();
+
+    const calls = this.config.pools.map((pool) => ({
+      target: pool.poolAddress,
+      allowFailure: true,
+      callData: this.getCallDataForPool(pool),
+    }));
+
+    const calldata = multicallIface.encodeFunctionData("aggregate3", [calls]);
+    const rawResult = await this.config.provider.call({
+      to: MULTICALL3_ADDRESS,
+      data: calldata,
+    });
+
+    if (!rawResult || rawResult === "0x") {
+      throw new Error("Multicall3 returned empty result");
+    }
+
+    const decoded = multicallIface.decodeFunctionResult("aggregate3", rawResult);
+    const results = decoded[0];
+
+    for (let i = 0; i < this.config.pools.length; i++) {
+      const pool = this.config.pools[i];
+      const key = pool.poolAddress.toLowerCase();
+      const result = results[i];
+
+      if (!result.success) {
+        const errCount = (this.consecutiveErrors.get(key) ?? 0) + 1;
+        this.consecutiveErrors.set(key, errCount);
+        this.emit(
+          "error",
+          new Error(`Multicall failed for ${pool.label}`),
+          pool,
+        );
+        if (errCount >= this.config.maxRetries) {
+          this.emit("stale", pool);
+        }
+        continue;
+      }
+
+      try {
+        const price = this.decodePriceFromResult(pool, result.returnData);
+        const snapshot: PriceSnapshot = {
+          pool,
+          price,
+          inversePrice: 1 / price,
+          blockNumber,
+          timestamp: Date.now(),
+        };
+        this.consecutiveErrors.set(key, 0);
+        this.snapshots.set(key, snapshot);
+        freshPools.add(key);
+        this.emit("priceUpdate", snapshot);
+      } catch (err) {
+        const errCount = (this.consecutiveErrors.get(key) ?? 0) + 1;
+        this.consecutiveErrors.set(key, errCount);
+        this.emit("error", toError(err), pool);
+        if (errCount >= this.config.maxRetries) {
+          this.emit("stale", pool);
+        }
+      }
+    }
+
+    this.detectOpportunities(freshPools);
+  }
+
+  /** Get the encoded call data for reading price from a pool */
+  private getCallDataForPool(pool: PoolConfig): string {
+    if (pool.dex === "camelot_v3") {
+      return algebraIface.encodeFunctionData("globalState");
+    }
+    if (pool.dex === "uniswap_v3" || pool.dex === "sushiswap_v3") {
+      return v3Iface.encodeFunctionData("slot0");
+    }
+    return v2Iface.encodeFunctionData("getReserves");
+  }
+
+  /** Decode the price from raw return data based on pool's DEX type */
+  private decodePriceFromResult(pool: PoolConfig, returnData: string): number {
+    if (pool.dex === "camelot_v3") {
+      const decoded = algebraIface.decodeFunctionResult(
+        "globalState",
+        returnData,
+      );
+      return this.calculateV3Price(
+        BigInt(decoded[0]),
+        pool.decimals0,
+        pool.decimals1,
+      );
+    }
+    if (pool.dex === "uniswap_v3" || pool.dex === "sushiswap_v3") {
+      const decoded = v3Iface.decodeFunctionResult("slot0", returnData);
+      return this.calculateV3Price(
+        BigInt(decoded[0]),
+        pool.decimals0,
+        pool.decimals1,
+      );
+    }
+    const decoded = v2Iface.decodeFunctionResult("getReserves", returnData);
+    return this.calculateV2Price(
+      BigInt(decoded[0]),
+      BigInt(decoded[1]),
+      pool.decimals0,
+      pool.decimals1,
+    );
   }
 
   /** Fetch the current price from a single pool */
@@ -214,12 +354,17 @@ export class PriceMonitor extends EventEmitter {
     return rawPrice * 10 ** (decimals0 - decimals1);
   }
 
-  /** Compare all pools with the same token pair and emit opportunity events */
-  private detectOpportunities(): void {
-    // Group snapshots by token pair
+  /**
+   * Compare all pools with the same token pair and emit opportunity events.
+   * Only considers pools that were successfully refreshed this cycle to
+   * avoid phantom spreads from stale cached prices after RPC errors.
+   */
+  private detectOpportunities(freshPools: Set<string>): void {
+    // Group snapshots by token pair, only including pools refreshed this cycle
     const pairGroups = new Map<string, PriceSnapshot[]>();
 
     for (const snapshot of this.snapshots.values()) {
+      if (!freshPools.has(snapshot.pool.poolAddress.toLowerCase())) continue;
       const key = this.pairKey(snapshot.pool);
       const group = pairGroups.get(key) ?? [];
       group.push(snapshot);

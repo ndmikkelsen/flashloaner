@@ -112,11 +112,15 @@ async function main(): Promise<void> {
       const ethCosts = gasComponentsToEth(components);
       return { gasCost: ethCosts.l2CostEth, l1DataFee: ethCosts.l1CostEth };
     } catch (err) {
-      // Fallback: use simple estimation if NodeInterface call fails (e.g., on local fork)
+      // Fallback: static L1+L2 estimate when NodeInterface fails (e.g., on local fork).
+      // Based on typical Arbitrum conditions: L1 data ~90% of cost, L2 execution ~10%.
+      // Total ~0.0002 ETH per swap step (conservative).
       console.warn(
-        `[GAS] NodeInterface call failed, using L2-only estimate: ${err instanceof Error ? err.message : err}`,
+        `[GAS] NodeInterface call failed, using static estimate: ${err instanceof Error ? err.message : err}`,
       );
-      return { gasCost: 0, l1DataFee: undefined };
+      const staticL2 = 0.00002 * numSwaps;
+      const staticL1 = 0.00018 * numSwaps;
+      return { gasCost: staticL2, l1DataFee: staticL1 };
     }
   };
 

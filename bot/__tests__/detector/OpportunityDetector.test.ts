@@ -257,12 +257,12 @@ describe("OpportunityDetector", () => {
       const delta = makeDelta({ buyPrice: 2000, sellPrice: 2020 });
       const path = detector.buildSwapPath(delta);
 
-      // Input: 10 USDC
-      // Step 1: 10 USDC * inversePrice(2000) = 10 * 0.0005 = 0.005 WETH
-      // Step 2: 0.005 WETH * 2020 = 10.1 USDC
-      // Gross profit = 10.1 - 10 = 0.1 USDC
+      // Input: 10 USDC (V2 pools → 0.3% fee per step)
+      // Step 1: 10 * (1 - 0.003) * 0.0005 = 0.004985 WETH
+      // Step 2: 0.004985 * (1 - 0.003) * 2020 = 10.0395 USDC
+      // Gross profit = 10.0395 - 10 ≈ 0.0395 USDC
       const grossProfit = detector.calculateGrossProfit(path, 10);
-      expect(grossProfit).toBeCloseTo(0.1, 2);
+      expect(grossProfit).toBeCloseTo(0.0395, 2);
     });
 
     it("should return negative for unprofitable path", () => {
@@ -295,7 +295,9 @@ describe("OpportunityDetector", () => {
       });
 
       // Price chain: 1 WETH → 2000 USDC → 2010 DAI → 1.005 WETH
-      // Gross = 1.005 - 1 = 0.005 WETH per 1 WETH input
+      // With 0.3% fee per step (3 steps):
+      // 1 * 0.997 * 2000 * 0.997 * 1.005 * 0.997 * 0.0005 ≈ 0.996
+      // Gross = 0.996 - 1 ≈ -0.004 (fees exceed the 0.5% raw spread)
       const snapAB = makeSnapshot(poolAB, 2000);
       const snapBC = makeSnapshot(poolBC, 1.005);
       const snapCA = makeSnapshot(poolCA, 0.0005);
@@ -303,9 +305,7 @@ describe("OpportunityDetector", () => {
       const path = detector.buildTriangularPath(snapAB, snapBC, snapCA);
       const grossProfit = detector.calculateGrossProfit(path, 1);
 
-      // 1 * 2000 * 1.005 * 0.0005 = 1.005
-      // Profit = 1.005 - 1 = 0.005
-      expect(grossProfit).toBeCloseTo(0.005, 4);
+      expect(grossProfit).toBeCloseTo(-0.004, 2);
     });
   });
 
@@ -598,8 +598,8 @@ describe("OpportunityDetector", () => {
 
       expect(result).not.toBeNull();
       expect(result!.inputAmount).toBe(100);
-      // 5% of 100 = 5.0
-      expect(result!.grossProfit).toBeCloseTo(5.0, 1);
+      // 5% spread minus 2 × 0.3% fees: 100 * 0.997^2 * 1.05 - 100 ≈ 4.37
+      expect(result!.grossProfit).toBeCloseTo(4.37, 1);
     });
   });
 });

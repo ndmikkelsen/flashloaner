@@ -62,6 +62,8 @@ export interface PriceMonitorConfig {
   pollIntervalMs?: number;
   /** Maximum retries per pool fetch before marking stale. Default: 3 */
   maxRetries?: number;
+  /** Use Multicall3 to batch all pool reads into a single RPC call. Default: true */
+  useMulticall?: boolean;
 }
 
 /** Events emitted by PriceMonitor */

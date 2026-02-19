@@ -316,20 +316,36 @@ export class OpportunityDetector extends EventEmitter {
   }
 
   /**
-   * Calculate gross profit for a swap path (before costs).
+   * Calculate gross profit for a swap path (before non-trading costs).
+   * Deducts DEX trading fees from each swap step, since fees reduce actual output.
+   *
    * For a 2-step path (buy low, sell high):
-   *   gross = inputAmount * (sellPrice / buyPrice - 1)
-   * For multi-hop: chain the expected prices.
+   *   output = input * (1 - fee1) * price1 * (1 - fee2) * price2
+   *   gross = output - input
    */
   calculateGrossProfit(path: SwapPath, inputAmount: number): number {
-    // Chain prices through the path to get output amount
+    // Chain prices through the path, deducting DEX trading fees at each step
     let amount = inputAmount;
     for (const step of path.steps) {
-      amount = amount * step.expectedPrice;
+      const feeRate = this.getSwapFeeRate(step);
+      amount = amount * (1 - feeRate) * step.expectedPrice;
     }
 
     // Gross profit = final amount - initial amount
     return amount - inputAmount;
+  }
+
+  /**
+   * Get the trading fee rate for a swap step.
+   * V3 pools: feeTier is in hundredths of a bip (500 = 0.05%, 3000 = 0.3%, 10000 = 1%)
+   * V2/Camelot V2 pools: standard 0.3% fee
+   */
+  private getSwapFeeRate(step: SwapStep): number {
+    if (step.feeTier !== undefined) {
+      return step.feeTier / 1_000_000;
+    }
+    // V2-style pools (SushiSwap V2, Camelot V2, Uniswap V2): standard 0.3%
+    return 0.003;
   }
 
   /**

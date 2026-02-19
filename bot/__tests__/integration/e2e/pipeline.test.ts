@@ -56,7 +56,7 @@ describe("E2E: PriceMonitor → OpportunityDetector pipeline", () => {
     const opp = opportunities[0];
     expect(opp.netProfit).toBeGreaterThan(0);
     expect(opp.path.steps).toHaveLength(2);
-    expect(opp.grossProfit).toBeCloseTo(0.5, 1); // 5% of 10 input
+    expect(opp.grossProfit).toBeCloseTo(0.437, 1); // 5% spread minus 2 × 0.3% DEX fees
   });
 
   it("should NOT emit opportunity for tiny spread below threshold", async () => {
