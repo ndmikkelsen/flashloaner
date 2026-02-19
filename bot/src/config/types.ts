@@ -44,6 +44,10 @@ export interface MonitorConfig {
   pollIntervalMs: number;
   /** Max consecutive fetch failures before stale. Default: 3 */
   maxRetries: number;
+  /** Minimum WETH reserve for V2 pools to be viable (ETH). Default: 0 (disabled) */
+  minReserveWeth?: number;
+  /** WETH address for liquidity checks */
+  wethAddress?: string;
 }
 
 /** OpportunityDetector configuration subset */

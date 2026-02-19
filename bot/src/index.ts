@@ -64,6 +64,8 @@ export class FlashloanBot {
       deltaThresholdPercent: config.monitor.deltaThresholdPercent,
       pollIntervalMs: config.monitor.pollIntervalMs,
       maxRetries: config.monitor.maxRetries,
+      minReserveWeth: config.monitor.minReserveWeth,
+      wethAddress: config.monitor.wethAddress,
     });
 
     this.detector = new OpportunityDetector({

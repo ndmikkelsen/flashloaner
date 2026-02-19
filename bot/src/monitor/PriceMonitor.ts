@@ -62,6 +62,8 @@ export class PriceMonitor extends EventEmitter {
       pollIntervalMs: config.pollIntervalMs ?? 12_000,
       maxRetries: config.maxRetries ?? 3,
       useMulticall: config.useMulticall ?? true,
+      minReserveWeth: config.minReserveWeth ?? 0,
+      wethAddress: config.wethAddress ?? "",
     };
   }
 
@@ -242,12 +244,10 @@ export class PriceMonitor extends EventEmitter {
       );
     }
     const decoded = v2Iface.decodeFunctionResult("getReserves", returnData);
-    return this.calculateV2Price(
-      BigInt(decoded[0]),
-      BigInt(decoded[1]),
-      pool.decimals0,
-      pool.decimals1,
-    );
+    const reserve0 = BigInt(decoded[0]);
+    const reserve1 = BigInt(decoded[1]);
+    this.checkV2Liquidity(pool, reserve0, reserve1);
+    return this.calculateV2Price(reserve0, reserve1, pool.decimals0, pool.decimals1);
   }
 
   /** Fetch the current price from a single pool */
@@ -281,13 +281,10 @@ export class PriceMonitor extends EventEmitter {
       this.config.provider,
     );
     const [reserve0, reserve1] = await contract.getReserves();
-
-    return this.calculateV2Price(
-      BigInt(reserve0),
-      BigInt(reserve1),
-      pool.decimals0,
-      pool.decimals1,
-    );
+    const r0 = BigInt(reserve0);
+    const r1 = BigInt(reserve1);
+    this.checkV2Liquidity(pool, r0, r1);
+    return this.calculateV2Price(r0, r1, pool.decimals0, pool.decimals1);
   }
 
   /** Read sqrtPriceX96 from a Uniswap V3-style pool */
@@ -352,6 +349,32 @@ export class PriceMonitor extends EventEmitter {
     const sqrtPrice = Number(sqrtPriceX96) / Number(Q96);
     const rawPrice = sqrtPrice * sqrtPrice;
     return rawPrice * 10 ** (decimals0 - decimals1);
+  }
+
+  /**
+   * Check that a V2 pool has sufficient WETH liquidity for viable arbitrage.
+   * Throws if the WETH-side reserve is below the configured minimum,
+   * preventing thin pools from generating false positive opportunities.
+   */
+  private checkV2Liquidity(pool: PoolConfig, reserve0: bigint, reserve1: bigint): void {
+    const minReserve = this.config.minReserveWeth;
+    const wethAddr = this.config.wethAddress?.toLowerCase();
+    if (!minReserve || !wethAddr) return;
+
+    let wethReserve: number;
+    if (pool.token0.toLowerCase() === wethAddr) {
+      wethReserve = Number(reserve0) / 1e18;
+    } else if (pool.token1.toLowerCase() === wethAddr) {
+      wethReserve = Number(reserve1) / 1e18;
+    } else {
+      return; // Not a WETH pair, skip check
+    }
+
+    if (wethReserve < minReserve) {
+      throw new Error(
+        `Low liquidity: ${pool.label} has ${wethReserve.toFixed(2)} WETH (min: ${minReserve})`,
+      );
+    }
   }
 
   /**

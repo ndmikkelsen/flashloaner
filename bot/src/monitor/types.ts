@@ -64,6 +64,10 @@ export interface PriceMonitorConfig {
   maxRetries?: number;
   /** Use Multicall3 to batch all pool reads into a single RPC call. Default: true */
   useMulticall?: boolean;
+  /** Minimum WETH reserve (in ETH) for V2 pools to be considered viable. Default: 5.0 */
+  minReserveWeth?: number;
+  /** WETH address for liquidity checks. Required when minReserveWeth is set. */
+  wethAddress?: string;
 }
 
 /** Events emitted by PriceMonitor */

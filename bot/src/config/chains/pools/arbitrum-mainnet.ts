@@ -234,15 +234,8 @@ export const ARBITRUM_MAINNET_POOLS: PoolDefinition[] = [
     decimals1: 18,
   },
 
-  {
-    label: "JONES/WETH SushiV2",
-    dex: "sushiswap",
-    poolAddress: "0xe8EE01aE5959D3231506FcDeF2d5F3E85987a39c",
-    token0: "0x10393c20975cF177a3513071bC110f7962CD67da", // JONES
-    token1: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH
-    decimals0: 18,
-    decimals1: 18,
-  },
+  // JONES/WETH SushiV2 removed — 3.4 WETH reserve ($9K), too thin for 5 ETH trades.
+  // JONES Camelot V2 kept as single-pool monitor (47.4 WETH, viable for future pairing).
 
   // ──── DPX/WETH ───────────────────────────────────────────────
 
@@ -278,13 +271,7 @@ export const ARBITRUM_MAINNET_POOLS: PoolDefinition[] = [
     decimals1: 18,
   },
 
-  {
-    label: "SPELL/WETH Camelot V2",
-    dex: "camelot_v2",
-    poolAddress: "0xE28881d63f4F0577d4f75eA04F3a3e75FEFfC491",
-    token0: "0x3E6648C5a70A150A88bCE65F4aD4d506Fe15d2AF", // SPELL
-    token1: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH
-    decimals0: 18,
-    decimals1: 18,
-  },
+  // SPELL/WETH Camelot V2 removed — 0.285 WETH reserve ($770 TVL). A 5 ETH trade
+  // drains 94% of the pool, causing catastrophic price impact. The 1.03% spread is
+  // real but unexecutable. SPELL SushiV2 kept for monitoring (37 WETH reserve).
 ];

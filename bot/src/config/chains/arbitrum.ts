@@ -74,6 +74,8 @@ export const ARBITRUM_CONFIG: ChainConfig = {
     deltaThresholdPercent: 0.3, // Same as Ethereum
     pollIntervalMs: 3_000, // 3s polling (still 12x Arbitrum's 0.25s block time)
     maxRetries: 3,
+    minReserveWeth: 5.0, // Skip V2 pools with < 5 WETH reserve (prevents thin-pool false positives)
+    wethAddress: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1",
   },
 
   // Detector configuration (Arbitrum thresholds — tuned from v1 dry-run analysis)
