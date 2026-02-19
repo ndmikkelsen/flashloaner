@@ -5,19 +5,20 @@
 See: .planning/PROJECT.md (updated 2026-02-19)
 
 **Core value:** The bot must never lose funds beyond gas costs — the 4-layer safety system (off-chain estimate, eth_call simulation, on-chain ProfitValidator, MEV protection) ensures every transaction either profits or reverts.
-**Current focus:** v1.0 milestone SHIPPED. Planning next milestone.
+**Current focus:** v1.1 Mainnet Profitability — defining requirements
 
 ## Current Position
 
-Milestone: v1.0 Multi-Chain Expansion — SHIPPED 2026-02-19
-Status: Between milestones. Post-v1.0 mainnet iteration work in progress.
-Last activity: 2026-02-19 — v1.0 milestone archived. 772 tests pass (312 Solidity + 460 TypeScript).
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements for v1.1
+Last activity: 2026-02-19 — Milestone v1.1 started
 
 ## Accumulated Context
 
 ### Decisions
 
-All v1.0 decisions documented in PROJECT.md Key Decisions table with outcomes.
+All v1.0 decisions documented in PROJECT.md Key Decisions table.
 
 ### Pending Todos
 
@@ -30,5 +31,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: v1.0 milestone archived. Next: `/gsd:new-milestone` for v1.1.
+Stopped at: Defining v1.1 requirements
 Resume file: .planning/ROADMAP.md

@@ -38,11 +38,13 @@ The bot must never lose funds beyond gas costs — the 4-layer safety system (of
 
 <!-- Current scope. Building toward these. -->
 
-- [ ] Mainnet profitability: achieve consistent net-positive arb trades on Arbitrum mainnet
-- [ ] Cross-fee-tier routing (0.05% <-> 0.3% pairs for lower combined fees)
-- [ ] Expanded DEX coverage (Trader Joe, Ramses, Zyberswap) for wider spreads
-- [ ] Optimal input sizing per-opportunity based on pool depth
-- [ ] Transaction execution with on-chain FlashloanExecutor (move beyond dry-run)
+- [ ] Consistent mainnet profitability: 24+ hours net-positive P&L on Arbitrum mainnet
+- [ ] Cross-fee-tier routing (0.05% + 0.3% pairs for 0.35% cost floor instead of 0.6%)
+- [ ] Expanded DEX coverage (Trader Joe, Ramses, Zyberswap) for wider cross-DEX spreads
+- [ ] Optimal input sizing per-opportunity based on pool depth and liquidity
+- [ ] Live execution via FlashloanExecutor with flash-loan-only trades (zero capital risk)
+- [ ] P&L dashboard with trade history, profit tracking, and summary statistics
+- [ ] Process management (pm2) for persistent bot operation with auto-restart
 
 ### Out of Scope
 
@@ -92,5 +94,19 @@ Shipped v1.0 with 17,418 LOC TypeScript + Solidity contracts. Tech stack: Foundr
 | SushiSwap V2 as UniV2 equivalent | Same interface on Arbitrum | ✓ Good — existing adapter works unchanged |
 | Pool-aware dynamic slippage | Static 0.1% model was inaccurate | ✓ Good — catches thin liquidity traps, accurate for deep pools |
 
+## Current Milestone: v1.1 Mainnet Profitability
+
+**Goal:** Achieve consistent net-positive arbitrage trading on Arbitrum mainnet with flash-loan-only execution (zero capital risk beyond gas).
+
+**Target features:**
+- Cross-fee-tier routing to reduce minimum cost floor from 0.6% to 0.35%
+- Expanded DEX coverage (Trader Joe, Ramses, Zyberswap) for wider spreads
+- Live transaction execution via FlashloanExecutor (flash loans only, reverts if unprofitable)
+- Optimal input sizing per-opportunity based on pool depth
+- P&L dashboard and trade history tracking
+- pm2 process management for persistent operation
+
+**Success bar:** Bot runs 24+ hours on Arbitrum mainnet with net-positive P&L after gas costs.
+
 ---
-*Last updated: 2026-02-19 after v1.0 milestone*
+*Last updated: 2026-02-19 after v1.1 milestone start*
