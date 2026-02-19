@@ -27,10 +27,15 @@ const ALGEBRA_V3_POOL_ABI = [
   "function globalState() view returns (uint160 price, int24 tick, uint16 feeZto, uint16 feeOtz, uint16 timepointIndex, uint8 communityFeeToken0, uint8 communityFeeToken1)",
 ];
 
+const LIQUIDITY_ABI = [
+  "function liquidity() view returns (uint128)",
+];
+
 // Pre-built Interface instances for encoding/decoding call data
 const v2Iface = new Interface(UNISWAP_V2_PAIR_ABI);
 const v3Iface = new Interface(UNISWAP_V3_POOL_ABI);
 const algebraIface = new Interface(ALGEBRA_V3_POOL_ABI);
+const liquidityIface = new Interface(LIQUIDITY_ABI);
 
 // Multicall3 — deployed at same address on all EVM chains
 const MULTICALL3_ADDRESS = "0xcA11bde05977b3631167028862bE2a173976CA11";
@@ -147,13 +152,28 @@ export class PriceMonitor extends EventEmitter {
     const blockNumber = await this.config.provider.getBlockNumber();
     const freshPools = new Set<string>();
 
-    const calls = this.config.pools.map((pool) => ({
+    // Build multicall: price calls (1 per pool) + liquidity calls (1 per V3 pool)
+    const priceCalls = this.config.pools.map((pool) => ({
       target: pool.poolAddress,
       allowFailure: true,
       callData: this.getCallDataForPool(pool),
     }));
 
-    const calldata = multicallIface.encodeFunctionData("aggregate3", [calls]);
+    const v3PoolIndices: number[] = [];
+    const liquidityCalls: Array<{ target: string; allowFailure: boolean; callData: string }> = [];
+    for (let i = 0; i < this.config.pools.length; i++) {
+      if (this.isV3Pool(this.config.pools[i])) {
+        v3PoolIndices.push(i);
+        liquidityCalls.push({
+          target: this.config.pools[i].poolAddress,
+          allowFailure: true,
+          callData: liquidityIface.encodeFunctionData("liquidity"),
+        });
+      }
+    }
+
+    const allCalls = [...priceCalls, ...liquidityCalls];
+    const calldata = multicallIface.encodeFunctionData("aggregate3", [allCalls]);
     const rawResult = await this.config.provider.call({
       to: MULTICALL3_ADDRESS,
       data: calldata,
@@ -166,7 +186,16 @@ export class PriceMonitor extends EventEmitter {
     const decoded = multicallIface.decodeFunctionResult("aggregate3", rawResult);
     const results = decoded[0];
 
-    for (let i = 0; i < this.config.pools.length; i++) {
+    // Process price results (indices 0..N-1)
+    const N = this.config.pools.length;
+    const poolData = new Map<number, {
+      price: number;
+      reserves?: [bigint, bigint];
+      sqrtPriceX96?: bigint;
+      liquidity?: bigint;
+    }>();
+
+    for (let i = 0; i < N; i++) {
       const pool = this.config.pools[i];
       const key = pool.poolAddress.toLowerCase();
       const result = results[i];
@@ -186,18 +215,8 @@ export class PriceMonitor extends EventEmitter {
       }
 
       try {
-        const price = this.decodePriceFromResult(pool, result.returnData);
-        const snapshot: PriceSnapshot = {
-          pool,
-          price,
-          inversePrice: 1 / price,
-          blockNumber,
-          timestamp: Date.now(),
-        };
-        this.consecutiveErrors.set(key, 0);
-        this.snapshots.set(key, snapshot);
-        freshPools.add(key);
-        this.emit("priceUpdate", snapshot);
+        const priceData = this.decodePriceFromResult(pool, result.returnData);
+        poolData.set(i, priceData);
       } catch (err) {
         const errCount = (this.consecutiveErrors.get(key) ?? 0) + 1;
         this.consecutiveErrors.set(key, errCount);
@@ -206,6 +225,45 @@ export class PriceMonitor extends EventEmitter {
           this.emit("stale", pool);
         }
       }
+    }
+
+    // Process liquidity results (indices N..N+M-1, one per V3 pool)
+    for (let j = 0; j < v3PoolIndices.length; j++) {
+      const poolIndex = v3PoolIndices[j];
+      const result = results[N + j];
+      if (result?.success) {
+        try {
+          const liqDecoded = liquidityIface.decodeFunctionResult("liquidity", result.returnData);
+          const data = poolData.get(poolIndex);
+          if (data) {
+            data.liquidity = BigInt(liqDecoded[0]);
+          }
+        } catch {
+          // Liquidity fetch failed — non-critical, slippage falls back to static
+        }
+      }
+    }
+
+    // Build and emit enriched snapshots
+    for (const [poolIndex, data] of poolData) {
+      const pool = this.config.pools[poolIndex];
+      const key = pool.poolAddress.toLowerCase();
+
+      const snapshot: PriceSnapshot = {
+        pool,
+        price: data.price,
+        inversePrice: 1 / data.price,
+        blockNumber,
+        timestamp: Date.now(),
+        ...(data.reserves && { reserves: data.reserves }),
+        ...(data.liquidity !== undefined && { liquidity: data.liquidity }),
+        ...(data.sqrtPriceX96 !== undefined && { sqrtPriceX96: data.sqrtPriceX96 }),
+      };
+
+      this.consecutiveErrors.set(key, 0);
+      this.snapshots.set(key, snapshot);
+      freshPools.add(key);
+      this.emit("priceUpdate", snapshot);
     }
 
     this.detectOpportunities(freshPools);
@@ -222,59 +280,79 @@ export class PriceMonitor extends EventEmitter {
     return v2Iface.encodeFunctionData("getReserves");
   }
 
-  /** Decode the price from raw return data based on pool's DEX type */
-  private decodePriceFromResult(pool: PoolConfig, returnData: string): number {
+  /** Decode price and liquidity data from raw return data based on pool's DEX type */
+  private decodePriceFromResult(pool: PoolConfig, returnData: string): {
+    price: number;
+    reserves?: [bigint, bigint];
+    sqrtPriceX96?: bigint;
+  } {
     if (pool.dex === "camelot_v3") {
       const decoded = algebraIface.decodeFunctionResult(
         "globalState",
         returnData,
       );
-      return this.calculateV3Price(
-        BigInt(decoded[0]),
-        pool.decimals0,
-        pool.decimals1,
-      );
+      const sqrtPriceX96 = BigInt(decoded[0]);
+      return {
+        price: this.calculateV3Price(sqrtPriceX96, pool.decimals0, pool.decimals1),
+        sqrtPriceX96,
+      };
     }
     if (pool.dex === "uniswap_v3" || pool.dex === "sushiswap_v3") {
       const decoded = v3Iface.decodeFunctionResult("slot0", returnData);
-      return this.calculateV3Price(
-        BigInt(decoded[0]),
-        pool.decimals0,
-        pool.decimals1,
-      );
+      const sqrtPriceX96 = BigInt(decoded[0]);
+      return {
+        price: this.calculateV3Price(sqrtPriceX96, pool.decimals0, pool.decimals1),
+        sqrtPriceX96,
+      };
     }
     const decoded = v2Iface.decodeFunctionResult("getReserves", returnData);
     const reserve0 = BigInt(decoded[0]);
     const reserve1 = BigInt(decoded[1]);
     this.checkV2Liquidity(pool, reserve0, reserve1);
-    return this.calculateV2Price(reserve0, reserve1, pool.decimals0, pool.decimals1);
+    return {
+      price: this.calculateV2Price(reserve0, reserve1, pool.decimals0, pool.decimals1),
+      reserves: [reserve0, reserve1],
+    };
+  }
+
+  /** Check if a pool uses V3-style concentrated liquidity */
+  private isV3Pool(pool: PoolConfig): boolean {
+    return pool.dex === "uniswap_v3" || pool.dex === "sushiswap_v3" || pool.dex === "camelot_v3";
   }
 
   /** Fetch the current price from a single pool */
   async fetchPrice(pool: PoolConfig): Promise<PriceSnapshot> {
     const blockNumber = await this.config.provider.getBlockNumber();
 
-    let price: number;
     if (pool.dex === "camelot_v3") {
-      price = await this.fetchAlgebraPrice(pool);
-    } else if (pool.dex === "uniswap_v3" || pool.dex === "sushiswap_v3") {
-      price = await this.fetchV3Price(pool);
-    } else {
-      // uniswap_v2, sushiswap, and camelot_v2 use the same pair interface
-      price = await this.fetchV2Price(pool);
+      const data = await this.fetchAlgebraPrice(pool);
+      return {
+        pool, price: data.price, inversePrice: 1 / data.price,
+        blockNumber, timestamp: Date.now(),
+        sqrtPriceX96: data.sqrtPriceX96, liquidity: data.liquidity,
+      };
     }
 
+    if (pool.dex === "uniswap_v3" || pool.dex === "sushiswap_v3") {
+      const data = await this.fetchV3Price(pool);
+      return {
+        pool, price: data.price, inversePrice: 1 / data.price,
+        blockNumber, timestamp: Date.now(),
+        sqrtPriceX96: data.sqrtPriceX96, liquidity: data.liquidity,
+      };
+    }
+
+    // uniswap_v2, sushiswap, and camelot_v2 use the same pair interface
+    const data = await this.fetchV2Price(pool);
     return {
-      pool,
-      price,
-      inversePrice: 1 / price,
-      blockNumber,
-      timestamp: Date.now(),
+      pool, price: data.price, inversePrice: 1 / data.price,
+      blockNumber, timestamp: Date.now(),
+      reserves: data.reserves,
     };
   }
 
   /** Read reserves from a Uniswap V2-style pair */
-  private async fetchV2Price(pool: PoolConfig): Promise<number> {
+  private async fetchV2Price(pool: PoolConfig): Promise<{ price: number; reserves: [bigint, bigint] }> {
     const contract = new Contract(
       pool.poolAddress,
       UNISWAP_V2_PAIR_ABI,
@@ -284,39 +362,66 @@ export class PriceMonitor extends EventEmitter {
     const r0 = BigInt(reserve0);
     const r1 = BigInt(reserve1);
     this.checkV2Liquidity(pool, r0, r1);
-    return this.calculateV2Price(r0, r1, pool.decimals0, pool.decimals1);
+    return {
+      price: this.calculateV2Price(r0, r1, pool.decimals0, pool.decimals1),
+      reserves: [r0, r1],
+    };
   }
 
   /** Read sqrtPriceX96 from a Uniswap V3-style pool */
-  private async fetchV3Price(pool: PoolConfig): Promise<number> {
+  private async fetchV3Price(pool: PoolConfig): Promise<{ price: number; sqrtPriceX96: bigint; liquidity?: bigint }> {
     const contract = new Contract(
       pool.poolAddress,
       UNISWAP_V3_POOL_ABI,
       this.config.provider,
     );
-    const [sqrtPriceX96] = await contract.slot0();
+    const [sqrtPriceX96Raw] = await contract.slot0();
+    const sqrtPriceX96 = BigInt(sqrtPriceX96Raw);
 
-    return this.calculateV3Price(
-      BigInt(sqrtPriceX96),
-      pool.decimals0,
-      pool.decimals1,
-    );
+    const liquidity = await this.fetchLiquidity(pool);
+
+    return {
+      price: this.calculateV3Price(sqrtPriceX96, pool.decimals0, pool.decimals1),
+      sqrtPriceX96,
+      liquidity,
+    };
   }
 
   /** Read sqrtPriceX96 from an Algebra V3-style pool (Camelot V3) */
-  private async fetchAlgebraPrice(pool: PoolConfig): Promise<number> {
+  private async fetchAlgebraPrice(pool: PoolConfig): Promise<{ price: number; sqrtPriceX96: bigint; liquidity?: bigint }> {
     const contract = new Contract(
       pool.poolAddress,
       ALGEBRA_V3_POOL_ABI,
       this.config.provider,
     );
-    const [sqrtPriceX96] = await contract.globalState();
+    const [sqrtPriceX96Raw] = await contract.globalState();
+    const sqrtPriceX96 = BigInt(sqrtPriceX96Raw);
 
-    return this.calculateV3Price(
-      BigInt(sqrtPriceX96),
-      pool.decimals0,
-      pool.decimals1,
-    );
+    const liquidity = await this.fetchLiquidity(pool);
+
+    return {
+      price: this.calculateV3Price(sqrtPriceX96, pool.decimals0, pool.decimals1),
+      sqrtPriceX96,
+      liquidity,
+    };
+  }
+
+  /** Fetch in-range liquidity from a V3 pool (non-critical, returns undefined on failure) */
+  private async fetchLiquidity(pool: PoolConfig): Promise<bigint | undefined> {
+    try {
+      const calldata = liquidityIface.encodeFunctionData("liquidity");
+      const result = await this.config.provider.call({
+        to: pool.poolAddress,
+        data: calldata,
+      });
+      if (result && result !== "0x") {
+        const decoded = liquidityIface.decodeFunctionResult("liquidity", result);
+        return BigInt(decoded[0]);
+      }
+    } catch {
+      // Non-critical — slippage estimation falls back to static model
+    }
+    return undefined;
   }
 
   /**

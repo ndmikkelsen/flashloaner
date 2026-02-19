@@ -353,15 +353,128 @@ describe("OpportunityDetector", () => {
       expect(gas3).toBeGreaterThan(gas2);
     });
 
-    it("should estimate slippage across multiple steps", () => {
+    it("should estimate slippage across multiple steps (static fallback)", () => {
       detector = new OpportunityDetector({ maxSlippage: 0.005 });
       const delta = makeDelta({ buyPrice: 2000, sellPrice: 2020 });
       const path = detector.buildSwapPath(delta);
 
       const slippage = detector.estimateSlippage(path, 10);
+      // No reserve data → falls back to static model
       // 2-step compound slippage: 1 - (1-0.005)^2 ≈ 0.009975
       // Cost = 10 * 0.009975 ≈ 0.09975
       expect(slippage).toBeCloseTo(0.09975, 3);
+    });
+
+    it("should use pool-aware slippage when V2 reserves are available", () => {
+      detector = new OpportunityDetector({ maxSlippage: 0.005 });
+
+      // Build a delta with V2 reserve data
+      const buyPool = makePool({ poolAddress: ADDR.POOL_V2 });
+      const sellPool = makePool({
+        label: "WETH/USDC Sushi",
+        dex: "sushiswap",
+        poolAddress: ADDR.POOL_SUSHI,
+      });
+
+      const buySnapshot: PriceSnapshot = {
+        pool: buyPool,
+        price: 2000,
+        inversePrice: 1 / 2000,
+        blockNumber: 19_000_000,
+        timestamp: Date.now(),
+        // 1000 WETH and 2,000,000 USDC reserves
+        reserves: [
+          BigInt("1000000000000000000000"),  // 1000 WETH (token0, 18 dec)
+          BigInt("2000000000000"),           // 2,000,000 USDC (token1, 6 dec)
+        ],
+      };
+
+      const sellSnapshot: PriceSnapshot = {
+        pool: sellPool,
+        price: 2020,
+        inversePrice: 1 / 2020,
+        blockNumber: 19_000_000,
+        timestamp: Date.now(),
+        reserves: [
+          BigInt("1000000000000000000000"),  // 1000 WETH
+          BigInt("2020000000000"),           // 2,020,000 USDC
+        ],
+      };
+
+      const delta: PriceDelta = {
+        pair: `${buyPool.token0}/${buyPool.token1}`,
+        buyPool: buySnapshot,
+        sellPool: sellSnapshot,
+        deltaPercent: 1.0,
+        timestamp: Date.now(),
+      };
+
+      const path = detector.buildSwapPath(delta);
+
+      // Verify virtualReserveIn was computed from reserves
+      // buyStep: tokenIn = USDC (token1), reserveIn = 2,000,000 USDC
+      expect(path.steps[0].virtualReserveIn).toBeCloseTo(2_000_000, 0);
+      // sellStep: tokenIn = WETH (token0), reserveIn = 1000 WETH
+      expect(path.steps[1].virtualReserveIn).toBeCloseTo(1000, 0);
+
+      // Pool-aware slippage for 10 USDC input on a 2M USDC pool: nearly zero
+      // vs static 0.5% which gives 0.09975
+      const slippage = detector.estimateSlippage(path, 10);
+      expect(slippage).toBeLessThan(0.01); // Much less than static model
+      expect(slippage).toBeGreaterThan(0);
+    });
+
+    it("should show higher slippage for larger trades relative to pool depth", () => {
+      detector = new OpportunityDetector({ maxSlippage: 0.005 });
+
+      const buyPool = makePool({ poolAddress: ADDR.POOL_V2 });
+      const sellPool = makePool({
+        label: "WETH/USDC Sushi",
+        dex: "sushiswap",
+        poolAddress: ADDR.POOL_SUSHI,
+      });
+
+      // Small pool: only 10 WETH / 20,000 USDC
+      const buySnapshot: PriceSnapshot = {
+        pool: buyPool,
+        price: 2000,
+        inversePrice: 1 / 2000,
+        blockNumber: 19_000_000,
+        timestamp: Date.now(),
+        reserves: [
+          BigInt("10000000000000000000"),  // 10 WETH
+          BigInt("20000000000"),           // 20,000 USDC
+        ],
+      };
+
+      const sellSnapshot: PriceSnapshot = {
+        pool: sellPool,
+        price: 2020,
+        inversePrice: 1 / 2020,
+        blockNumber: 19_000_000,
+        timestamp: Date.now(),
+        reserves: [
+          BigInt("10000000000000000000"),  // 10 WETH
+          BigInt("20200000000"),           // 20,200 USDC
+        ],
+      };
+
+      const delta: PriceDelta = {
+        pair: `${buyPool.token0}/${buyPool.token1}`,
+        buyPool: buySnapshot,
+        sellPool: sellSnapshot,
+        deltaPercent: 1.0,
+        timestamp: Date.now(),
+      };
+
+      const path = detector.buildSwapPath(delta);
+
+      // 10,000 USDC into a 20,000 USDC pool: massive ~33% price impact
+      const slippageLarge = detector.estimateSlippage(path, 10_000);
+      // 10 USDC into same pool: tiny price impact
+      const slippageSmall = detector.estimateSlippage(path, 10);
+
+      expect(slippageLarge).toBeGreaterThan(slippageSmall * 10);
     });
 
     it("should return full cost estimate", () => {

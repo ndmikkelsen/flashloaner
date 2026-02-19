@@ -34,6 +34,12 @@ export interface PriceSnapshot {
   blockNumber: number;
   /** Timestamp (ms) when this snapshot was taken */
   timestamp: number;
+  /** V2: Raw reserves [reserve0, reserve1] for price impact estimation */
+  reserves?: [bigint, bigint];
+  /** V3: In-range liquidity (L) for virtual reserve computation */
+  liquidity?: bigint;
+  /** V3: sqrtPriceX96 for virtual reserve computation */
+  sqrtPriceX96?: bigint;
 }
 
 /** Emitted when a price delta exceeds the configured threshold */

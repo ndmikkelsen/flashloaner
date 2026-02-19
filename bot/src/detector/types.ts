@@ -18,6 +18,9 @@ export interface SwapStep {
   expectedPrice: number;
   /** Uniswap V3 fee tier (bps) — only for uniswap_v3 */
   feeTier?: number;
+  /** Virtual reserve of tokenIn for slippage estimation (human-readable units).
+   *  V2: actual reserve. V3: computed from L and sqrtPriceX96. */
+  virtualReserveIn?: number;
 }
 
 /** A complete arbitrage path (sequence of swaps) */

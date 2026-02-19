@@ -245,6 +245,9 @@ export class OpportunityDetector extends EventEmitter {
       decimalsOut: buyPool.pool.decimals0,
       expectedPrice: buyPool.inversePrice,
       feeTier: buyPool.pool.feeTier,
+      virtualReserveIn: this.computeVirtualReserveIn(
+        delta.buyPool, buyPool.pool.token1, buyPool.pool.decimals1,
+      ),
     };
 
     // Step 2: Sell token0 on the expensive pool (swap token0 → token1)
@@ -257,6 +260,9 @@ export class OpportunityDetector extends EventEmitter {
       decimalsOut: sellPool.pool.decimals1,
       expectedPrice: sellPool.price,
       feeTier: sellPool.pool.feeTier,
+      virtualReserveIn: this.computeVirtualReserveIn(
+        delta.sellPool, sellPool.pool.token0, sellPool.pool.decimals0,
+      ),
     };
 
     return {
@@ -386,18 +392,98 @@ export class OpportunityDetector extends EventEmitter {
   }
 
   /**
-   * Estimate slippage cost based on configured max slippage.
-   * Conservative estimate: assume we lose maxSlippage on each step.
+   * Estimate slippage cost using pool-aware AMM simulation when reserve data
+   * is available, otherwise falls back to the static maxSlippage model.
+   *
+   * Pool-aware mode compares spot output (no price impact) vs AMM-simulated
+   * output (with constant-product price impact). The difference is the slippage cost.
+   *
+   * For V2 pools: uses actual reserves from getReserves()
+   * For V3 pools: uses virtual reserves computed from liquidity L and sqrtPriceX96
    */
   estimateSlippage(path: SwapPath, inputAmount: number): number {
-    // Compound slippage across all steps
-    const slippageMultiplier =
-      1 - (1 - this.config.maxSlippage) ** path.steps.length;
-    return inputAmount * slippageMultiplier;
+    const hasReserveData = path.steps.some(
+      (s) => s.virtualReserveIn !== undefined && s.virtualReserveIn > 0,
+    );
+
+    if (!hasReserveData) {
+      // Fallback: static slippage model (compound across steps)
+      const slippageMultiplier =
+        1 - (1 - this.config.maxSlippage) ** path.steps.length;
+      return inputAmount * slippageMultiplier;
+    }
+
+    // Pool-aware: simulate AMM output and compare to spot output
+    const grossProfit = this.calculateGrossProfit(path, inputAmount);
+    const spotOutput = inputAmount + grossProfit;
+
+    // Trace through each step with AMM price impact
+    let amount = inputAmount;
+    for (const step of path.steps) {
+      const feeRate = this.getSwapFeeRate(step);
+      const amountAfterFee = amount * (1 - feeRate);
+
+      if (step.virtualReserveIn !== undefined && step.virtualReserveIn > 0) {
+        // AMM constant-product impact: actual output < spot output
+        // impact = amountIn / (reserveIn + amountIn)
+        const impact = amountAfterFee / (step.virtualReserveIn + amountAfterFee);
+        amount = amountAfterFee * (1 - impact) * step.expectedPrice;
+      } else {
+        // No reserve data for this step: assume no additional impact
+        amount = amountAfterFee * step.expectedPrice;
+      }
+    }
+
+    const slippageCost = spotOutput - amount;
+    return Math.max(0, slippageCost);
   }
 
   /** Check if a pool is marked as stale */
   private isPoolStale(snapshot: PriceSnapshot): boolean {
     return this.stalePools.has(snapshot.pool.poolAddress.toLowerCase());
+  }
+
+  /**
+   * Compute the virtual reserve of the input token for slippage estimation.
+   *
+   * V2 pools: uses actual reserves from getReserves()
+   * V3 pools: computes virtual reserves from in-range liquidity L and sqrtPriceX96
+   *   - token0 virtual reserve = L / sqrt(P)
+   *   - token1 virtual reserve = L * sqrt(P)
+   *
+   * Returns undefined when reserve data is not available (falls back to static slippage).
+   */
+  private computeVirtualReserveIn(
+    snapshot: PriceSnapshot,
+    tokenIn: string,
+    decimalsIn: number,
+  ): number | undefined {
+    const pool = snapshot.pool;
+
+    // V2: use actual reserves
+    if (snapshot.reserves) {
+      const isToken0 = tokenIn.toLowerCase() === pool.token0.toLowerCase();
+      const reserveRaw = isToken0 ? snapshot.reserves[0] : snapshot.reserves[1];
+      return Number(reserveRaw) / 10 ** decimalsIn;
+    }
+
+    // V3: compute virtual reserves from L and sqrtPriceX96
+    if (snapshot.liquidity !== undefined && snapshot.sqrtPriceX96 !== undefined) {
+      const L = Number(snapshot.liquidity);
+      const Q96 = Number(2n ** 96n);
+      const sqrtP = Number(snapshot.sqrtPriceX96) / Q96;
+      if (sqrtP === 0 || L === 0) return undefined;
+
+      const isToken0 = tokenIn.toLowerCase() === pool.token0.toLowerCase();
+      if (isToken0) {
+        // x_virtual = L / sqrtP (raw token0 units)
+        return (L / sqrtP) / 10 ** decimalsIn;
+      } else {
+        // y_virtual = L * sqrtP (raw token1 units)
+        return (L * sqrtP) / 10 ** decimalsIn;
+      }
+    }
+
+    return undefined;
   }
 }
