@@ -1,953 +1,708 @@
-# Architecture Patterns: Multi-Chain Flashloan Arbitrage Bot
+# Architecture Patterns: v1.1 Mainnet Profitability
 
-**Domain:** Multi-chain DeFi flashloan arbitrage
-**Researched:** 2026-02-16
-**Confidence:** HIGH
+**Domain:** Flashloan arbitrage bot — Arbitrum mainnet feature additions
+**Researched:** 2026-02-19
+**Confidence:** HIGH (based on direct codebase inspection)
 
-## Recommended Architecture
+---
 
-### System Overview
+## Current Architecture (What Exists)
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        MONOREPO ROOT                                 │
-│                    flashloaner-multichain/                           │
-└─────────────────────────────────────────────────────────────────────┘
-                                │
-        ┌───────────────────────┼───────────────────────┐
-        │                       │                       │
-┌───────▼────────┐    ┌─────────▼─────────┐    ┌──────▼──────────┐
-│   packages/    │    │   packages/       │    │   chains/       │
-│   contracts/   │    │   bot-core/       │    │   ethereum/     │
-│                │    │                   │    │   arbitrum/     │
-│   (shared)     │    │   (shared)        │    │   base/         │
-│                │    │                   │    │   (per-chain)   │
-└────────────────┘    └───────────────────┘    └─────────────────┘
-```
+Before describing changes, here is the exact current structure — read directly from the source.
 
-**Design principle:** Share logic, isolate configuration and chain-specific adapters.
-
-### Component Boundaries
-
-| Component | Responsibility | Location | Reused Across Chains? |
-|-----------|---------------|----------|----------------------|
-| **FlashloanExecutor.sol** | Core flashloan orchestration logic | `packages/contracts/src/` | YES - identical bytecode |
-| **DEX Adapters** (UniV2, UniV3, etc.) | Swap execution interfaces | `packages/contracts/src/adapters/` | YES - identical bytecode |
-| **Safety Modules** | Circuit breakers, profit validation | `packages/contracts/src/safety/` | YES - identical bytecode |
-| **PriceMonitor** | Multi-DEX price fetching | `packages/bot-core/src/monitor/` | YES - parameterized by config |
-| **OpportunityDetector** | Arbitrage pathfinding | `packages/bot-core/src/detector/` | YES - parameterized by config |
-| **TransactionBuilder** | Calldata encoding, gas estimation | `packages/bot-core/src/builder/` | YES - parameterized by config |
-| **ExecutionEngine** | Transaction submission, MEV protection | `packages/bot-core/src/engine/` | YES - parameterized by config |
-| **HealthMonitor** | Balance tracking, P&L, alerts | `packages/bot-core/src/health/` | YES - parameterized by config |
-| **Chain-specific config** | RPC URLs, contract addresses, pool configs, gas settings | `chains/{chain}/config.ts` | NO - unique per chain |
-| **Chain-specific entry point** | Bot process entry point | `chains/{chain}/index.ts` | NO - imports config + shared code |
-| **Deployment scripts** | Foundry deploy scripts | `chains/{chain}/script/` | NO - chain-specific RPC/verifier |
-
-### Shared vs Chain-Specific Boundary
-
-**SHARED (packages/):**
-- All Solidity contracts (deployed with CREATE2 for deterministic addresses)
-- All TypeScript bot logic (PriceMonitor, OpportunityDetector, ExecutionEngine, etc.)
-- Type definitions, interfaces, ABIs
-- Testing utilities, mock contracts
-
-**CHAIN-SPECIFIC (chains/{chain}/):**
-- `config.ts` - RPC endpoints, contract addresses, pool definitions, gas price settings, MEV config
-- `index.ts` - Entry point that imports shared bot-core and chain config
-- `script/Deploy.s.sol` - Foundry deployment script with chain-specific RPC/verifier
-- `.env.{chain}` - Environment variables for that chain
-- `deployments.json` - Deployed contract addresses on this chain
-
-### Data Flow
-
-#### Multi-Chain Bot Operation (Recommended: One Process Per Chain)
+### Pipeline
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│  Bot Process: Ethereum (pid 1001)                                   │
-│  ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐        │
-│  │ Monitor  │──▶│ Detector │──▶│ Builder  │──▶│ Engine   │        │
-│  └──────────┘   └──────────┘   └──────────┘   └──────────┘        │
-│       ▲                                             │               │
-│       └─────────────────────────────────────────────┘               │
-│                    (ethereum/config.ts)                             │
-└─────────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────────┐
-│  Bot Process: Arbitrum (pid 1002)                                   │
-│  ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐        │
-│  │ Monitor  │──▶│ Detector │──▶│ Builder  │──▶│ Engine   │        │
-│  └──────────┘   └──────────┘   └──────────┘   └──────────┘        │
-│       ▲                                             │               │
-│       └─────────────────────────────────────────────┘               │
-│                    (arbitrum/config.ts)                             │
-└─────────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────────┐
-│  Bot Process: Base (pid 1003)                                       │
-│  ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐        │
-│  │ Monitor  │──▶│ Detector │──▶│ Builder  │──▶│ Engine   │        │
-│  └──────────┘   └──────────┘   └──────────┘   └──────────┘        │
-│       ▲                                             │               │
-│       └─────────────────────────────────────────────┘               │
-│                    (base/config.ts)                                 │
-└─────────────────────────────────────────────────────────────────────┘
+PriceMonitor
+  │  emits: PriceSnapshot (per pool, per poll cycle)
+  │  emits: PriceDelta    (when deltaPercent >= threshold)
+  │
+  ▼
+OpportunityDetector
+  │  listens: PriceDelta from monitor.on("opportunity")
+  │  evaluates: gross profit, gas cost, flash loan fee, slippage
+  │  emits: ArbitrageOpportunity (if net profit > threshold)
+  │
+  ▼
+[FlashloanBot.wireEvents() in index.ts]
+  │  currently: logs the opportunity, stops here in dry-run mode
+  │  missing:   TransactionBuilder + ExecutionEngine not yet wired in
+  │
+  ▼ (not yet wired)
+TransactionBuilder
+  │  takes: ArbitrageOpportunity
+  │  encodes: executeArbitrage() calldata for FlashloanExecutor
+  │
+  ▼ (not yet wired)
+ExecutionEngine
+     submits: PreparedTransaction via signer
+     tracks:  confirmation, profit, failures
 ```
 
-**Why one process per chain:**
-1. **Isolation**: Chain A crash doesn't affect Chain B
-2. **Resource allocation**: Different chains have different opportunity frequencies (Ethereum > Base > Arbitrum)
-3. **Simplicity**: No complex orchestration logic, standard Node.js process monitoring (pm2, systemd)
-4. **RPC management**: Each process maintains its own RPC connection pool and failover state
-5. **Deployment**: Can deploy to different machines, scale horizontally
+### Key Observations from Code Inspection
 
-**Alternative (single unified bot) rejected because:**
-- Complex orchestration of multi-chain event streams
-- Single point of failure for all chains
-- RPC rate limit conflicts (one chain's burst affects others)
-- Harder to debug and monitor (logs from all chains interleaved)
+1. **TransactionBuilder and ExecutionEngine already exist** but are not wired into `FlashloanBot`. The bot currently stops at `opportunityFound` with a log message.
 
-## Patterns to Follow
+2. **DEXProtocol type is the integration seam**: `"uniswap_v2" | "uniswap_v3" | "sushiswap" | "sushiswap_v3" | "camelot_v2" | "camelot_v3"`. New DEXes (Trader Joe, Ramses) require adding values here.
 
-### Pattern 1: Monorepo with Workspaces
+3. **AdapterMap in builder/types.ts** maps `DEXProtocol → deployed adapter address`. New DEXes need entries here.
 
-**What:** Use pnpm workspaces (or npm/yarn workspaces) to manage shared packages.
+4. **PriceMonitor routes to DEX handling via `pool.dex` string** (`getCallDataForPool`, `decodePriceFromResult`, `isV3Pool`). New DEXes must extend these switch-like conditionals.
 
-**When:** Always - this is the foundation of multi-chain code reuse.
+5. **OpportunityDetector.analyzeDelta()** uses a fixed `defaultInputAmount` (currently 5 ETH). This is the hook point for optimal input sizing.
 
-**Example structure:**
+6. **The `inputAmount` field on `ArbitrageOpportunity`** flows all the way through to `TransactionBuilder.buildArbitrageTransaction()`. Changing it per-opportunity just means setting it before `analyzeDelta` fires — or computing it inside the detector.
 
+7. **`HealthMonitor` already exists** with full P&L tracking, balance alerts, and heartbeat. It is NOT wired into `FlashloanBot` yet either. Dashboard work extends this.
+
+8. **`bot/src/run-arb-mainnet.ts`** is the entry point for Arbitrum. This is where pm2 will point and where live execution gets wired.
+
+---
+
+## Feature Integration Map
+
+### Feature 1: Cross-Fee-Tier Routing
+
+**Problem:** Same-DEX same-token pairs (e.g., WETH/USDC on UniV3 0.05% vs UniV3 0.3%) have a minimum cost floor of 0.6% (two fees combined). Cross-fee-tier routing pairs a 0.05% pool with a 0.3% pool for a 0.35% cost floor.
+
+**What this affects:** Nothing needs to change architecturally. The existing `PriceMonitor` already treats each pool by its address, not its fee tier. A UniV3 0.05% and a UniV3 0.3% pool on the same pair are already tracked as two separate `PoolConfig` entries with different `poolAddress` values.
+
+**Integration point:** `bot/src/config/chains/pools/arbitrum-mainnet.ts`
+
+**What to add:** Pool definitions pairing different fee tiers of the same token pair. The monitor will detect spread between them naturally. The detector already respects `feeTier` when computing fees in `getSwapFeeRate()`.
+
+**New components needed:** None.
+
+**Modified components:**
+- `bot/src/config/chains/pools/arbitrum-mainnet.ts` — add cross-fee-tier pool pairs (e.g., WETH/USDC UniV3 0.05% paired with WETH/USDC UniV3 0.3%, ensure both are present)
+- No code logic changes needed; this is pure configuration.
+
+**Backward compatibility:** Fully backward compatible. Dry-run mode unchanged.
+
+---
+
+### Feature 2: New DEX Adapters (Trader Joe LB, Ramses)
+
+**Two-layer work:** Each new DEX requires an on-chain adapter contract AND off-chain price reading support.
+
+#### On-Chain: New Adapter Contracts
+
+**Integration point:** `contracts/src/adapters/`
+
+The existing `IDEXAdapter` interface (`swap()` + `getAmountOut()`) is the contract. Each new DEX needs a new `.sol` file implementing it.
+
+- `TraderJoeLBAdapter.sol` — Trader Joe Liquidity Book uses bin-based AMM (not constant-product). Requires `ILBRouter.swapExactTokensForTokens()` with packed `binSteps` path encoding.
+- `RamsesV2Adapter.sol` — Ramses is a Uniswap V3 fork with fee tiers and `ve(3,3)` emissions. Uses the same V3 `ISwapRouter.exactInputSingle()` interface. This adapter will be nearly identical to `UniswapV3Adapter.sol`.
+
+**New files:**
 ```
-flashloaner-multichain/
-├── package.json              # Root workspace config
-├── pnpm-workspace.yaml       # pnpm workspace definition
-├── tsconfig.base.json        # Base TypeScript config
-├── turbo.json                # (Optional) Turborepo for build orchestration
-├── packages/
-│   ├── contracts/            # Shared Solidity contracts
-│   │   ├── src/
-│   │   │   ├── FlashloanExecutor.sol
-│   │   │   ├── adapters/
-│   │   │   └── safety/
-│   │   ├── test/
-│   │   ├── foundry.toml
-│   │   └── package.json
-│   └── bot-core/             # Shared TypeScript bot logic
-│       ├── src/
-│       │   ├── monitor/
-│       │   ├── detector/
-│       │   ├── builder/
-│       │   ├── engine/
-│       │   └── health/
-│       ├── tsconfig.json
-│       └── package.json
-└── chains/
-    ├── ethereum/
-    │   ├── config.ts         # Ethereum-specific config
-    │   ├── index.ts          # Entry point: imports bot-core + config
-    │   ├── script/
-    │   │   └── Deploy.s.sol  # Foundry deploy script
-    │   ├── deployments.json  # Deployed addresses
-    │   ├── .env.ethereum
-    │   └── package.json
-    ├── arbitrum/
-    │   ├── config.ts
-    │   ├── index.ts
-    │   ├── script/Deploy.s.sol
-    │   ├── deployments.json
-    │   ├── .env.arbitrum
-    │   └── package.json
-    └── base/
-        ├── config.ts
-        ├── index.ts
-        ├── script/Deploy.s.sol
-        ├── deployments.json
-        ├── .env.base
-        └── package.json
+contracts/src/adapters/TraderJoeLBAdapter.sol
+contracts/src/adapters/RamsesV2Adapter.sol
 ```
 
-**pnpm-workspace.yaml:**
+**Modified files:**
+- `contracts/src/interfaces/IDEXAdapter.sol` — no change needed; interface already covers both
+- `FlashloanExecutor.sol` — no change needed; `registerAdapter()` handles whitelist at runtime
 
-```yaml
-packages:
-  - 'packages/*'
-  - 'chains/*'
+#### Off-Chain: Price Reader Support
+
+**Integration point:** `bot/src/monitor/PriceMonitor.ts`
+
+Three methods must be extended for each new DEX:
+
+1. **`getCallDataForPool(pool)`** — must return correct encoded calldata for the DEX's price-reading function
+2. **`decodePriceFromResult(pool, data)`** — must decode the raw return into `price` and optionally `sqrtPriceX96`/`reserves`
+3. **`isV3Pool(pool)`** — must classify the pool correctly for liquidity fetching
+
+**Ramses V2:** Functionally identical to Uniswap V3 (same `slot0()` ABI). Add `"ramses_v2"` to the `uniswap_v3` branch in all three methods. Cost: ~5 lines.
+
+**Trader Joe LB:** Uses a completely different pricing model (bin-based). The active bin price is readable via `ILBPair.getReservesAndId()` or `getActiveId()` + `getBin()`. Requires a new decode branch and a new ABI fragment. No `sqrtPriceX96` concept; encode price directly from bin reserves.
+
+**Integration point:** `bot/src/monitor/types.ts`
+
+Add to `DEXProtocol` union:
+```typescript
+export type DEXProtocol =
+  | "uniswap_v2" | "uniswap_v3"
+  | "sushiswap" | "sushiswap_v3"
+  | "camelot_v2" | "camelot_v3"
+  | "ramses_v2"         // new
+  | "trader_joe_lb";    // new
 ```
 
-**Root package.json:**
+**Integration point:** `bot/src/builder/TransactionBuilder.ts` — `encodeExtraData(step)`
 
-```json
-{
-  "name": "flashloaner-multichain",
-  "private": true,
-  "scripts": {
-    "build": "pnpm -r build",
-    "test": "pnpm -r test",
-    "deploy:ethereum": "pnpm --filter @flashloaner/ethereum deploy",
-    "deploy:arbitrum": "pnpm --filter @flashloaner/arbitrum deploy",
-    "start:ethereum": "pnpm --filter @flashloaner/ethereum start",
-    "start:arbitrum": "pnpm --filter @flashloaner/arbitrum start"
-  }
-}
-```
+Must handle the new DEX protocols:
+- `ramses_v2`: same as `uniswap_v3` (encode `uint24 feeTier`)
+- `trader_joe_lb`: encode `binStep` as `uint16` instead of fee tier
 
-**chains/ethereum/package.json:**
-
-```json
-{
-  "name": "@flashloaner/ethereum",
-  "version": "1.0.0",
-  "dependencies": {
-    "@flashloaner/bot-core": "workspace:*",
-    "ethers": "^6.13.5"
-  },
-  "scripts": {
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "deploy": "forge script script/Deploy.s.sol --rpc-url $ETH_RPC_URL --broadcast"
-  }
-}
-```
-
-### Pattern 2: CREATE2 Deterministic Contract Deployment
-
-**What:** Deploy contracts to the same address on all chains using CREATE2.
-
-**When:** For contracts with no constructor arguments OR when constructor args are identical across chains.
-
-**Why:** Simplifies config (same contract address everywhere), easier to reason about, enables cross-chain verification.
-
-**Example:**
-
-```solidity
-// script/Deploy.s.sol (in packages/contracts/)
-pragma solidity ^0.8.28;
-
-import "forge-std/Script.sol";
-import "../src/FlashloanExecutor.sol";
-
-contract DeployFlashloanExecutor is Script {
-    // Fixed salt for deterministic deployment
-    bytes32 constant SALT = keccak256("flashloaner-v1");
-
-    function run() external {
-        uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
-
-        vm.startBroadcast(deployerPrivateKey);
-
-        // CREATE2 deployment (same address on all chains)
-        FlashloanExecutor executor = new FlashloanExecutor{salt: SALT}(
-            msg.sender  // owner - same deployer address
-        );
-
-        console.log("FlashloanExecutor deployed to:", address(executor));
-
-        vm.stopBroadcast();
-    }
-}
-```
-
-**foundry.toml (in packages/contracts/):**
-
-```toml
-[profile.default]
-solc = "0.8.28"          # Pin exact version for deterministic bytecode
-auto_detect_solc = false # Don't auto-detect, always use pinned version
-optimizer = true
-optimizer_runs = 200
-```
-
-**Deployment to multiple chains:**
-
-```bash
-# Deploy to Ethereum
-forge script script/Deploy.s.sol \
-  --rpc-url $ETH_RPC_URL \
-  --broadcast \
-  --verify \
-  --etherscan-api-key $ETHERSCAN_API_KEY
-
-# Deploy to Arbitrum (same address!)
-forge script script/Deploy.s.sol \
-  --rpc-url $ARBITRUM_RPC_URL \
-  --broadcast \
-  --verify \
-  --etherscan-api-key $ARBISCAN_API_KEY
-```
-
-**Note:** If constructor arguments differ per chain (e.g., chain-specific Aave pool addresses), CREATE2 won't produce the same address. In that case, accept different addresses and manage them in `deployments.json`.
-
-### Pattern 3: Per-Chain Configuration Files
-
-**What:** Isolate all chain-specific settings in a single config file per chain.
-
-**When:** Always - this is the boundary between shared and chain-specific code.
-
-**Example (chains/ethereum/config.ts):**
+**Integration point:** `bot/src/builder/types.ts` — `AdapterMap`
 
 ```typescript
-import type { BotConfig } from '@flashloaner/bot-core/config/types.js';
-import { DEFAULT_MONITOR, DEFAULT_DETECTOR } from '@flashloaner/bot-core/config/defaults.js';
-import { MAINNET_MEV_CONFIG } from '@flashloaner/bot-core/mev/config.js';
-
-// Load deployed contract addresses
-import deployments from './deployments.json';
-
-export const ETHEREUM_CONFIG: BotConfig = {
-  network: {
-    rpcUrl: process.env.ETH_RPC_URL!,
-    wsUrl: process.env.ETH_WS_URL,
-    chainId: 1,
-  },
-
-  contracts: {
-    executor: deployments.FlashloanExecutor,
-    adapters: {
-      uniswapV2: deployments.UniswapV2Adapter,
-      uniswapV3: deployments.UniswapV3Adapter,
-      sushiswap: deployments.SushiSwapAdapter,
-    },
-  },
-
-  pools: [
-    {
-      label: "UniV2_WETH_USDC",
-      dex: "uniswap-v2",
-      poolAddress: "0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc",
-      token0: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", // WETH
-      token1: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", // USDC
-      decimals0: 18,
-      decimals1: 6,
-    },
-    // ... more pools
-  ],
-
-  monitor: {
-    ...DEFAULT_MONITOR,
-    pollIntervalMs: 12_000, // Ethereum: 12s blocks
-  },
-
-  detector: {
-    ...DEFAULT_DETECTOR,
-    gasPriceGwei: 30,       // Ethereum: higher gas
-    minProfitThreshold: 0.05, // Ethereum: higher threshold
-  },
-
-  mev: MAINNET_MEV_CONFIG, // Flashbots protection
-
-  logLevel: "info",
-};
+export type AdapterMap = Record<DEXProtocol, string>;
 ```
 
-**Example (chains/arbitrum/config.ts):**
+New DEX entries need deployed adapter addresses.
 
-```typescript
-import type { BotConfig } from '@flashloaner/bot-core/config/types.js';
-import { DEFAULT_MONITOR, DEFAULT_DETECTOR } from '@flashloaner/bot-core/config/defaults.js';
-import deployments from './deployments.json';
+**Integration point:** `bot/src/config/chains/arbitrum.ts` — `dexes` section
 
-export const ARBITRUM_CONFIG: BotConfig = {
-  network: {
-    rpcUrl: process.env.ARBITRUM_RPC_URL!,
-    wsUrl: process.env.ARBITRUM_WS_URL,
-    chainId: 42161,
-  },
+Add Trader Joe and Ramses factory/router addresses.
 
-  contracts: {
-    executor: deployments.FlashloanExecutor,
-    adapters: {
-      uniswapV2: deployments.UniswapV2Adapter,
-      uniswapV3: deployments.UniswapV3Adapter,
-      sushiswap: deployments.SushiSwapAdapter,
-      camelot: deployments.CamelotAdapter, // Arbitrum-specific
-    },
-  },
+**Integration point:** `bot/src/config/chains/pools/arbitrum-mainnet.ts`
 
-  pools: [
-    {
-      label: "UniV3_WETH_USDC_500",
-      dex: "uniswap-v3",
-      poolAddress: "0xC31E54c7a869B9FcBEcc14363CF510d1c41fa443",
-      token0: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1", // WETH (Arbitrum)
-      token1: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", // USDC (Arbitrum)
-      decimals0: 18,
-      decimals1: 6,
-      feeTier: 500,
-    },
-    // ... more pools
-  ],
+Add pool definitions using the new `dex` values.
 
-  monitor: {
-    ...DEFAULT_MONITOR,
-    pollIntervalMs: 1_000,  // Arbitrum: faster blocks
-  },
+**New files (TypeScript):** None — changes are inline extensions to existing files.
 
-  detector: {
-    ...DEFAULT_DETECTOR,
-    gasPriceGwei: 0.1,      // Arbitrum: much lower gas
-    minProfitThreshold: 0.005, // Arbitrum: lower threshold
-  },
-
-  mev: { mode: "none" },    // No Flashbots on Arbitrum
-
-  logLevel: "info",
-};
+**New files (Solidity):**
+```
+contracts/src/adapters/TraderJoeLBAdapter.sol
+contracts/src/adapters/RamsesV2Adapter.sol
+contracts/test/adapters/TraderJoeLBAdapter.t.sol
+contracts/test/adapters/RamsesV2Adapter.t.sol
 ```
 
-### Pattern 4: RPC Provider Management with Failover
+---
 
-**What:** Use multiple RPC providers per chain with automatic failover and rate limit handling.
+### Feature 3: Optimal Input Sizing
 
-**When:** Always for production. Rate limits and outages are inevitable.
+**Problem:** `defaultInputAmount = 5 ETH` is fixed regardless of pool depth. Deep pools tolerate 50 ETH with minimal slippage. Thin pools lose money at 5 ETH.
 
-**Example:**
+**Where the hook is:** `OpportunityDetector.analyzeDelta()` — line 124: `const inputAmount = this.config.defaultInputAmount;`
 
-```typescript
-// packages/bot-core/src/rpc/RPCManager.ts
+**Approach:** Add an `InputOptimizer` module that computes the optimal input amount given pool reserve data (already present in `PriceSnapshot` as `reserves` for V2 and `liquidity + sqrtPriceX96` for V3).
 
-import { ethers } from 'ethers';
+**Integration point:** `OpportunityDetector.analyzeDelta()` and `analyzeDeltaAsync()`
 
-export interface RPCProviderConfig {
-  url: string;
-  priority: number;        // Lower = higher priority (primary = 0)
-  maxRequestsPerSecond?: number;
-  timeout?: number;
-}
+Replace the static `this.config.defaultInputAmount` with a call to `InputOptimizer.computeOptimalInput(delta, path)`.
 
-export class RPCManager {
-  private providers: Map<number, ethers.JsonRpcProvider> = new Map();
-  private providerConfigs: RPCProviderConfig[];
-  private currentProviderIndex: number = 0;
-  private rateLimiters: Map<number, RateLimiter> = new Map();
-
-  constructor(configs: RPCProviderConfig[]) {
-    // Sort by priority
-    this.providerConfigs = configs.sort((a, b) => a.priority - b.priority);
-
-    // Initialize providers
-    this.providerConfigs.forEach((config, index) => {
-      this.providers.set(index, new ethers.JsonRpcProvider(config.url));
-
-      if (config.maxRequestsPerSecond) {
-        this.rateLimiters.set(
-          index,
-          new RateLimiter(config.maxRequestsPerSecond)
-        );
-      }
-    });
-  }
-
-  async getProvider(): Promise<ethers.JsonRpcProvider> {
-    const provider = this.providers.get(this.currentProviderIndex)!;
-    const limiter = this.rateLimiters.get(this.currentProviderIndex);
-
-    // Wait for rate limit if necessary
-    if (limiter) {
-      await limiter.acquire();
-    }
-
-    return provider;
-  }
-
-  async executeWithFailover<T>(
-    operation: (provider: ethers.JsonRpcProvider) => Promise<T>
-  ): Promise<T> {
-    let lastError: Error | undefined;
-
-    for (let attempt = 0; attempt < this.providers.size; attempt++) {
-      const provider = await this.getProvider();
-
-      try {
-        const result = await operation(provider);
-        // Success - reset to primary provider
-        this.currentProviderIndex = 0;
-        return result;
-      } catch (error: any) {
-        lastError = error;
-
-        // Check if error is rate limit or connection issue
-        if (this.isRetryableError(error)) {
-          console.warn(
-            `Provider ${this.currentProviderIndex} failed: ${error.message}. Failing over...`
-          );
-
-          // Move to next provider
-          this.currentProviderIndex =
-            (this.currentProviderIndex + 1) % this.providers.size;
-
-          // Wait before retry
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        } else {
-          // Non-retryable error, throw immediately
-          throw error;
-        }
-      }
-    }
-
-    throw new Error(
-      `All RPC providers failed. Last error: ${lastError?.message}`
-    );
-  }
-
-  private isRetryableError(error: any): boolean {
-    const message = error.message?.toLowerCase() || '';
-    return (
-      message.includes('429') ||           // Rate limit
-      message.includes('rate limit') ||
-      message.includes('timeout') ||
-      message.includes('econnrefused') ||
-      message.includes('network error')
-    );
-  }
-}
-
-class RateLimiter {
-  private tokens: number;
-  private lastRefill: number;
-  private refillRate: number;
-
-  constructor(requestsPerSecond: number) {
-    this.tokens = requestsPerSecond;
-    this.lastRefill = Date.now();
-    this.refillRate = requestsPerSecond;
-  }
-
-  async acquire(): Promise<void> {
-    // Refill tokens based on time elapsed
-    const now = Date.now();
-    const elapsed = (now - this.lastRefill) / 1000;
-    this.tokens = Math.min(
-      this.refillRate,
-      this.tokens + elapsed * this.refillRate
-    );
-    this.lastRefill = now;
-
-    // If no tokens, wait
-    if (this.tokens < 1) {
-      const waitMs = ((1 - this.tokens) / this.refillRate) * 1000;
-      await new Promise(resolve => setTimeout(resolve, waitMs));
-      this.tokens = 1;
-      this.lastRefill = Date.now();
-    }
-
-    this.tokens -= 1;
-  }
-}
+**New module:**
+```
+bot/src/optimizer/InputOptimizer.ts
+bot/src/optimizer/types.ts
+bot/src/optimizer/index.ts
 ```
 
-**Usage in chain config:**
-
+**Interface:**
 ```typescript
-// chains/ethereum/config.ts
-
-export const ETHEREUM_RPC_PROVIDERS: RPCProviderConfig[] = [
-  {
-    url: process.env.ETH_RPC_ALCHEMY!,
-    priority: 0,  // Primary
-    maxRequestsPerSecond: 100,
-    timeout: 5000,
-  },
-  {
-    url: process.env.ETH_RPC_INFURA!,
-    priority: 1,  // Fallback
-    maxRequestsPerSecond: 50,
-    timeout: 5000,
-  },
-  {
-    url: process.env.ETH_RPC_QUICKNODE!,
-    priority: 2,  // Second fallback
-    maxRequestsPerSecond: 30,
-    timeout: 5000,
-  },
-];
-
-// In entry point
-const rpcManager = new RPCManager(ETHEREUM_RPC_PROVIDERS);
-const provider = await rpcManager.getProvider();
+// bot/src/optimizer/InputOptimizer.ts
+export function computeOptimalInput(
+  delta: PriceDelta,
+  config: { minInput: number; maxInput: number; steps?: number }
+): number;
 ```
 
-### Pattern 5: Chain-Specific Entry Points
+**Algorithm:** Binary search on input amount. For each candidate `x`:
+1. Compute gross profit using `calculateGrossProfit()` with simulated AMM price impact (already available in `estimateSlippage()` logic)
+2. Compute total cost
+3. Return `x` that maximizes `netProfit = grossProfit(x) - costs(x)`
 
-**What:** Each chain has its own entry point that imports shared bot-core and chain config.
+The slippage math is already implemented — `computeVirtualReserveIn()` in OpportunityDetector gives the virtual reserve. The optimizer calls the same formula to find the peak net profit.
 
-**When:** Always - this is how you run one bot process per chain.
+**Modified components:**
+- `bot/src/detector/OpportunityDetector.ts` — inject `InputOptimizer`, replace fixed `defaultInputAmount`
+- `bot/src/detector/types.ts` — add `minInput` / `maxInput` to `OpportunityDetectorConfig`
 
-**Example (chains/ethereum/index.ts):**
+**Backward compatibility:** If no optimizer is injected (or pool has no reserve data), falls back to `defaultInputAmount`. Dry-run mode unchanged.
 
+---
+
+### Feature 4: Live Execution
+
+**Problem:** `TransactionBuilder` and `ExecutionEngine` exist but are not wired into `FlashloanBot`. Opportunities are detected then dropped.
+
+**Integration point:** `bot/src/index.ts` — `FlashloanBot` class
+
+Currently `wireEvents()` calls `console.log(formatOpportunityReport(...))` when `opportunityFound` fires. Live execution replaces this with a call through the builder → engine pipeline.
+
+**What to add to `FlashloanBot`:**
+1. Accept optional `TransactionBuilder` and `ExecutionEngine` in the constructor (or via a `setExecutor()` method)
+2. In `wireEvents()`, when `opportunityFound` fires and `!this.dryRun`, call:
+   - `builder.buildArbitrageTransaction(opp)`
+   - Gas estimation from `ArbitrumGasEstimator`
+   - `builder.prepareTransaction(tx, gas, nonce)`
+   - `engine.executeTransaction(preparedTx)`
+
+**Pattern — keep dry-run backward compatible:**
 ```typescript
-import { PriceMonitor } from '@flashloaner/bot-core/monitor';
-import { OpportunityDetector } from '@flashloaner/bot-core/detector';
-import { TransactionBuilder } from '@flashloaner/bot-core/builder';
-import { ExecutionEngine } from '@flashloaner/bot-core/engine';
-import { HealthMonitor } from '@flashloaner/bot-core/health';
-import { RPCManager } from '@flashloaner/bot-core/rpc';
+// In FlashloanBot constructor
+private executor?: { builder: TransactionBuilder; engine: ExecutionEngine };
 
-import { ETHEREUM_CONFIG, ETHEREUM_RPC_PROVIDERS } from './config';
-
-async function main() {
-  console.log('Starting Ethereum flashloan arbitrage bot...');
-
-  // Initialize RPC manager with failover
-  const rpcManager = new RPCManager(ETHEREUM_RPC_PROVIDERS);
-  const provider = await rpcManager.getProvider();
-
-  // Initialize components (shared code, chain-specific config)
-  const monitor = new PriceMonitor(provider, ETHEREUM_CONFIG);
-  const detector = new OpportunityDetector(ETHEREUM_CONFIG);
-  const builder = new TransactionBuilder(provider, ETHEREUM_CONFIG);
-  const engine = new ExecutionEngine(provider, ETHEREUM_CONFIG);
-  const health = new HealthMonitor(provider, ETHEREUM_CONFIG);
-
-  // Wire up event handlers
-  monitor.on('priceUpdate', (update) => {
-    const opportunity = detector.analyze(update);
-    if (opportunity) {
-      const tx = builder.build(opportunity);
-      engine.execute(tx);
-    }
-  });
-
-  // Start monitoring
-  await monitor.start();
-  await health.start();
-
-  console.log('Ethereum bot running on chain', ETHEREUM_CONFIG.network.chainId);
-}
-
-main().catch((error) => {
-  console.error('Fatal error:', error);
-  process.exit(1);
+// In wireEvents()
+detector.on("opportunityFound", async (opp) => {
+  if (this.dryRun || !this.executor) {
+    console.log(formatOpportunityReport(opp, true));
+    return;
+  }
+  // Live path
+  await this.executeOpportunity(opp);
 });
 ```
 
-**Running multiple chains:**
+**Integration point:** `bot/src/run-arb-mainnet.ts`
 
-```bash
-# Terminal 1: Ethereum
-pnpm --filter @flashloaner/ethereum start
+This entry point is where the signer (ethers `Wallet`) gets constructed from `PRIVATE_KEY` env var, and where `TransactionBuilder` + `ExecutionEngine` instances are created and passed to `FlashloanBot`.
 
-# Terminal 2: Arbitrum
-pnpm --filter @flashloaner/arbitrum start
+**Modified components:**
+- `bot/src/index.ts` — `FlashloanBot`: add optional executor wiring, `executeOpportunity()` method
+- `bot/src/run-arb-mainnet.ts` — construct signer + executor when `DRY_RUN=false`
+- `bot/src/config/types.ts` — add `executorAddress`, `adapters`, `flashLoanProviders` to `BotConfig` (needed for live execution)
 
-# Terminal 3: Base
-pnpm --filter @flashloaner/base start
+**New components:** None — `TransactionBuilder` and `ExecutionEngine` are already implemented.
+
+**Key constraint:** Live execution must remain off by default. `FlashloanBot` defaults to `dryRun = true`. Live execution only activates when `DRY_RUN=false` AND `executor` is provided AND `EXECUTOR_ADDRESS` env var is set.
+
+---
+
+### Feature 5: P&L Dashboard
+
+**What exists:** `HealthMonitor` (in `bot/src/health/HealthMonitor.ts`) already tracks:
+- Token balances with threshold alerts
+- Gross profit per token (via `recordProfit()`)
+- Gas costs (via `recordGasCost()`)
+- Error rates in rolling window
+- Heartbeat events
+
+**What is missing:**
+1. `HealthMonitor` is not wired into `FlashloanBot`
+2. No trade-level history — `ProfitRecord` in `ExecutionEngine` tracks per-tx profit, but nothing aggregates this into human-readable reporting
+3. No persistent storage — everything resets on restart
+4. No dashboard UI — needs a console summary or file output
+
+**Integration point:** `bot/src/index.ts` — `FlashloanBot`
+
+Wire `HealthMonitor` into the bot:
+- On `engine.on("profit", record)` → call `health.recordProfit(record.token, profitAmount)` and `health.recordGasCost(record.gasCostWei)`
+- On `engine.on("reverted", result)` → call `health.recordLoss(...)`
+- On `health.on("alert", ...)` → log alerts with severity
+
+**Persistent storage — two options:**
+
+Option A (recommended for v1.1): **Append to JSONL file**
+Each trade result appends one JSON line to `.data/trades.jsonl`. The dashboard reads this file on startup to reconstruct history.
+
+Option B (future): SQLite via `better-sqlite3`. Adds a dependency. Defer to v1.2.
+
+**New module:**
+```
+bot/src/dashboard/PnLDashboard.ts   — reads trades.jsonl, computes summary
+bot/src/dashboard/types.ts          — TradeRecord interface
+bot/src/dashboard/index.ts
 ```
 
-**Or with pm2 (process manager):**
-
-```bash
-pm2 start ecosystem.config.js
+**Interface:**
+```typescript
+// bot/src/dashboard/PnLDashboard.ts
+export class PnLDashboard {
+  constructor(dataDir: string);
+  recordTrade(result: ExecutionResult, opportunity: ArbitrageOpportunity): void;
+  getSummary(): PnLSummary;
+  printSummary(): void;            // formats table to stdout
+  exportCSV(path: string): void;   // for external analysis
+}
 ```
 
-**ecosystem.config.js:**
+**Data file location:** `.data/trades.jsonl` (gitignored). Directory created on startup if missing.
 
+**Console display:** Called on graceful shutdown (existing `shutdown()` function in `run-arb-mainnet.ts`) and periodically via the existing stats interval.
+
+**Modified components:**
+- `bot/src/index.ts` — wire `HealthMonitor` and `PnLDashboard` into `FlashloanBot`
+- `bot/src/run-arb-mainnet.ts` — instantiate `PnLDashboard`, call `printSummary()` on shutdown
+- `.gitignore` — add `.data/`
+
+---
+
+### Feature 6: pm2 Process Management
+
+**Integration point:** Repository root
+
+pm2 needs an ecosystem config file. The bot already handles SIGINT/SIGTERM gracefully (the `shutdown()` function in `run-arb-mainnet.ts` and `FlashloanBot.registerShutdownHandlers()`).
+
+**New file:**
+```
+ecosystem.config.cjs    (root)
+```
+
+Note: `ecosystem.config.js` requires `module.exports` which conflicts with ESM (`"type": "module"` in `package.json`). Use `.cjs` extension.
+
+**Content pattern:**
 ```javascript
+// ecosystem.config.cjs
 module.exports = {
   apps: [
     {
-      name: 'flashloaner-ethereum',
-      cwd: './chains/ethereum',
-      script: 'pnpm start',
-      env: { NODE_ENV: 'production' },
-    },
-    {
-      name: 'flashloaner-arbitrum',
-      cwd: './chains/arbitrum',
-      script: 'pnpm start',
-      env: { NODE_ENV: 'production' },
-    },
-    {
-      name: 'flashloaner-base',
-      cwd: './chains/base',
-      script: 'pnpm start',
-      env: { NODE_ENV: 'production' },
+      name: "flashloaner-arb-mainnet",
+      script: "node",
+      args: "--import tsx bot/src/run-arb-mainnet.ts",
+      // OR after build:
+      // script: "node",
+      // args: "dist/run-arb-mainnet.js",
+      cwd: "/path/to/project",
+      env: {
+        NODE_ENV: "production",
+        // Secrets come from .env loaded by dotenv/config in the script
+      },
+      max_restarts: 10,
+      restart_delay: 5000,
+      kill_timeout: 10000,    // 10s for graceful shutdown
+      log_file: "logs/arb-mainnet.log",
+      error_file: "logs/arb-mainnet-error.log",
+      merge_logs: true,
+      time: true,             // prefix logs with timestamp
     },
   ],
 };
 ```
 
+**Graceful shutdown:** `kill_timeout: 10000` gives the bot 10 seconds to complete the shutdown sequence (stop monitor, flush pending trades to disk, print final P&L summary) before pm2 force-kills it.
+
+**Log management:** pm2 handles log rotation natively via `pm2 install pm2-logrotate`. The existing console output becomes the pm2 log stream.
+
+**Modified components:** None — existing shutdown handlers are already correct.
+
+**New files:**
+```
+ecosystem.config.cjs
+logs/          (gitignored directory, pm2 writes here)
+```
+
+---
+
+## Component Modification Summary
+
+| Component | Status | Change Type | What Changes |
+|-----------|--------|-------------|--------------|
+| `bot/src/monitor/types.ts` | Exists | Modified | Add `"ramses_v2" \| "trader_joe_lb"` to `DEXProtocol` |
+| `bot/src/monitor/PriceMonitor.ts` | Exists | Modified | Extend `getCallDataForPool`, `decodePriceFromResult`, `isV3Pool` for new DEXes |
+| `bot/src/detector/OpportunityDetector.ts` | Exists | Modified | Replace fixed `defaultInputAmount` with `InputOptimizer` call |
+| `bot/src/detector/types.ts` | Exists | Modified | Add `minInput`, `maxInput`, `maxInput` to config; add `inputOptimizer` optional field |
+| `bot/src/builder/TransactionBuilder.ts` | Exists | Modified | Extend `encodeExtraData` for `ramses_v2`, `trader_joe_lb` |
+| `bot/src/builder/types.ts` | Exists | Modified | `AdapterMap` automatically expands with `DEXProtocol` |
+| `bot/src/index.ts` (FlashloanBot) | Exists | Modified | Wire `ExecutionEngine`, `TransactionBuilder`, `HealthMonitor`, `PnLDashboard`; add `executeOpportunity()` |
+| `bot/src/run-arb-mainnet.ts` | Exists | Modified | Construct signer + executor for live mode; instantiate dashboard; call summary on shutdown |
+| `bot/src/config/chains/arbitrum.ts` | Exists | Modified | Add Trader Joe + Ramses DEX addresses |
+| `bot/src/config/chains/pools/arbitrum-mainnet.ts` | Exists | Modified | Add cross-fee-tier pairs + new DEX pools |
+| `bot/src/config/types.ts` | Exists | Modified | Add `executorAddress`, `adapters`, `flashLoanProviders` fields |
+| `contracts/src/adapters/TraderJoeLBAdapter.sol` | New | New file | Trader Joe LB swap adapter |
+| `contracts/src/adapters/RamsesV2Adapter.sol` | New | New file | Ramses V2 swap adapter (V3 fork) |
+| `bot/src/optimizer/InputOptimizer.ts` | New | New file | Binary-search optimal input amount |
+| `bot/src/optimizer/types.ts` | New | New file | `InputOptimizerConfig` interface |
+| `bot/src/optimizer/index.ts` | New | New file | Re-export |
+| `bot/src/dashboard/PnLDashboard.ts` | New | New file | Trade history, P&L summary, CSV export |
+| `bot/src/dashboard/types.ts` | New | New file | `TradeRecord`, `PnLSummary` interfaces |
+| `bot/src/dashboard/index.ts` | New | New file | Re-export |
+| `ecosystem.config.cjs` | New | New file | pm2 ecosystem config |
+
+---
+
+## New Component Specifications
+
+### InputOptimizer
+
+```
+bot/src/optimizer/InputOptimizer.ts
+```
+
+**Inputs:**
+- `delta: PriceDelta` — contains `buyPool.reserves`, `buyPool.liquidity`, `buyPool.sqrtPriceX96` from the monitor
+- `config: { minInput: number; maxInput: number; steps?: number }`
+
+**Algorithm:** Ternary search on `[minInput, maxInput]` for peak net profit. Ternary search converges in O(log n) iterations without derivatives.
+
+**Dependencies:** Pure math — no external deps. Uses types from existing `detector/types.ts` and `monitor/types.ts`.
+
+**Contract:** Returns `number` (ETH units). If reserve data is missing (pool hasn't populated snapshot yet), returns `config.minInput` as safe fallback.
+
+### PnLDashboard
+
+```
+bot/src/dashboard/PnLDashboard.ts
+```
+
+**Inputs on `recordTrade()`:**
+- `ExecutionResult` (from `engine/types.ts`) — `status`, `txHash`, `gasUsed`, `effectiveGasPrice`
+- `ArbitrageOpportunity` (from `detector/types.ts`) — `netProfit`, `costs`, `path`, `inputAmount`
+
+**Persistence:** Append-only JSONL. One `TradeRecord` JSON line per confirmed or reverted trade. File at `.data/trades.jsonl`.
+
+**`getSummary()` output:**
+```typescript
+interface PnLSummary {
+  totalTrades: number;
+  profitable: number;
+  reverted: number;
+  totalGrossProfit: number;      // ETH
+  totalGasCost: number;          // ETH
+  totalFlashFee: number;         // ETH
+  totalSlippage: number;         // ETH
+  netPnL: number;                // ETH
+  winRate: number;               // 0-1
+  avgNetProfitPerTrade: number;  // ETH
+  runtime: number;               // ms
+}
+```
+
+**`printSummary()`:** Formats a table to stdout using only `console.log` (no external deps).
+
+---
+
+## Data Flow with New Features
+
+```
+PriceMonitor
+  │  polls pools via Multicall3 (unchanged)
+  │  emits PriceDelta when delta >= threshold
+  │
+  ▼
+OpportunityDetector
+  │  receives PriceDelta
+  │  calls InputOptimizer.computeOptimalInput(delta, config)   [NEW]
+  │  uses optimal input in analyzeDeltaAsync()
+  │  emits ArbitrageOpportunity
+  │
+  ▼
+FlashloanBot.wireEvents()
+  │
+  ├─ [DRY_RUN=true]  ──▶ log opportunity report (existing behavior, unchanged)
+  │
+  └─ [DRY_RUN=false] ──▶ executeOpportunity(opp)           [NEW]
+       │
+       ├── TransactionBuilder.buildArbitrageTransaction(opp)
+       │    encodes executeArbitrage() calldata
+       │    resolves adapter addresses (now includes trader_joe_lb, ramses_v2)
+       │
+       ├── ArbitrumGasEstimator.estimateArbitrumGas(provider, to, data)
+       │    returns L1+L2 gas breakdown
+       │
+       ├── TransactionBuilder.prepareTransaction(tx, gas, nonce)
+       │
+       └── ExecutionEngine.executeTransaction(preparedTx)
+            │  eth_call simulation pre-flight (existing)
+            │  signer.sendTransaction()
+            │  wait for confirmation
+            │  parse ArbitrageExecuted event
+            │  emit "profit" | "reverted" | "failed"
+            │
+            ▼
+       PnLDashboard.recordTrade(result, opp)                  [NEW]
+            │  appends to .data/trades.jsonl
+            │
+       HealthMonitor.recordProfit() / recordGasCost()         [NEW wiring]
+            │  updates in-memory P&L
+            │  emits alerts on thresholds
+```
+
+---
+
+## Build Order
+
+Dependencies between features determine the order. Features with no inter-dependencies can be developed in parallel.
+
+### Phase 1: Pool Configuration + Cross-Fee-Tier Routing
+
+**Dependency:** None — pure config change.
+
+**Why first:** Validates the monitoring pipeline with new pool pairs. No code changes. Fast feedback: run dry-run for 30 minutes and observe whether cross-fee-tier pairs show narrower spreads. This also expands the dataset for optimal input sizing calibration.
+
+**Files:**
+- `bot/src/config/chains/pools/arbitrum-mainnet.ts` — add cross-fee-tier pairs
+
+---
+
+### Phase 2: New DEX Adapters (Ramses V2 first, then Trader Joe LB)
+
+**Dependency:** Phase 1 (need correct pool definitions to test new adapters).
+
+**Why Ramses first:** It is a Uniswap V3 fork — the on-chain adapter is ~20 lines of code reusing `UniswapV3Adapter.sol` patterns. Off-chain support in `PriceMonitor` adds 3 lines to existing branches. Very low risk.
+
+**Why Trader Joe second:** Novel AMM model (bin-based). Requires understanding `ILBPair.getActiveId()` + `getBin()` price computation. More code, more testing.
+
+**Subtasks (Ramses):**
+1. `RamsesV2Adapter.sol` — implement, test with Foundry fork test
+2. Add `"ramses_v2"` to `DEXProtocol`
+3. Extend `PriceMonitor` for `ramses_v2`
+4. Extend `TransactionBuilder.encodeExtraData` for `ramses_v2`
+5. Add Ramses pool addresses to `arbitrum.ts` config
+6. Add Ramses pools to pool definitions
+7. Deploy `RamsesV2Adapter` to Arbitrum Sepolia → run dry-run to validate
+
+**Subtasks (Trader Joe LB):**
+1. Research `ILBPair` interface for price reading (MEDIUM confidence — LB uses non-standard bin math)
+2. `TraderJoeLBAdapter.sol` — implement bin-aware swap routing
+3. Add `"trader_joe_lb"` to `DEXProtocol`
+4. Extend `PriceMonitor` for `trader_joe_lb` price decoding
+5. Extend `TransactionBuilder.encodeExtraData` for `trader_joe_lb` (binStep encoding)
+6. Add pools, deploy adapter, validate on Sepolia
+
+---
+
+### Phase 3: Optimal Input Sizing
+
+**Dependency:** Phase 1 (needs pool data), Phase 2 desirable but not blocking.
+
+**Why third:** The optimizer uses `reserves`/`liquidity` data already present in `PriceSnapshot`. This data comes from Phase 1 pools. More pool types (Phase 2) give it more context but aren't required.
+
+**Subtasks:**
+1. `InputOptimizer.ts` — implement ternary search
+2. Unit tests with synthetic reserve data
+3. Inject into `OpportunityDetector` — replace `defaultInputAmount`
+4. Verify: dry-run for 1 hour, compare `inputAmount` values against pool depth; confirm no inputs exceed 20% of pool reserve
+
+---
+
+### Phase 4: Live Execution
+
+**Dependency:** Phases 1-3 (need accurate profit estimates before spending gas).
+
+**Why fourth:** Live execution is the highest-risk feature. All profit estimation must be calibrated first. The eth_call simulation in `ExecutionEngine` will reject losing trades, but miscalibrated inputs still waste gas on simulation calls.
+
+**Subtasks:**
+1. Wire `TransactionBuilder` + `ExecutionEngine` into `FlashloanBot.wireEvents()`
+2. Add `executeOpportunity()` private method to `FlashloanBot`
+3. Update `run-arb-mainnet.ts` to construct signer and executor from env vars
+4. Add `EXECUTOR_ADDRESS`, `PRIVATE_KEY` to env config loading
+5. Gate live execution behind `DRY_RUN !== "false"` check (existing) AND presence of `executor`
+6. Run on Arbitrum Sepolia with live execution enabled (real transactions, no real profit)
+7. Confirm: transactions confirm, `ArbitrageExecuted` events parse correctly, `ProfitRecord` populates
+
+---
+
+### Phase 5: P&L Dashboard
+
+**Dependency:** Phase 4 (needs `ExecutionResult` data from live trades).
+
+**Subtasks:**
+1. `PnLDashboard.ts` — implement with JSONL persistence
+2. Wire into `FlashloanBot` via `engine.on("profit")` / `engine.on("reverted")`
+3. Wire `HealthMonitor` into `FlashloanBot` (it already exists, just needs wiring)
+4. Call `dashboard.printSummary()` in `run-arb-mainnet.ts` shutdown handler
+5. Test: run with mock execution results, verify JSONL writes and summary math
+
+---
+
+### Phase 6: pm2
+
+**Dependency:** Phase 4 (needs stable live execution before putting under process management).
+
+**Subtasks:**
+1. `ecosystem.config.cjs` — write config
+2. Test: `pm2 start ecosystem.config.cjs`, verify bot starts, logs appear
+3. Test graceful restart: `pm2 reload flashloaner-arb-mainnet` — verify shutdown completes within `kill_timeout`
+4. Test crash recovery: `pm2 kill` — verify pm2 restarts bot
+5. Install `pm2-logrotate` for log rotation
+
+---
+
+### Build Order Summary
+
+```
+Phase 1: Pool Config (cross-fee-tier)
+   │  no dependencies
+   ▼
+Phase 2: New DEX Adapters
+   │  depends on: Phase 1
+   ▼
+Phase 3: Input Optimizer
+   │  depends on: Phase 1
+   │  (Phase 2 helpful but not blocking)
+   ▼
+Phase 4: Live Execution
+   │  depends on: Phase 1, 2, 3
+   ▼
+Phase 5: P&L Dashboard
+   │  depends on: Phase 4
+   ▼
+Phase 6: pm2
+      depends on: Phase 4
+```
+
+**Parallelization opportunity:** Phase 3 (Input Optimizer) can be developed alongside Phase 2 (DEX Adapters) since both depend only on Phase 1 and are independent of each other. The developer can build the optimizer with existing pool data while adapter contracts are being tested.
+
+---
+
+## Backward Compatibility Guarantees
+
+Every feature is gated so existing dry-run behavior is preserved:
+
+| Feature | Guard |
+|---------|-------|
+| New pool config | Additive — existing pools unchanged |
+| New DEX adapters | Only active when pool has new `dex` value |
+| Input optimizer | Falls back to `defaultInputAmount` when no reserve data |
+| Live execution | Requires `DRY_RUN=false` AND `executor` injected — both must be explicitly set |
+| P&L dashboard | Only wired when `dashboard` is provided to `FlashloanBot`; JSONL writes don't affect runtime |
+| pm2 | External — no code changes required in bot itself |
+
+Running `pnpm test` and `forge test` must continue to pass after every phase. No breaking changes to existing interfaces.
+
+---
+
 ## Anti-Patterns to Avoid
 
-### Anti-Pattern 1: Cross-Chain Arbitrage (At This Scale)
+### Anti-Pattern 1: Routing Logic in OpportunityDetector
 
-**What:** Attempting to execute arbitrage across two different chains in a single transaction.
+**What:** Adding multi-hop path selection (e.g., WETH → USDC via pool A then B) inside `OpportunityDetector`.
 
-**Why bad:**
-- Requires bridge (slow, expensive, introduces trust assumptions)
-- No atomic execution guarantee across chains
-- Bridge fees erase profit
-- Timing risk (price moves while assets are in transit)
-- Exponentially more complex than single-chain arb
+**Why bad:** The detector's job is profit evaluation, not path discovery. Adding path search makes it a dual-responsibility class, exponentially increasing complexity and test surface.
 
-**Instead:** Run single-chain arbitrage on multiple chains independently. Opportunities exist within each chain's DEX ecosystem (Uniswap vs Sushi on Ethereum, Uniswap vs Camelot on Arbitrum, etc.).
+**Instead:** Keep path building in `buildSwapPath()` (already in OpportunityDetector as a simple 2-step path builder). Cross-fee-tier routing is just two pools with the same tokens — `buildSwapPath()` already handles this correctly via the `PriceDelta.buyPool` / `sellPool` structure.
 
-**When cross-chain arb MIGHT be viable:**
-- Very large price discrepancies (>5%)
-- Low bridge fees (e.g., native L2 bridges)
-- Slow-moving opportunities (hours, not seconds)
-- This is an advanced feature for Phase 3+, not initial multi-chain support.
+### Anti-Pattern 2: Trader Joe LB Using V3 Price Formula
 
-### Anti-Pattern 2: Shared Contract Instances Across Chains
+**What:** Approximating Trader Joe LB price with `sqrtPriceX96` math (since LB is bin-based, not constant-product).
 
-**What:** Deploying a single contract on Chain A that tries to interact with Chain B.
+**Why bad:** LB bins have discrete prices. The active bin price is `(1 + binStep/10000)^(activeId - 8388608)`. Using V3 math will produce wrong prices and incorrect slippage estimates.
 
-**Why bad:**
-- Contracts are chain-isolated by design
-- Would require cross-chain messaging (LayerZero, Axelar) - complex, expensive, slow
-- Defeats the purpose of multi-chain: you want independent operations
+**Instead:** Implement `decodeLBPrice()` using the bin math formula, or read `getReservesOfBin(activeId)` directly and compute price from bin reserves.
 
-**Instead:** Deploy the same contract code to each chain independently. Each chain has its own instance that operates atomically within that chain.
+### Anti-Pattern 3: Input Optimizer Making RPC Calls
 
-### Anti-Pattern 3: Single Bot Process Managing All Chains
+**What:** Calling the chain to get fresh reserve data inside `computeOptimalInput()`.
 
-**What:** One Node.js process managing Ethereum, Arbitrum, Base, etc. simultaneously.
+**Why bad:** The opportunity window on Arbitrum (0.25s blocks) closes faster than an RPC round-trip. Adding an RPC call inside the hot path adds 20-100ms latency, causing the opportunity to be stale by execution time.
 
-**Why bad:**
-- Crash on one chain affects all chains
-- Complex orchestration of multiple event streams
-- RPC rate limit conflicts
-- Hard to scale (can't distribute to multiple machines)
-- Debugging nightmare (interleaved logs from all chains)
+**Instead:** Use reserve data already in the `PriceSnapshot` that was fetched in the same Multicall3 batch. The data is at most one poll cycle old (3 seconds), which is acceptable.
 
-**Instead:** One process per chain. Use process managers (pm2, systemd) for monitoring and auto-restart.
+### Anti-Pattern 4: Writing P&L to SQLite in the Hot Path
 
-**Exception:** For a proof-of-concept or testnet, a unified bot might be acceptable. Move to per-chain processes before production.
+**What:** Inserting a SQLite row synchronously after every trade.
 
-### Anti-Pattern 4: Hardcoding Chain-Specific Values in Shared Code
+**Why bad:** File I/O in the hot path can block the Node.js event loop during periods of high opportunity frequency. Even with async SQLite, connection setup adds latency.
 
-**What:** Putting Ethereum contract addresses, gas prices, or RPC URLs in `packages/bot-core/`.
+**Instead:** Append to JSONL asynchronously (fire-and-forget write). If the process crashes mid-write, the last partial line is ignored on next read. Acceptable data integrity for an in-process analytics store.
 
-**Why bad:**
-- Makes the "shared" code not actually reusable
-- Forces code changes when adding a new chain
-- Error-prone (easy to forget to update for new chain)
+---
 
-**Instead:**
-- All chain-specific values live in `chains/{chain}/config.ts`
-- Shared code is 100% parameterized by config
-- Adding a new chain requires zero changes to shared code
+## Key Risk: Trader Joe LB Bin Math
 
-**Test:** If adding a new chain requires changing anything in `packages/`, your boundaries are wrong.
+**Risk level:** MEDIUM
 
-### Anti-Pattern 5: Different Contract Versions Per Chain
+**What:** Trader Joe LB (Liquidity Book) uses a novel bin-based AMM. Price computation, slippage estimation, and swap routing are different from both constant-product (V2) and concentrated liquidity (V3). The on-chain swap router (`ILBRouter`) takes a packed path with `binStep` values, not fee tiers.
 
-**What:** Deploying FlashloanExecutor v1.0 on Ethereum, v1.1 on Arbitrum, v1.2 on Base.
+**Mitigation:**
+1. Research LB whitepaper and official SDK before implementing
+2. Test adapter on Arbitrum Sepolia fork against real LB pool before mainnet
+3. If LB implementation proves too complex for v1.1 scope, defer and focus on Ramses V2 (which is a V3 fork and straightforward)
 
-**Why bad:**
-- Behavior divergence (bugs on one chain might not exist on another)
-- Harder to test (need different test suites)
-- Maintenance burden (bug fix needs to be ported to all versions)
-- CREATE2 deterministic addresses are impossible
+**Decision point:** If LB research shows > 2 days of implementation time, cut Trader Joe from v1.1 and add it to v1.2.
 
-**Instead:**
-- Deploy the exact same contract code to all chains
-- Use feature flags or adapter registration for chain-specific features
-- If a contract needs chain-specific behavior, inject it via constructor or config, not different code
-
-**Workflow:** Test on one chain (Ethereum), then deploy identical bytecode to all other chains.
-
-## Scalability Considerations
-
-| Concern | Initial (1-2 chains) | Growth (3-5 chains) | Scale (5+ chains) |
-|---------|---------------------|---------------------|------------------|
-| **Bot processes** | Run manually in terminals | pm2 on single server | Kubernetes pods, one per chain |
-| **RPC providers** | Single provider per chain | 2 providers with failover | 3+ providers with intelligent routing |
-| **Configuration** | `.env` files | `.env.{chain}` files | Config server (e.g., Consul, etcd) |
-| **Monitoring** | Console logs | File logs + pm2 status | Centralized logging (Datadog, Grafana) |
-| **Deployment** | Manual forge script | Bash script loop | CI/CD pipeline with multi-chain verification |
-| **Secret management** | Local .env files | Environment variables | Secrets manager (AWS Secrets Manager, Vault) |
-| **Opportunity aggregation** | Per-chain logs | Aggregated dashboard | Real-time analytics pipeline |
-
-## Build Order and Migration Path
-
-### Phase 1: Monorepo Structure (Week 1)
-
-**Goal:** Reorganize existing code into monorepo without breaking functionality.
-
-**Tasks:**
-1. Create `packages/contracts/` and move all Solidity code
-2. Create `packages/bot-core/` and move all TypeScript bot code
-3. Create `chains/ethereum/` with current Ethereum config
-4. Set up pnpm workspace
-5. Update imports to use workspace references
-6. Verify all tests still pass
-
-**Deliverable:** Existing bot runs on Ethereum with new directory structure.
-
-**Dependencies:** None (pure refactor)
-
-**Risk:** Low - no new functionality, just reorganization
-
-### Phase 2: Configuration Abstraction (Week 2)
-
-**Goal:** Extract all Ethereum-specific config into `chains/ethereum/config.ts`.
-
-**Tasks:**
-1. Audit `packages/bot-core/` for hardcoded values
-2. Create `BotConfig` interface that includes all configurable parameters
-3. Refactor all components to accept config in constructor
-4. Move Ethereum values to `chains/ethereum/config.ts`
-5. Update entry point to pass config to components
-
-**Deliverable:** Shared bot code is 100% parameterized, no hardcoded chain-specific values.
-
-**Dependencies:** Phase 1 complete
-
-**Risk:** Medium - requires careful refactoring to avoid breaking changes
-
-### Phase 3: RPC Management Layer (Week 3)
-
-**Goal:** Add multi-provider failover and rate limiting.
-
-**Tasks:**
-1. Implement `RPCManager` class
-2. Add `RPCProviderConfig[]` to `BotConfig`
-3. Update all components to use `RPCManager` instead of direct provider
-4. Add retry logic and failover
-5. Add rate limiter with token bucket algorithm
-6. Test with simulated RPC failures
-
-**Deliverable:** Ethereum bot uses multi-RPC failover.
-
-**Dependencies:** Phase 2 complete
-
-**Risk:** Medium - need to test failover thoroughly
-
-### Phase 4: Second Chain (Arbitrum) (Week 4)
-
-**Goal:** Deploy contracts and bot to Arbitrum using shared code.
-
-**Tasks:**
-1. Create `chains/arbitrum/` directory
-2. Copy deployment script, update RPC/verifier URLs
-3. Deploy contracts to Arbitrum
-4. Create `arbitrum/config.ts` with Arbitrum pools, gas settings, etc.
-5. Create `arbitrum/index.ts` entry point
-6. Run Arbitrum bot in parallel with Ethereum bot
-7. Monitor for 24 hours
-
-**Deliverable:** Two bot processes running independently on Ethereum and Arbitrum.
-
-**Dependencies:** Phase 3 complete
-
-**Risk:** Low - just applying proven pattern to new chain
-
-**Success criteria:** Zero changes to `packages/bot-core/` required.
-
-### Phase 5: Third Chain (Base) (Week 5)
-
-**Goal:** Validate that adding a new chain is now trivial.
-
-**Tasks:**
-1. Create `chains/base/` directory
-2. Deploy contracts (should be copy-paste of Arbitrum deployment)
-3. Create `base/config.ts`
-4. Create `base/index.ts`
-5. Run Base bot
-
-**Deliverable:** Three chains running.
-
-**Dependencies:** Phase 4 complete
-
-**Risk:** Very low - this should be nearly mechanical
-
-**Success criteria:** Adding Base takes <1 day (vs 1 week for Arbitrum in Phase 4).
-
-### Phase 6: Process Management and Monitoring (Week 6)
-
-**Goal:** Production-grade process management and observability.
-
-**Tasks:**
-1. Create `ecosystem.config.js` for pm2
-2. Add structured logging with chain context
-3. Set up centralized log aggregation (optional: Datadog, Grafana)
-4. Add health check endpoints
-5. Create monitoring dashboard
-6. Document runbook for common issues
-
-**Deliverable:** Production-ready multi-chain bot with monitoring.
-
-**Dependencies:** Phase 5 complete
-
-**Risk:** Low - operational improvements, doesn't affect core functionality
-
-### Phase 7: Chain-Specific Adapters (Week 7+)
-
-**Goal:** Support chain-specific DEXes (e.g., Camelot on Arbitrum, Aerodrome on Base).
-
-**Tasks:**
-1. Create Camelot adapter in `packages/contracts/src/adapters/`
-2. Deploy Camelot adapter to Arbitrum
-3. Add Camelot pools to `arbitrum/config.ts`
-4. Create Aerodrome adapter
-5. Deploy Aerodrome adapter to Base
-6. Add Aerodrome pools to `base/config.ts`
-
-**Deliverable:** Chain-specific DEX support.
-
-**Dependencies:** Phase 6 complete
-
-**Risk:** Medium - new adapter contracts need thorough testing
-
-**Note:** Adapters are shared code, but only deployed where needed.
-
-## Component Dependencies
-
-```
-Phase 1 (Monorepo)
-    ↓
-Phase 2 (Config Abstraction)
-    ↓
-Phase 3 (RPC Management)
-    ↓
-Phase 4 (Arbitrum) ──→ Phase 5 (Base)
-    ↓                       ↓
-    └───────────────────────┘
-                ↓
-    Phase 6 (Process Management)
-                ↓
-    Phase 7 (Chain-Specific Adapters)
-```
-
-**Critical path:** Phases 1-4 must be sequential.
-
-**Parallelization opportunity:** After Phase 4, adding new chains (Phase 5) can happen in parallel with process management work (Phase 6).
-
-## Suggested Initial Chains
-
-| Chain | Priority | Rationale |
-|-------|----------|-----------|
-| **Ethereum** | P0 | Already supported, largest liquidity, most established |
-| **Arbitrum** | P0 | High liquidity, low gas, active DEX ecosystem (Uniswap, Sushi, Camelot) |
-| **Base** | P1 | Growing liquidity, very low gas, Coinbase backing |
-| **Optimism** | P2 | Similar to Arbitrum but less liquidity |
-| **Polygon** | P2 | Large user base but higher gas than L2s |
-
-**Recommendation:** Start with Ethereum + Arbitrum (Phase 4), add Base (Phase 5), then evaluate others based on opportunity frequency.
+---
 
 ## Sources
 
-**Multi-Chain DeFi Architecture:**
-- [How to Build a Solana AI Agent in 2026](https://www.alchemy.com/blog/how-to-build-solana-ai-agents-in-2026)
-- [Multi-Agent AI Architecture for Personalized DeFi Investment Strategies](https://medium.com/@gwrx2005/multi-agent-ai-architecture-for-personalized-defi-investment-strategies-c81c1b9de20c)
-- [Why Multi-Chain DeFi Is Hard — And How AI Agents Can Help](https://medium.com/coinmonks/why-multi-chain-defi-is-hard-and-how-ai-agents-can-help-f07a3d54c082)
+All findings based on direct codebase inspection of:
+- `bot/src/monitor/PriceMonitor.ts` (537 lines)
+- `bot/src/detector/OpportunityDetector.ts` (489 lines)
+- `bot/src/engine/ExecutionEngine.ts` (495 lines)
+- `bot/src/builder/TransactionBuilder.ts` (241 lines)
+- `bot/src/index.ts` (285 lines — FlashloanBot)
+- `bot/src/health/HealthMonitor.ts` (299 lines)
+- `bot/src/run-arb-mainnet.ts` (228 lines)
+- `contracts/src/FlashloanExecutor.sol` (302 lines)
+- `contracts/src/adapters/UniswapV3Adapter.sol` (232 lines)
+- `contracts/src/interfaces/IDEXAdapter.sol` (81 lines)
+- `bot/src/config/chains/arbitrum.ts`, `pools/arbitrum-mainnet.ts`
+- `bot/src/config/chains/types.ts`, `bot/src/detector/types.ts`, `bot/src/monitor/types.ts`
 
-**RPC Provider Management:**
-- [Base RPC Nodes Guide 2026](https://rpcfast.com/blog/base-rpc-nodes)
-- [Top 9 Solana RPC Node Providers in 2026 - Comprehensive Comparison](https://dysnix.com/blog/solana-node-providers)
-- [Best Ethereum RPC providers for production workloads in 2026](https://chainstack.com/best-ethereum-rpc-providers-in-2026/)
-
-**TypeScript Monorepo Patterns:**
-- [Monorepos in JavaScript & TypeScript](https://www.robinwieruch.de/javascript-monorepos/)
-- [Managing TypeScript Packages in Monorepos](https://nx.dev/blog/managing-ts-packages-in-monorepos)
-- [Configuration Management for TypeScript Node.js Apps](https://medium.com/@andrei-trukhin/configuration-management-for-typescript-node-js-apps-60b6c99d6331)
-
-**Foundry Multi-Chain Deployment:**
-- [Deterministic Deployments with CREATE2 – foundry](https://www.getfoundry.sh/guides/deterministic-deployments-using-create2)
-- [Scripting – foundry - Ethereum Development Framework](https://getfoundry.sh/forge/deploying/)
-- [GitHub - timurguvenkaya/foundry-multichain](https://github.com/timurguvenkaya/foundry-multichain)
-
-**Flash Loan Multi-Chain:**
-- [Flash Loans | Aave Protocol Documentation](https://aave.com/docs/aave-v3/guides/flash-loans)
-- [Aave Review: Is It the Best DeFi Lending Platform in 2026?](https://coinbureau.com/review/aave-lend/)
-- [Flash Loan Arbitrage Bot Development Services: Boost DeFi Profits 2026](https://www.kirhyip.com/blog/crypto-flash-loan-arbitrage-bot-development-company/)
+**Confidence:** HIGH — all architectural claims traced to specific lines of source code.

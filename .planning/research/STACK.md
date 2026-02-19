@@ -1,593 +1,415 @@
-# Technology Stack: Multi-Chain Flashloan Arbitrage
+# Technology Stack — v1.1 Mainnet Profitability
 
-**Project:** Flashloaner Multi-Chain Expansion
-**Researched:** 2026-02-16
-**Focus:** Alternative EVM chains for small-capital ($500-$1,000) flashloan arbitrage
-
-## Executive Summary
-
-For small-capital flashloan arbitrage in 2026, **Base, Arbitrum, and Polygon** are the top three chains. Base offers the best combination of low gas costs ($0.005 average), high DEX volume (~50% of all L2 DEX activity), and Aave V3 flash loan availability. Arbitrum provides stable liquidity with lower MEV competition (7% optimistic MEV vs 51-55% on Base/Optimism). Polygon offers ultra-low gas costs ($0.0005-$0.2) but higher competition.
-
-**Avoid:** zkSync Era, Scroll, Linea, Mantle, Blast, Mode, Metis — insufficient DEX liquidity, immature flash loan ecosystems, or excessive gas costs for ZK-proof generation.
+**Project:** Flashloan Arbitrage Bot (Arbitrum)
+**Milestone:** v1.1 — Live execution + new DEX adapters + P&L dashboard
+**Researched:** 2026-02-19
+**Confidence:** MEDIUM (contract addresses HIGH via on-chain verification; SDK versions MEDIUM via npm search; Zyberswap status LOW)
 
 ---
 
-## Chain Rankings for Small-Capital Arbitrage
+## Scope
 
-### Tier 1: Recommended (Deploy First)
+This document covers **only the stack additions needed for v1.1** features. The existing stack (ethers.js v6, TypeScript, Foundry, Vitest, tsx, dotenv) is validated and unchanged.
 
-| Rank | Chain | Gas Cost | Flash Loan Providers | Top DEXs | Daily DEX Volume | MEV Competition | Why |
-|------|-------|----------|---------------------|----------|------------------|----------------|-----|
-| 1 | **Base** | $0.005 avg | Aave V3, Balancer V2 | Uniswap V3, Aerodrome | ~$185k revenue/day (50% of L2) | HIGH (51% cyclic arb, 6.3% success) | Highest volume, Coinbase funnel, sub-cent gas |
-| 2 | **Arbitrum** | $0.01 avg | Aave V3 ($2.2B TVL), Balancer V2 | Uniswap V3, SushiSwap, Camelot | Stable (~31% L2 TVL) | MODERATE (7% optimistic MEV, 52.6% success) | Lower competition, better success rates, proven liquidity |
-| 3 | **Polygon PoS** | $0.0005-$0.2 | Aave V3, Balancer V2 | Uniswap V3, SushiSwap, QuickSwap | High (mature market) | HIGH | Ultra-low gas, large ecosystem, good for micro-arbs |
+### Existing Stack (Validated — Do Not Touch)
 
-### Tier 2: Deploy After Validation
-
-| Rank | Chain | Gas Cost | Flash Loan Providers | Top DEXs | Daily DEX Volume | MEV Competition | Why |
-|------|-------|----------|---------------------|----------|------------------|----------------|-----|
-| 4 | **Optimism** | $0.01 avg | Aave V3, Balancer V2 | Uniswap V3, Velodrome | Lower than Base/Arb | VERY HIGH (55% cyclic arb, 12% success) | Good tech, but retail shifted to Base; high failure rates |
-| 5 | **Avalanche** | $0.10-$2 | Aave V3, Balancer V2 | Trader Joe ($57M TVL), Uniswap V3 | $175M 24h (Trader Joe) | MODERATE | Higher gas but strong DEX ecosystem; 25-27 nAVAX base fee |
-| 6 | **BSC** | <$0.10 | PancakeSwap flash swaps | PancakeSwap V3, Uniswap V2 | High (largest CEX-linked DEX) | VERY HIGH | 0.25% pool fee, 6.9 gwei gas; competitive but proven arb opportunities |
-
-### Tier 3: Monitor But Don't Prioritize
-
-| Chain | Status | Reason |
-|-------|--------|--------|
-| **zkSync Era** | SKIP | ZK rollup gas overhead (~1.9 Gwei for zkEVM), SyncSwap has only $64M TVL, arbitrage decay extends over minutes (different dynamics), insufficient flash loan maturity |
-| **Scroll** | SKIP | $3.64M monthly data costs (Feb 2024), newer chain with less DEX liquidity, ZK overhead, no major flash loan providers verified |
-| **Linea** | SKIP | $2.29M monthly data costs, newer ConsenSys chain, limited DEX ecosystem, ZK overhead |
-| **Mantle** | SKIP | $1.05M monthly data costs, smallest of the chains analyzed, insufficient flash loan infrastructure |
-| **Blast** | SKIP | #42 TVL ranking, immature ecosystem launched 2024, insufficient flash loan provider data |
-| **Mode** | SKIP | Insufficient data on DEX volume and flash loan providers |
-| **Metis** | SKIP | Insufficient data on DEX volume and flash loan providers |
-| **Fantom** | MAYBE | Aave V3 deployed, Curve deployed, but lower activity than top chains; consider if expanding beyond L2s |
+| Component | Version | Notes |
+|-----------|---------|-------|
+| Solidity / Foundry | Latest stable | FlashloanExecutor, adapters |
+| ethers.js | v6 (`^6.x`) | All on-chain interaction |
+| TypeScript | `^5.9.3` | ESM (`"type": "module"`) |
+| tsx | `^4.21.0` | Runtime TS execution |
+| Vitest | `^4.0.18` | TypeScript tests |
+| dotenv | `^17.3.1` | Env loading |
+| Node.js | LTS (v22+) | Runtime |
 
 ---
 
-## Recommended Multi-Chain Stack
+## Feature 1: Cross-Fee-Tier Routing
 
-### Core Infrastructure
+### What it is
+Route arbitrage through different Uniswap V3 fee tiers (500 / 3000 / 10000 bps) on the same token pair. Example: buy WETH on USDC/WETH 0.05% pool, sell on USDC/WETH 0.3% pool. Lowers the effective cost floor vs. using the same fee tier on both legs.
 
-| Technology | Version | Purpose | Configuration |
-|------------|---------|---------|--------------|
-| **Foundry** | Latest | Solidity development, multi-chain deployment | Multi-network `foundry.toml` with chain-specific RPC URLs |
-| **ethers.js** | v6 | Blockchain interaction, multi-chain support | Provider switching for Base, Arbitrum, Polygon |
-| **TypeScript** | 5.x | Bot orchestration | Chain-specific opportunity detectors |
+### What's already present
+The codebase already handles this structurally:
+- `feeTier` field exists on `PoolDefinition` and `SwapStep`
+- `getSwapFeeRate()` in `OpportunityDetector` reads `feeTier` and applies it correctly
+- `ARBITRUM_CONFIG` already has QuoterV2 at `0x61fFE014bA17989E743c5F6cB21bF9697530B21e`
+- `PriceMonitor` already polls individual pools independently
 
-### RPC Providers (Multi-Chain Support)
+Cross-fee-tier routing is therefore a **pool configuration extension**, not a library addition. The architecture already supports it.
 
-**Recommended:** Alchemy or QuickNode for unified multi-chain access
+### Stack additions needed
 
-| Provider | Chains Supported | Latency | Cost Model | Notes |
-|----------|-----------------|---------|------------|-------|
-| **Alchemy** | Ethereum, Base, Polygon, Arbitrum, Optimism | Low (99.99% uptime) | Free tier + pay-as-you-go | **NO trace API for Arbitrum** (critical limitation) |
-| **QuickNode** | All major EVM chains | Very Low (multi-region) | 20x base + 40-80x for trace/debug | Automatic failover, expensive for trace calls |
-| **Infura** | Ethereum, Optimism, Arbitrum, Polygon, Avalanche, Aurora, Starknet | Medium | Free tier + subscription | Broad chain support |
+**No new npm packages required.**
 
-**Cost Optimization Strategy:**
-- Use Alchemy for Base, Polygon, Optimism (trace API available)
-- Use QuickNode or public RPCs for Arbitrum (Alchemy lacks trace API)
-- Use chain-native public RPCs for testing (fallback only)
+Changes:
+1. **Pool config:** Add entries to `bot/src/config/chains/pools/arbitrum-mainnet.ts` for same token pairs at different fee tiers (0.05% / 0.3% / 1% pool variants on UniV3, SushiV3, CamelotV3).
+2. **QuoterV2 integration:** Add a `QuoterService` class that calls QuoterV2's `quoteExactInputSingle` via ethers ABI to validate multi-leg paths before execution. Uses the existing address already in `arbitrum.ts`.
+3. **Path selection logic:** Small extension to `OpportunityDetector.buildSwapPath()` or a new `PathOptimizer` that, given multiple pools for the same pair, selects the fee-tier combination with the highest net profit after fees.
 
-**RPC Endpoints:**
+**Why not `@uniswap/smart-order-router`:** The Uniswap smart-order-router is a ~150-transitive-dependency package optimized for retail swap routing across thousands of pools. For a tightly controlled 22-pool arbitrage scanner where pool candidates are known in advance, direct QuoterV2 ABI calls via ethers.js are faster, lighter, and more deterministic. (MEDIUM confidence — from search results and codebase analysis)
 
-```typescript
-// .env.example additions
-BASE_RPC_URL=https://base-mainnet.g.alchemy.com/v2/YOUR_API_KEY
-ARBITRUM_RPC_URL=https://arb-mainnet.g.alchemy.com/v2/YOUR_API_KEY
-POLYGON_RPC_URL=https://polygon-mainnet.g.alchemy.com/v2/YOUR_API_KEY
-OPTIMISM_RPC_URL=https://opt-mainnet.g.alchemy.com/v2/YOUR_API_KEY
-AVALANCHE_RPC_URL=https://api.avax.network/ext/bc/C/rpc
-BSC_RPC_URL=https://bsc-dataseed.binance.org
-```
-
-### Flash Loan Providers by Chain
-
-#### Aave V3 (Recommended — Widest Coverage)
-
-**Fee:** 0.09% (governance adjustable, reduced from 0.05% in some markets)
-**Chains:** Ethereum, Arbitrum, Optimism, Base, Polygon, Avalanche, Fantom, and 7+ more
-
-| Chain | Aave V3 Pool Address | TVL | Notes |
-|-------|---------------------|-----|-------|
-| **Arbitrum** | `0x794a61358D6845594F94dc1DB02A252b5b4814aD` | $2.2B | #2 largest Aave deployment |
-| **Optimism** | `0x794a61358D6845594F94dc1DB02A252b5b4814aD` | Lower than Arbitrum | Same address (CREATE2) |
-| **Base** | `0x794a61358D6845594F94dc1DB02A252b5b4814aD` | Growing | Same address (CREATE2) |
-| **Polygon** | `0x794a61358D6845594F94dc1DB02A252b5b4814aD` | Mature | Same address (CREATE2) |
-| **Avalanche** | `0x794a61358D6845594F94dc1DB02A252b5b4814aD` | Active | Tutorial-tested |
-
-**Key Advantage:** Same contract address across chains (CREATE2 deployment) simplifies multi-chain contract development.
-
-#### Balancer V2 (Recommended — Zero Fees)
-
-**Fee:** 0% (set at deployment, not changed by governance as of 2026)
-**Chains:** Ethereum, Arbitrum, Optimism, Polygon, others
-**Liquidity:** $1B+ vault liquidity (combined across all pools)
-
-**Key Advantage:** Zero-fee flash loans maximize net returns. Vault architecture allows multi-token borrowing in single transaction.
-
-**Trade-off:** Smaller asset selection than Aave, but zero fees offset this for supported assets.
-
-#### Chain-Specific Flash Loan Providers
-
-| Chain | Additional Providers | Fee | Notes |
-|-------|---------------------|-----|-------|
-| **Ethereum** | Uniswap V3, dYdX | Varies | Already supported in existing bot |
-| **BSC** | PancakeSwap Flash Swaps | 0.25% pool fee | No dedicated flash loan — use flash swaps |
-| **Arbitrum** | Uniswap V3 | 0.05% | Available but Aave/Balancer preferred |
-| **Base** | Uniswap V3 | 0.05% | Available but Aave/Balancer preferred |
-
-### DEX Ecosystem by Chain
-
-#### Base (Top Priority)
-
-| DEX | Type | Deployment | TVL/Volume | Notes |
-|-----|------|------------|------------|-------|
-| **Aerodrome** | V2 AMM | Native | High | Core Base liquidity hub |
-| **Uniswap V3** | Concentrated liquidity | `0x...` (see Uniswap docs) | Dominant | Concentrated liquidity, multiple fee tiers |
-| **Uniswap V2** | Classic AMM | Deployed 2024+ | Growing | Recently deployed across 6 new chains including Base |
-
-**Liquidity Profile:** ~50% of all L2 DEX volume, $185k daily revenue, driven by Coinbase retail funnel
-
-#### Arbitrum
-
-| DEX | Type | Deployment | TVL/Volume | Notes |
-|-----|------|------------|------------|-------|
-| **Uniswap V3** | Concentrated liquidity | Official | Dominant | Best liquidity depth |
-| **SushiSwap V2** | Classic AMM | `0x1b02da8cb0d097eb8d57a175b88c7d8b47997506` | Established | Router V2 |
-| **SushiSwap V3** | Concentrated liquidity | `0x1af415a1eba07a4986a52b6f2e7de7003d82231e` | Growing | Factory V3 |
-| **Camelot** | Native AMM | Arbitrum-native | Strong | Arbitrum-specific optimizations |
-
-**Liquidity Profile:** $2.8-$2.9B TVL (31% of L2 DeFi TVL), stable year-over-year, 250ms block times (requires performance optimization)
-
-#### Polygon PoS
-
-| DEX | Type | Deployment | TVL/Volume | Notes |
-|-----|------|------------|------------|-------|
-| **Uniswap V3** | Concentrated liquidity | Official | Dominant | Best for large trades |
-| **SushiSwap V2** | Classic AMM | `0x1b02da8cb0d097eb8d57a175b88c7d8b47997506` | Established | Same router as Arbitrum |
-| **QuickSwap** | Native AMM | Polygon-native | High | Polygon-optimized, dragon lair staking |
-
-**Liquidity Profile:** Ultra-low gas ($0.0005-$0.2), mature ecosystem, high competition
-
-#### Optimism
-
-| DEX | Type | Deployment | TVL/Volume | Notes |
-|-----|------|------------|------------|-------|
-| **Velodrome** | Full-stack AMM | Native | Core hub | Optimism Superchain liquidity hub |
-| **Uniswap V3** | Concentrated liquidity | Official | Strong | Multiple fee levels, TWAP oracles |
-| **Uniswap V2** | Classic AMM | Deployed 2024+ | Growing | Recently deployed |
-
-**Liquidity Profile:** Lower than Base, retail attention shifted to Base, 55% cyclic arb with only 12% success rate (high competition)
-
-#### Avalanche C-Chain
-
-| DEX | Type | Deployment | TVL/Volume | Notes |
-|-----|------|------------|------------|-------|
-| **Trader Joe** | Native AMM | Avalanche-native | $57M TVL, $175M 24h volume | Largest Avalanche DEX, expanded to Arbitrum/Ethereum |
-| **Uniswap V3** | Concentrated liquidity | Official | Growing | Cross-chain deployment |
-| **Uniswap V2** | Classic AMM | Deployed 2024+ | Active | Recently deployed |
-
-**Liquidity Profile:** $150M TVL across Trader Joe, higher gas (25-27 nAVAX base, $0.10-$2 total) but strong volume
-
-#### BSC (Binance Smart Chain)
-
-| DEX | Type | Deployment | TVL/Volume | Notes |
-|-----|------|------------|------------|-------|
-| **PancakeSwap V3** | Concentrated liquidity | Native | Dominant | Largest CEX-linked DEX |
-| **Uniswap V2** | Classic AMM | Deployed 2024+ | Growing | Cross-chain expansion |
-
-**Liquidity Profile:** 6.9 gwei average gas, <$0.10 per tx, 0.25% pool fee, flash swaps available (no dedicated flash loan)
+**Arbitrum QuoterV2 address (HIGH confidence — official Uniswap docs):**
+`0x61fFE014bA17989E743c5F6cB21bF9697530B21e`
 
 ---
 
-## Chain-Specific Configuration
+## Feature 2: New DEX Adapters
 
-### Gas Cost Analysis (Critical for Small Capital)
+### 2a. Trader Joe V2.1 (Liquidity Book)
 
-| Chain | Average Gas Cost | Complex Arb Cost | Profitability Threshold | Notes |
-|-------|-----------------|------------------|------------------------|-------|
-| **Base** | $0.005 | ~$0.01-$0.02 | 0.2% spread | Post-Dencun, ideal for micro-arbs |
-| **Arbitrum** | $0.01 | ~$0.02-$0.05 | 0.5% spread | 0.1 Gwei average, 20+ TPS |
-| **Polygon PoS** | $0.0005-$0.2 | ~$0.01-$0.05 | 0.1-0.5% spread | Variable, ultra-low at best |
-| **Optimism** | $0.01 | ~$0.02-$0.05 | 0.5% spread | Similar to Arbitrum |
-| **Avalanche** | $0.10-$2 | ~$0.50-$5 | 2-5% spread | Higher threshold, larger opps only |
-| **BSC** | <$0.10 | ~$0.10-$0.50 | 1-2% spread | Moderate, competitive |
+**What it is:** DLMM (Discrete Liquidity Market Maker) pool design unique to Trader Joe. Uses discrete "bins" instead of a continuous price curve. Each bin has zero slippage within it. Price = fixed exchange rate per bin. The active bin determines the current price.
 
-**Key Insight:** With $500-$1,000 capital, target chains where gas is <$0.05 per transaction. A $0.50 gas cost on a $500 arb = 0.1% of capital per failed attempt.
+Arbitrage arises when the active bin price diverges from other DEX prices. Detection pattern: read active bin price from `LBPair`, compare to UniV3/SushiV3 spot prices.
 
-### Profitability Model by Chain
+**Key contracts on Arbitrum (HIGH confidence — verified on Arbiscan):**
 
-**Assumptions:**
-- Capital: $500-$1,000
-- Flash loan fee: 0.09% (Aave) or 0% (Balancer)
-- Target: 0.5-2% arbitrage spreads (small opportunities)
-- Failed tx tolerance: 3-5 failed attempts per success
+| Contract | Address | Notes |
+|----------|---------|-------|
+| LBRouter v2.1 | `0xb4315e873dbcf96ffd0acd8ea43f689d8c20fb30` | V2.1 router — use this |
+| LBRouter v2.0 | `0x7bfd7192e76d950832c77bb412aae841049d8d9b` | Earlier version, keep as fallback |
+| LBFactory v2.1 | `0x8e42f2F4101563bF679975178e880FD87d3eFd4e` | Pool discovery |
+| LBFactory v2.0 | `0x1886d09c9ade0c5db822d85d21678db67b6c2982` | Pool discovery (legacy) |
 
-| Chain | Min Profitable Spread | Net Return (1% spread, $1k) | Failed TX Cost | Verdict |
-|-------|----------------------|----------------------------|---------------|---------|
-| **Base** | 0.2% | $10 - $0.01 - $0.90 = **$9.09** | $0.01 | **Excellent** |
-| **Arbitrum** | 0.5% | $10 - $0.05 - $0.90 = **$9.05** | $0.05 | **Excellent** |
-| **Polygon** | 0.1% | $10 - $0.01 - $0.90 = **$9.09** | $0.01 | **Excellent** |
-| **Optimism** | 0.5% | $10 - $0.05 - $0.90 = **$9.05** | $0.05 | Good (but high competition) |
-| **Avalanche** | 2% | $20 - $2 - $1.80 = **$16.20** | $2 | Moderate (high gas eats small spreads) |
-| **BSC** | 1% | $10 - $0.50 - $2.50 = **$7.00** | $0.50 | Moderate (0.25% pool fee hurts) |
-
-**Calculation:**
-```
-Net = (Capital × Spread) - Gas - (Capital × Flash Loan Fee)
-```
-
-**Recommendation:** Start with Base and Arbitrum where sub-0.5% spreads remain profitable.
-
----
-
-## MEV Competition Assessment
-
-### Competition Levels by Chain
-
-| Chain | MEV Competition | Cyclic Arb % of Gas | Success Rate | Barriers to Entry | Recommendation |
-|-------|----------------|---------------------|--------------|------------------|----------------|
-| **Base** | VERY HIGH | 51% | 6.3% | 2 entities control 80%+ MEV | Deploy but expect low success rates; optimize aggressively |
-| **Arbitrum** | MODERATE | 7% | 52.6% | Performance optimization required (250ms blocks) | **Best balance** — lower competition, higher success |
-| **Optimism** | VERY HIGH | 55% | 12% | Saturated market | Deploy but don't expect high returns |
-| **Polygon** | HIGH | Unknown | Unknown | Mature market, many bots | Deploy for volume, not margins |
-| **Avalanche** | MODERATE | Unknown | Unknown | Higher gas barrier, fewer small-capital bots | Good for larger spreads (2%+) |
-| **BSC** | VERY HIGH | Unknown | Unknown | Largest CEX-linked DEX attracts bots | Competitive but proven opportunities |
-
-**Key Insight:** Base and Optimism have **optimistic MEV** where bots speculatively submit transactions on-chain, hoping to land in the next block. 51-55% of gas is consumed by cyclic arbitrage, but only 6-12% succeed. This is wasteful for small capital.
-
-**Arbitrum's Advantage:** Only 7% of gas consumed by cyclic arb, and 52.6% success rate. This suggests either:
-1. Lower competition (fewer bots probing)
-2. Better bot quality (more sophisticated detection)
-3. Different mempool dynamics (less speculative submission)
-
-**Strategy:** Prioritize Arbitrum for higher success rates. Use Base for volume but expect more failed transactions.
-
----
-
-## Multi-Chain Deployment Architecture
-
-### Contract Deployment Strategy
-
-**Approach:** Deploy same contracts to multiple chains using CREATE2 for deterministic addresses
-
+**LBQuoter:** Available from the `lfj-gg/joe-v2` GitHub repo (`src/LBQuoter.sol`). Key function for price reading:
 ```solidity
-// FlashloanExecutor.sol — Chain-agnostic
-// DEX adapters — Chain-specific (Aerodrome on Base, Camelot on Arbitrum, etc.)
-// ProfitValidator — Chain-agnostic (adjust for gas costs)
-// CircuitBreaker — Chain-agnostic
+function findBestPathFromAmountIn(
+    address[] calldata route,
+    uint128 amountIn
+) external view returns (Quote memory quote)
+// Quote includes: route, pairs, binSteps, versions, fees, amounts
 ```
 
-**Deployment Order:**
-1. **Phase 1:** Base (highest volume, lowest gas)
-2. **Phase 2:** Arbitrum (best success rates)
-3. **Phase 3:** Polygon (ultra-low gas, test micro-arbs)
-4. **Phase 4:** Optimism, Avalanche, BSC (if Phase 1-3 profitable)
+**SDK option:** `@traderjoe-xyz/sdk-v2` at version `^3.0.30` (MEDIUM confidence — npm search). Provides TypeScript types for `PairV2`, bin step calculations, and path routing. However, for a price-read-only arbitrage scanner, direct ABI calls to `LBQuoter` are sufficient and avoid the dependency.
 
-### Bot Architecture (Multi-Chain Support)
+**Recommended approach (no SDK for price reads):**
+Use the `LBQuoter.findBestPathFromAmountIn()` via ethers ABI. This is the same approach already used for UniV3 QuoterV2 calls. Add the LBQuoter ABI as a constant in the TypeScript codebase.
 
-```typescript
-// Existing: Ethereum mainnet support
-// New: Chain-specific opportunity detectors
+Install SDK only if bin-step math is needed for swap calldata construction beyond what LBRouter ABI provides:
+```bash
+pnpm add @traderjoe-xyz/sdk-v2  # Install only if needed
+```
 
-interface ChainConfig {
-  chainId: number;
-  rpcUrl: string;
-  flashLoanProviders: Address[];
-  dexRouters: { name: string; address: Address }[];
-  gasThreshold: bigint; // Max gas to pay per tx
-  minSpread: number; // Min profitable spread %
-}
+**Solidity adapter needed:** New `TraderJoeV2Adapter.sol` in `contracts/src/adapters/`. The LBRouter V2.1 swap interface:
+```solidity
+function swapExactTokensForTokens(
+    uint256 amountIn,
+    uint256 amountOutMin,
+    ILBRouter.Path calldata path,  // tokenPath[], pairBinSteps[], versions[]
+    address to,
+    uint256 deadline
+) external returns (uint256 amountOut)
+```
+The `Path` struct encodes bin steps and version flags. This differs meaningfully from UniV3/V2 adapters and requires a dedicated Solidity adapter.
 
-const chains: Record<string, ChainConfig> = {
-  base: {
-    chainId: 8453,
-    rpcUrl: process.env.BASE_RPC_URL,
-    flashLoanProviders: [
-      "0x794a61358D6845594F94dc1DB02A252b5b4814aD", // Aave V3
-      // Balancer V2 address TBD
-    ],
-    dexRouters: [
-      { name: "Uniswap V3", address: "..." },
-      { name: "Aerodrome", address: "..." },
-    ],
-    gasThreshold: parseEther("0.00002"), // $0.05 max
-    minSpread: 0.002, // 0.2%
-  },
-  // Arbitrum, Polygon, etc.
+### 2b. Ramses V2/V3 (ve(3,3) Concentrated Liquidity)
+
+**What it is:** A Uniswap V3 fork with ve(3,3) tokenomics layered on top. The AMM swap interface is nearly identical to Uniswap V3. V3 removes proxies and improves gas efficiency vs V2. Ramses is Arbitrum-native and has meaningful liquidity on WETH/USDC, WETH/ARB, and RAM pairs.
+
+**Key contracts on Arbitrum (HIGH confidence — from official Ramses docs):**
+
+| Contract | Address | Notes |
+|----------|---------|-------|
+| V3 SwapRouter | `0x4730e03EB4a58A5e20244062D5f9A99bCf5770a6` | Use this for swaps |
+| V3 Factory | `0xd0019e86edB35E1fedaaB03aED5c3c60f115d28b` | Pool discovery |
+| V3 QuoterV2 | `0x00d4FeA3Dd90C4480992f9c7Ea13b8a6A8F7E124` | Price reads |
+| V3 QuoterV1 | `0x0C20C6E42242DB7AF259CC40366A07B198f2C295` | Fallback quoter |
+| UniversalRouter | `0x23B6EC50Fe0197FbE436717a0676BC07c54ba562` | Not needed for arb |
+| V2 Legacy Router | `0x1614a7e1fe63960B4684867a62080acd2404757f` | V2 AMM (legacy) |
+
+**Solidity adapter:** Because Ramses V3 is a Uniswap V3 fork with the same swap interface, the existing `UniswapV3Adapter.sol` can be reused with only the router address changed. Create a thin `RamsesV3Adapter.sol` that inherits or delegates to the V3 adapter pattern, parameterized with the Ramses router address. No new swap interface patterns needed.
+
+**npm packages needed:** None. Direct ABI calls via ethers.js using the standard Uniswap V3 QuoterV2 ABI, pointed at Ramses QuoterV2 address `0x00d4FeA3Dd90C4480992f9c7Ea13b8a6A8F7E124`.
+
+**Audit note:** Ramses underwent a Code4rena security audit in October 2024 (MEDIUM confidence — GitHub code4rena repo). Contracts are verified on Arbiscan.
+
+### 2c. Zyberswap (Algebra Protocol Fork) — DEFERRED
+
+**Status: LOW PRIORITY — Defer to v1.2**
+
+Zyberswap is an Algebra Protocol concentrated liquidity fork (not Uniswap V3). Current on-chain activity: ~30 active addresses/day, ~$0.15 gas used/day (from DefiLlama data — LOW confidence, limited dataset). TVL is stagnant.
+
+**Decision: Do not integrate in v1.1.** The arbitrage opportunity surface is too thin to justify the integration cost. Algebra Protocol has a meaningfully different swap interface (`IAlgebraRouter`) from Uniswap V3. The npm package `@cryptoalgebra/integral-sdk` exists but should not be installed until Zyberswap TVL exceeds $5M.
+
+Revisit in v1.2 if TVL recovers.
+
+---
+
+## Feature 3: pm2 Process Management
+
+**Purpose:** Replace manual `pnpm start` with supervised persistent process — auto-restart on crash, survive server reboots, structured log files, and a live monitor dashboard.
+
+**Package:** `pm2`
+**Version:** `6.0.14` (latest as of Feb 2026, MEDIUM confidence — npm search)
+
+**Install globally on server (not as project dependency):**
+```bash
+npm install -g pm2
+pm2 startup   # Run as root — generates systemd unit for auto-start on reboot
+pm2 save      # Persist current process list
+```
+
+**Critical ESM compatibility detail (HIGH confidence — PM2 GitHub issue #5953):**
+
+This project uses `"type": "module"` in `package.json`. PM2 loads ecosystem config via `require()` internally. An ecosystem file with `.js` extension will fail in ESM projects with "require() of ES Module not supported". The fix: name the config file `ecosystem.config.cjs`.
+
+**Recommended `ecosystem.config.cjs`:**
+```javascript
+// ecosystem.config.cjs  <-- .cjs required for ESM projects
+module.exports = {
+  apps: [{
+    name: 'flashloaner-bot',
+    script: 'bot/src/run-arb-mainnet.ts',
+    interpreter: 'node',
+    interpreter_args: '--import tsx',   // tsx as ESM loader hook, not the interpreter
+    // NOTE: Do NOT set interpreter to 'tsx' — breaks cluster mode and PM2 internals
+    exec_mode: 'fork',                  // Singleton — bot maintains one RPC connection + nonce state
+    instances: 1,                       // Never cluster: nonce conflicts, competing circuit breakers
+    watch: false,                       // Never watch in production — causes restart loops
+    max_memory_restart: '500M',         // Kill + restart if memory leaks past 500MB
+    restart_delay: 5000,                // 5s delay between restarts (dampens crash loops)
+    max_restarts: 10,                   // Stop trying after 10 restarts within exponential window
+    log_file: 'logs/bot-combined.log',
+    out_file: 'logs/bot-out.log',
+    error_file: 'logs/bot-err.log',
+    time: true,                         // Prefix each log line with timestamp
+    env: {
+      NODE_ENV: 'production',
+    },
+    env_dry_run: {
+      NODE_ENV: 'production',
+      DRY_RUN: 'true',
+    },
+  }]
 };
 ```
 
-### Multi-Chain Monitoring Strategy
-
-**Option 1: Parallel Monitors (Resource Intensive)**
-- Run separate bot instances per chain
-- Each monitors its own chain independently
-- Pros: Simple, isolated failures
-- Cons: 3-6x infrastructure cost
-
-**Option 2: Unified Monitor (Efficient)**
-- Single bot instance, round-robin chain monitoring
-- Switch providers per iteration
-- Pros: Lower cost, shared infrastructure
-- Cons: Complex coordination, slower per-chain monitoring
-
-**Recommendation:** Start with **Parallel Monitors** for Base and Arbitrum (top 2 chains). Add unified monitoring if expanding to 4+ chains.
-
----
-
-## Technology Recommendations
-
-### Core Stack (No Changes)
-
-| Category | Technology | Version | Rationale |
-|----------|-----------|---------|-----------|
-| Smart Contracts | Solidity | 0.8.x | Existing contracts are chain-agnostic |
-| Contract Framework | Foundry | Latest | Multi-chain deployment support built-in |
-| Ethereum Library | ethers.js | v6 | Multi-chain provider support |
-| Bot Runtime | TypeScript + Node.js | 5.x + 20.x | Existing stack works across chains |
-| Testing | Foundry + Vitest | Latest | Dual-language testing maintained |
-
-### New: Multi-Chain Libraries
-
-| Library | Version | Purpose | Why |
-|---------|---------|---------|-----|
-| **viem** | 2.x | Alternative to ethers.js | Better TypeScript support, multi-chain utilities, consider for new code |
-| **@chain-registry/types** | Latest | Chain metadata (RPC URLs, chain IDs, explorers) | Centralized chain configuration |
-| **@layerzerolabs/scan-client** | Latest (if using LayerZero) | Cross-chain message tracking | Only if implementing cross-chain arbs |
-
-**Decision:** Stick with **ethers.js v6** for consistency with existing codebase. Avoid introducing viem unless refactoring.
-
-### RPC Infrastructure (Updated)
-
-**Primary:** Alchemy (Base, Polygon, Optimism) + QuickNode or public RPC (Arbitrum)
-
-**Backup:** Infura (all chains)
-
-**Public RPCs (Free Tier Testing Only):**
+**Key commands:**
 ```bash
-# Base
-https://mainnet.base.org
-
-# Arbitrum
-https://arb1.arbitrum.io/rpc
-
-# Polygon
-https://polygon-rpc.com
-
-# Optimism
-https://mainnet.optimism.io
-
-# Avalanche
-https://api.avax.network/ext/bc/C/rpc
-
-# BSC
-https://bsc-dataseed.binance.org
+pm2 start ecosystem.config.cjs                    # Live mode
+pm2 start ecosystem.config.cjs --env dry_run      # Dry-run mode
+pm2 stop flashloaner-bot
+pm2 restart flashloaner-bot
+pm2 logs flashloaner-bot --lines 100
+pm2 monit                                          # Real-time CPU/memory/log dashboard
+pm2 save                                           # Persist after config changes
 ```
 
-**Warning:** Public RPCs are rate-limited and unreliable for production. Use only for testing.
+**Why pm2 over raw systemd:** PM2 provides log aggregation, memory-based restart, and `pm2 monit` live dashboard with zero additional config. A systemd unit file provides durability but requires separate logrotate config and journald for log access. For a solo-operator bot, pm2 is the right level of complexity.
 
-### Deployment Tooling
-
-| Tool | Purpose | Configuration |
-|------|---------|--------------|
-| **Foundry scripts** | Multi-chain contract deployment | Chain-specific RPC URLs in `foundry.toml` |
-| **Hardhat (optional)** | Verification on non-standard explorers | Only if Foundry verify fails |
-| **Tenderly** | Multi-chain transaction simulation | Supports Base, Arbitrum, Polygon, Optimism |
-
-**Multi-Chain foundry.toml:**
-
-```toml
-[profile.default]
-# ... existing config
-
-[rpc_endpoints]
-base = "${BASE_RPC_URL}"
-arbitrum = "${ARBITRUM_RPC_URL}"
-polygon = "${POLYGON_RPC_URL}"
-optimism = "${OPTIMISM_RPC_URL}"
-avalanche = "${AVALANCHE_RPC_URL}"
-bsc = "${BSC_RPC_URL}"
-
-[etherscan]
-base = { key = "${BASESCAN_API_KEY}", url = "https://api.basescan.org/api" }
-arbitrum = { key = "${ARBISCAN_API_KEY}", url = "https://api.arbiscan.io/api" }
-polygon = { key = "${POLYGONSCAN_API_KEY}", url = "https://api.polygonscan.com/api" }
-optimism = { key = "${OPTIMISTIC_ETHERSCAN_API_KEY}", url = "https://api-optimistic.etherscan.io/api" }
-avalanche = { key = "${SNOWTRACE_API_KEY}", url = "https://api.snowtrace.io/api" }
-bsc = { key = "${BSCSCAN_API_KEY}", url = "https://api.bscscan.com/api" }
-```
+**Why `fork` not `cluster` mode:** The bot is a singleton — it maintains a single WebSocket RPC connection, a single nonce counter managed by `ExecutionEngine`, and a circuit breaker that gates all submissions. Cluster mode spawns competing instances that would conflict on nonce management and circuit breaker state.
 
 ---
 
-## Anti-Recommendations (What NOT to Use)
+## Feature 4: P&L Dashboard with Trade History
 
-### Chains to Avoid
+### Storage Layer
 
-| Chain | Reason | Alternative |
-|-------|--------|-------------|
-| **zkSync Era** | ZK proof gas overhead (~1.9 Gwei for zkEVM), immature flash loan ecosystem, arbitrage decay extends over minutes (different dynamics than optimistic rollups) | Use Arbitrum or Base instead |
-| **Scroll** | Newer ZK rollup, limited DEX liquidity, $3.64M monthly data costs indicate lower activity, no major flash loan providers | Use Base or Arbitrum |
-| **Linea** | ConsenSys ZK rollup, $2.29M monthly data costs, limited DEX ecosystem, ZK overhead | Use Optimism (same team's optimistic rollup) |
-| **Mantle** | Smallest analyzed chain ($1.05M monthly costs), insufficient flash loan infrastructure | Use larger L2s |
-| **Blast, Mode, Metis** | Insufficient data on DEX volume and flash loan providers, too early-stage for production | Monitor but don't deploy yet |
-
-### Flash Loan Providers to Avoid
-
-| Provider | Reason | Alternative |
-|----------|--------|-------------|
-| **dYdX** | Ethereum-only, not deployed on L2s | Use Aave V3 or Balancer V2 |
-| **Uniswap V3 Flash** | 0.05% fee when Balancer offers 0% | Use Balancer V2 |
-| **PancakeSwap Flash Swaps** | 0.25% pool fee (higher than Aave's 0.09%) | Use Aave V3 on BSC if/when deployed |
-
-### RPC Providers to Avoid
-
-| Provider/Approach | Reason | Alternative |
-|------------------|--------|-------------|
-| **Alchemy for Arbitrum** | No trace API support (critical for debugging complex arbs) | Use QuickNode or Infura for Arbitrum |
-| **Public RPCs for production** | Rate limits, downtime, no SLA | Use Alchemy, QuickNode, or Infura |
-| **Running own nodes** | $500-$2,000/month per chain, operational overhead | Use managed RPC providers |
-
----
-
-## Installation & Configuration
-
-### Environment Variables
+**Package:** `better-sqlite3`
+**Version:** `^12.6.2` (latest, MEDIUM confidence — npm search)
+**Types:** `@types/better-sqlite3`
 
 ```bash
-# Add to .env (NEVER commit)
-
-# === RPC Endpoints ===
-BASE_RPC_URL=https://base-mainnet.g.alchemy.com/v2/YOUR_API_KEY
-ARBITRUM_RPC_URL=https://arb-mainnet.g.alchemy.com/v2/YOUR_API_KEY
-POLYGON_RPC_URL=https://polygon-mainnet.g.alchemy.com/v2/YOUR_API_KEY
-OPTIMISM_RPC_URL=https://opt-mainnet.g.alchemy.com/v2/YOUR_API_KEY
-AVALANCHE_RPC_URL=https://api.avax.network/ext/bc/C/rpc
-BSC_RPC_URL=https://bsc-dataseed.binance.org
-
-# === Etherscan API Keys (for contract verification) ===
-BASESCAN_API_KEY=YOUR_API_KEY_HERE
-ARBISCAN_API_KEY=YOUR_API_KEY_HERE
-POLYGONSCAN_API_KEY=YOUR_API_KEY_HERE
-OPTIMISTIC_ETHERSCAN_API_KEY=YOUR_API_KEY_HERE
-SNOWTRACE_API_KEY=YOUR_API_KEY_HERE
-BSCSCAN_API_KEY=YOUR_API_KEY_HERE
-
-# === Deployment Configuration ===
-DEPLOYER_PRIVATE_KEY=YOUR_PRIVATE_KEY_HERE
-
-# === Chain Selection (for bot) ===
-ENABLED_CHAINS=base,arbitrum,polygon
-PRIMARY_CHAIN=base
+pnpm add better-sqlite3
+pnpm add -D @types/better-sqlite3
 ```
 
-### Package Dependencies (No New Packages Needed)
+**Why better-sqlite3 over alternatives:**
+- **vs. Postgres:** Requires a separate database process, connection management, and backup strategy. Unnecessary for a single-server bot with sequential trade execution.
+- **vs. TypeORM:** Adds 500+ lines of decorator-based configuration for 2-3 tables. Direct SQL with better-sqlite3 is more transparent and performant for the query patterns here (insert on trade, read for periodic reports).
+- **vs. Node.js native SQLite (v22):** Still experimental as of early 2025, requires a `--experimental-sqlite` flag. better-sqlite3 is stable, synchronous, and ships prebuilt binaries.
+- **vs. async sqlite3:** better-sqlite3 is synchronous, which suits the bot's event-loop model — no async database operations blocking the critical path.
+
+**Schema (no ORM — define as constants in TypeScript):**
+```sql
+CREATE TABLE IF NOT EXISTS trades (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  tx_hash           TEXT UNIQUE,
+  timestamp         INTEGER NOT NULL,
+  block_number      INTEGER,
+  token_in          TEXT,
+  token_out         TEXT,
+  flash_loan_amount TEXT,       -- bigint as string
+  gross_profit_wei  TEXT,
+  gas_cost_wei      TEXT,
+  net_profit_wei    TEXT,
+  net_profit_eth    REAL,       -- float for aggregation queries
+  status            TEXT,       -- 'confirmed' | 'reverted' | 'failed'
+  dex_buy           TEXT,
+  dex_sell          TEXT,
+  fee_tier_buy      INTEGER,
+  fee_tier_sell     INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+  id               INTEGER PRIMARY KEY AUTOINCREMENT,
+  started_at       INTEGER,
+  stopped_at       INTEGER,
+  opportunities    INTEGER DEFAULT 0,
+  trades_executed  INTEGER DEFAULT 0,
+  total_profit_eth REAL DEFAULT 0.0
+);
+```
+
+### Dashboard Display
+
+**Recommendation: Extend the existing `reporting.ts` console output pattern.** Do NOT add a TUI library (blessed/ink) for v1.1.
+
+**Rationale for no TUI library:**
+- `blessed-contrib` was last published 4 years ago. It is effectively abandoned. No TypeScript support, no ESM support.
+- `ink` (React-based TUI) is actively maintained and TypeScript-first, but requires React as a dependency — significant overhead for what amounts to a 40-line formatted table.
+- The existing `reporting.ts` produces clean, structured console output. pm2's `pm2 logs` and `pm2 monit` already provide real-time monitoring.
+- Log files produced by pm2 are trivially parseable by any external tool.
+
+**What to add to `reporting.ts`:**
+1. `formatPnLSummary(trades: TradeRecord[]): string` — prints a trade history table with ANSI color codes (green for profit, red for loss), cumulative totals, and per-session stats.
+2. A periodic interval in the main bot loop (every 5 minutes) that queries the SQLite DB and calls `formatPnLSummary`.
+3. A `--report` CLI flag in `run-arb-mainnet.ts` that prints the last N trades and exits (useful for checking from a separate terminal without stopping the bot).
+
+**If a live TUI is explicitly required in a later milestone:** Use `ink` v5 (React-based, TypeScript-first, actively maintained). Do not use `blessed`.
+
+---
+
+## Feature 5: Live Flash Loan Execution
+
+**What changes:** Switch `ExecutionEngine` from `dryRun: true` to `dryRun: false`. Wire a real `ethers.Wallet` signer.
+
+**New npm packages needed: None.**
+
+Everything required is already in the codebase:
+- `ExecutionEngine` has live execution logic (`sendTransaction`, confirmation waiting, pre-flight `eth_call` simulation, revert parsing)
+- `TransactionBuilder` encodes real ABI calldata for `FlashloanExecutor.executeArbitrage()`
+- `ExecutionSigner` interface accepts any ethers.js v6 `Signer`
+- `CircuitBreaker`, `ProfitValidator`, consecutive failure pausing are all implemented
+
+**What IS needed (configuration, not packages):**
+
+1. **Wallet instantiation from env (already in ethers.js v6):**
+   ```typescript
+   import { Wallet, JsonRpcProvider } from "ethers";
+   const provider = new JsonRpcProvider(process.env.RPC_URL);
+   const wallet = new Wallet(process.env.PRIVATE_KEY!, provider);
+   // Pass wallet to ExecutionEngine as the signer
+   ```
+
+2. **Environment variables to add (not new packages):**
+   ```bash
+   PRIVATE_KEY=<hot wallet private key>           # Never commit
+   FLASHLOAN_EXECUTOR_ADDRESS=<deployed address>  # From deployment
+   DRY_RUN=false                                  # Toggle
+   ```
+
+3. **One-time on-chain setup (admin transactions, not code):**
+   - Call `FlashloanExecutor.approveAdapter(traderJoeAdapterAddress)` for each new adapter
+   - Call `FlashloanExecutor.approveAdapter(ramsesAdapterAddress)`
+   - These are admin calls from the deployer wallet, executed once after contract deployment
+
+4. **Profit withdrawal script:** Implement as a standalone `scripts/withdraw-profit.ts` that calls `FlashloanExecutor.withdrawProfit(token, to, amount)`. Run manually, not from the bot loop.
+
+**Safety layers already in place (do not duplicate):**
+- Pre-flight `eth_call` simulation in `ExecutionEngine.simulateTransaction()` — catches reverts before spending gas
+- `ProfitValidator` in `FlashloanExecutor` — on-chain profit floor enforcement
+- `CircuitBreaker` — pauses contract on-chain if circuit trips
+- `maxConsecutiveFailures` + engine pause in `ExecutionEngine` — off-chain circuit breaker
+- Gas estimation with L1 data fee component via `ArbitrumGasEstimator`
+
+**No hardware wallet package needed** for initial live run. A hot wallet with a limited WETH balance (5-10 ETH) and no other assets is the appropriate v1.1 setup. If hardware wallet support is added later, use `@ethersproject/hardware-wallets` (ethers.js ecosystem, no new paradigm).
+
+---
+
+## Complete Installation Summary
+
+### New Production Dependencies
 
 ```bash
-# Existing packages already support multi-chain
-pnpm install ethers@6
-pnpm install -D @types/node
+pnpm add better-sqlite3
 ```
 
-### Foundry Setup
+### New Dev Dependencies
 
 ```bash
-# Test deployment on Base fork
-forge script script/Deploy.s.sol --fork-url $BASE_RPC_URL
-
-# Test deployment on Arbitrum fork
-forge script script/Deploy.s.sol --fork-url $ARBITRUM_RPC_URL
-
-# Broadcast to Base testnet (e.g., Base Sepolia)
-forge script script/Deploy.s.sol --rpc-url $BASE_TESTNET_RPC_URL --broadcast --verify
-
-# Broadcast to Base mainnet (requires explicit approval)
-forge script script/Deploy.s.sol --rpc-url $BASE_RPC_URL --broadcast --verify
+pnpm add -D @types/better-sqlite3
 ```
 
----
+### Optional (install only if LB bin-step math is needed beyond ABI calls)
 
-## Key Contract Addresses (Reference)
-
-### Aave V3 Pool (Same Address on All Chains)
-
-```solidity
-address constant AAVE_V3_POOL = 0x794a61358D6845594F94dc1DB02A252b5b4814aD;
-
-// Deployed on:
-// - Ethereum
-// - Arbitrum
-// - Optimism
-// - Base
-// - Polygon
-// - Avalanche
-// - Fantom
-// - Others (14+ chains)
+```bash
+pnpm add @traderjoe-xyz/sdk-v2   # Only if LBQuoter ABI calls prove insufficient
 ```
 
-### Uniswap V3 (Chain-Specific)
+### Global (server setup — not project deps)
 
-See official Uniswap deployment docs:
-- https://docs.uniswap.org/contracts/v3/reference/deployments/
-- https://docs.uniswap.org/contracts/v3/reference/deployments/arbitrum-deployments
+```bash
+npm install -g pm2
+pm2 startup   # Run as root — enables auto-start on server reboot
+```
 
-### SushiSwap V2/V3
+### Not needed (explicitly rejected)
 
-| Chain | Router V2 | Factory V3 |
-|-------|-----------|------------|
-| Arbitrum | `0x1b02da8cb0d097eb8d57a175b88c7d8b47997506` | `0x1af415a1eba07a4986a52b6f2e7de7003d82231e` |
-| Polygon | `0x1b02da8cb0d097eb8d57a175b88c7d8b47997506` | TBD |
-| BSC | `0x1b02da8cb0d097eb8d57a175b88c7d8b47997506` | TBD |
-
-### Balancer V2 Vault
-
-See Balancer docs for chain-specific addresses:
-- https://docs-v2.balancer.fi/reference/contracts/deployment-addresses/
+| Package | Reason Rejected |
+|---------|----------------|
+| `@uniswap/smart-order-router` | 150+ transitive deps; overkill for fixed 22-pool scanner |
+| `@cryptoalgebra/integral-sdk` | Zyberswap integration deferred; TVL too low |
+| `blessed-contrib` | Abandoned 4 years ago; no TypeScript/ESM support |
+| TypeORM | Unnecessary ORM overhead for 2-3 SQLite tables |
+| `@types/pm2` | pm2 v6 ships its own TypeScript definitions |
 
 ---
 
-## Sources & Confidence Assessment
+## Contract Addresses Reference (Arbitrum One, chainId: 42161)
 
-| Topic | Confidence | Sources |
-|-------|-----------|---------|
-| Gas costs (Base, Arbitrum, Optimism, Polygon) | HIGH | [Gas Fee Markets on Layer 2 Statistics 2026](https://coinlaw.io/gas-fee-markets-on-layer-2-statistics/), [Arbitrum Gas Docs](https://docs.arbitrum.io/how-arbitrum-works/deep-dives/gas-and-fees) |
-| Aave V3 deployments | HIGH | [Aave Flash Loans Docs](https://aave.com/docs/aave-v3/guides/flash-loans), [Aave Arbitrum](https://aave.com/blog/aave-arbitrum), [Aave Addresses Dashboard](https://aave.com/docs/resources/addresses) |
-| DEX volume (Base, Arbitrum) | HIGH | [Base DefiLlama](https://defillama.com/chain/base), [2026 Layer 2 Outlook](https://www.theblock.co/post/383329/2026-layer-2-outlook), [DEX Statistics 2026](https://coinlaw.io/decentralized-exchanges-dex-statistics/) |
-| MEV competition analysis | HIGH | [Optimistic MEV in L2s](https://arxiv.org/html/2506.14768), [When Priority Fails](https://arxiv.org/html/2506.01462) |
-| Balancer flash loans | HIGH | [Balancer Flash Loans Docs](https://docs-v2.balancer.fi/reference/contracts/flash-loans.html), [Capitalizing on Balancer's Flash Loans](https://medium.com/balancer-protocol/capitalizing-on-balancers-flash-loans-ddb17dec6958) |
-| Uniswap V2/V3 deployments | HIGH | [Uniswap V2 Multi-Chain Launch](https://blog.uniswap.org/uniswap-v2-now-live-across-more-major-chains), [Uniswap Deployment Addresses](https://docs.uniswap.org/contracts/v3/reference/deployments/) |
-| RPC providers | MEDIUM | [7 High-Performance RPC Providers 2026](https://www.cherryservers.com/blog/high-performance-rpc-node-providers), [Best Arbitrum RPC Providers](https://www.dwellir.com/blog/best-arbitrum-rpc-providers-2025), [Top 6 Base RPC Providers](https://www.dwellir.com/blog/top-6-base-providers-2025) |
-| Small-capital profitability | MEDIUM | [Flash Loan Arbitrage Profitability](https://medium.com/@barronqasem/i-made-47-000-in-my-first-month-using-flash-loan-arbitrage-and-you-can-learn-how-62cc0586f931), [What Is Flash Loan Arbitrage](https://yellow.com/learn/what-is-flash-loan-arbitrage-a-guide-to-profiting-from-defi-exploits) |
-| zkSync Era, Scroll, Linea, Mantle | MEDIUM | [ZKsync Fee Structure](https://docs.zksync.io/zksync-protocol/rollup/fee-model/fee-structure), [L2 Data Costs Tweet](https://x.com/0xKofi/status/1764684311297503644) |
-| Avalanche (Trader Joe) | MEDIUM | [Trader Joe DefiLlama](https://defillama.com/protocol/joe-dex), [Avalanche DefiLlama](https://defillama.com/chain/avalanche) |
-| BSC (PancakeSwap) | MEDIUM | [PancakeSwap Flash Loan Arbitrage](https://medium.com/coinmonks/flash-loan-arbitrage-on-pancakeswap-yummy-cake-or-pie-in-the-sky-part-ii-e9357ab1ff94) |
-| Blast, Mode, Metis | LOW | [Blast DefiLlama](https://defillama.com/chain/Blast), [Mode DefiLlama](https://defillama.com/chain/mode), [Metis DefiLlama](https://defillama.com/chain/Metis) — insufficient 2026 data |
+### Already in codebase (`bot/src/config/chains/arbitrum.ts`)
 
-**Overall Confidence:** MEDIUM-HIGH
+| Protocol | Contract | Address |
+|----------|----------|---------|
+| Uniswap V3 | Factory | `0x1F98431c8aD98523631AE4a59f267346ea31F984` |
+| Uniswap V3 | SwapRouter02 | `0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45` |
+| Uniswap V3 | QuoterV2 | `0x61fFE014bA17989E743c5F6cB21bF9697530B21e` |
+| Aave V3 | Pool | `0x794a61358D6845594F94dc1DB02A252b5b4814aD` |
+| Balancer V2 | Vault | `0xBA12222222228d8Ba445958a75a0704d566BF2C8` |
+| SushiSwap V2 | Router | `0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506` |
+| SushiSwap V3 | Factory | `0x1af415a1EbA07a4986a52B6f2e7dE7003D82231e` |
 
-- **High confidence:** Gas costs, Aave V3 availability, Uniswap deployments, MEV competition on Base/Arbitrum/Optimism
-- **Medium confidence:** RPC provider performance, small-capital profitability estimates, zkSync/Scroll/Linea/Mantle assessment
-- **Low confidence:** Blast, Mode, Metis (insufficient current data)
+### New — Add to `arbitrum.ts` dexes section
 
-**Gaps to Address:**
-- Real-time TVL/volume data for all chains (use DefiLlama API in bot for current data)
-- Chain-specific Balancer V2 Vault addresses (verify in Balancer docs during implementation)
-- Exact Base contract addresses for Aerodrome and other Base-native DEXs
-- Updated 2026 data for zkSync Era, Scroll, Linea (monitoring phase)
+| Protocol | Contract | Address | Confidence |
+|----------|----------|---------|-----------|
+| Trader Joe V2.1 | LBRouter | `0xb4315e873dbcf96ffd0acd8ea43f689d8c20fb30` | HIGH — Arbiscan |
+| Trader Joe V2.1 | LBFactory | `0x8e42f2F4101563bF679975178e880FD87d3eFd4e` | HIGH — Arbiscan |
+| Ramses V3 | SwapRouter | `0x4730e03EB4a58A5e20244062D5f9A99bCf5770a6` | HIGH — Ramses docs |
+| Ramses V3 | Factory | `0xd0019e86edB35E1fedaaB03aED5c3c60f115d28b` | HIGH — Ramses docs |
+| Ramses V3 | QuoterV2 | `0x00d4FeA3Dd90C4480992f9c7Ea13b8a6A8F7E124` | HIGH — Ramses docs |
 
 ---
 
-## Next Steps (For Roadmap)
+## Confidence Assessment
 
-1. **Phase 1: Base Deployment**
-   - Deploy contracts to Base testnet (Base Sepolia)
-   - Integrate Aave V3 and Balancer V2 on Base
-   - Add Uniswap V3 and Aerodrome DEX adapters
-   - Test with small capital ($100-$500) on mainnet
+| Area | Confidence | Basis |
+|------|------------|-------|
+| Uniswap V3 cross-fee-tier routing (no new packages) | HIGH | Codebase analysis — feeTier already wired |
+| Trader Joe LBRouter/LBFactory addresses | HIGH | Verified on Arbiscan |
+| Ramses V3 contract addresses | HIGH | Official Ramses docs |
+| pm2 v6 + tsx integration pattern | MEDIUM | PM2 GitHub issue #5953 + futurestud.io tutorial |
+| pm2 ESM `.cjs` requirement | HIGH | GitHub issue confirmed, multiple sources agree |
+| better-sqlite3 v12.6.2 | MEDIUM | npm search |
+| @traderjoe-xyz/sdk-v2 v3.0.30 | MEDIUM | npm search |
+| Zyberswap activity/TVL | LOW | DefiLlama limited data; hard to confirm current state |
+| Live execution (no new packages needed) | HIGH | Full codebase review — ExecutionEngine already complete |
 
-2. **Phase 2: Arbitrum Deployment**
-   - Deploy contracts to Arbitrum (reuse Base contracts)
-   - Integrate Arbitrum-specific DEXs (Camelot, SushiSwap)
-   - Implement 250ms block time optimizations
-   - Compare success rates vs Base
+---
 
-3. **Phase 3: Polygon Deployment**
-   - Deploy to Polygon PoS
-   - Test micro-arbitrage ($0.0005-$0.2 gas)
-   - Measure competition levels
+## Sources
 
-4. **Phase 4: Profitability Analysis**
-   - 30-day trial on Base, Arbitrum, Polygon
-   - Track: success rate, average profit per arb, gas costs, failed tx ratio
-   - Decision: continue with top 2 chains, pause bottom 1
-
-5. **Phase 5: Expansion (Optional)**
-   - Deploy to Optimism, Avalanche, BSC if Phase 1-4 profitable
-   - Monitor zkSync Era, Scroll, Linea for maturation
-
-**Research Flags:**
-- **Phase 1:** Likely needs deeper research into Aerodrome DEX API and Base-specific MEV dynamics
-- **Phase 2:** Arbitrum 250ms block times may require bot architecture changes (research parallel vs sequential monitoring)
-- **Phase 4:** Profitability analysis will determine if expansion is viable
+- [Uniswap V3 Arbitrum Deployments — Official](https://docs.uniswap.org/contracts/v3/reference/deployments/arbitrum-deployments) — HIGH
+- [Trader Joe LBRouter v2.1 — Arbiscan](https://arbiscan.io/address/0xb4315e873dbcf96ffd0acd8ea43f689d8c20fb30) — HIGH
+- [Trader Joe LBFactory v2.1 — Arbiscan](https://arbiscan.io/address/0x8e42f2F4101563bF679975178e880FD87d3eFd4e) — HIGH
+- [joe-v2 GitHub — LBQuoter.sol](https://github.com/traderjoe-xyz/joe-v2/blob/main/src/LBQuoter.sol) — HIGH
+- [Ramses Exchange Docs — Contract Addresses](https://docs.ramses.exchange/pages/contract-addresses) — HIGH
+- [Ramses Code4rena Audit Oct 2024](https://github.com/code-423n4/2024-10-ramses-exchange) — MEDIUM
+- [@traderjoe-xyz/sdk-v2 npm](https://www.npmjs.com/package/@traderjoe-xyz/sdk-v2) — MEDIUM
+- [PM2 with tsx — futurestud.io](https://futurestud.io/tutorials/pm2-use-tsx-to-start-your-app) — MEDIUM
+- [PM2 ESM config issue — GitHub #5953](https://github.com/Unitech/pm2/issues/5953) — HIGH
+- [PM2 Ecosystem File Reference](https://pm2.io/docs/runtime/reference/ecosystem-file/) — HIGH
+- [better-sqlite3 npm](https://www.npmjs.com/package/better-sqlite3) — MEDIUM
+- [Zyberswap — DefiLlama](https://defillama.com/protocol/zyberswap) — LOW
