@@ -40,11 +40,11 @@ See: `.planning/milestones/v1.0-ROADMAP.md` for full details.
   1. Bot compares prices between different fee tiers for the same token pair (e.g., UniV3 WETH/USDC 0.05% vs 0.3%) and detects cross-tier spreads
   2. Bot routes buy leg through lowest-fee pool and sell leg through highest-price pool when that path is more profitable than same-tier pairing
   3. Dry-run output shows opportunities with cost floors below 0.60% for cross-fee-tier pairs across all 5 major token pairs (WETH/USDC, WETH/USDT, ARB/WETH, LINK/WETH, GMX/WETH)
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 05-01: TBD
-- [ ] 05-02: TBD
+- [ ] 05-01-PLAN.md -- Expand pool config with cross-fee-tier pools + coverage tests
+- [ ] 05-02-PLAN.md -- Cross-fee-tier routing tests + dry-run fee visibility
 
 ### Phase 6: Optimal Input Sizing
 **Goal**: Bot computes optimal trade size per opportunity based on pool liquidity depth, replacing fixed defaults with right-sized amounts
