@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A multi-chain flashloan arbitrage system — on-chain Solidity contracts for atomic flash loan execution and DEX swaps, plus an off-chain TypeScript bot for opportunity detection and execution. The system detects price discrepancies across DEX pools, borrows via flash loans, executes multi-hop swaps, and captures the spread — all in a single atomic transaction that reverts if unprofitable. Currently built for Ethereum, expanding to lower-cost chains where small capital ($500-$1,000) can profitably arb.
+A multi-chain flashloan arbitrage system — on-chain Solidity contracts for atomic flash loan execution and DEX swaps, plus an off-chain TypeScript bot for opportunity detection and execution. The system detects price discrepancies across DEX pools, borrows via flash loans, executes multi-hop swaps, and captures the spread — all in a single atomic transaction that reverts if unprofitable. Now deployed on Arbitrum with multi-DEX monitoring across 22 pools, pool-aware dynamic slippage estimation, and L1+L2 dual-component gas modeling.
 
 ## Core Value
 
@@ -27,47 +27,52 @@ The bot must never lose funds beyond gas costs — the 4-layer safety system (of
 - ✓ Security audit (10 findings, 4 fixed, 6 acknowledged) — existing
 - ✓ 735 tests (312 Solidity + 423 TypeScript), 0 failures — existing
 - ✓ Sepolia testnet validation (2,227 opportunities, 0 errors) — existing
+- ✓ Arbitrum validated as optimal chain for small-capital arb (52.6% success rate) — v1.0
+- ✓ 5 contracts deployed to Arbitrum Sepolia (FlashloanExecutor, ProfitValidator, CircuitBreaker, UniV2/V3 adapters) — v1.0
+- ✓ Multi-chain config system (loadChainConfig, chain-specific pools/tokens) — v1.0
+- ✓ ArbitrumGasEstimator with L1+L2 dual-component model — v1.0
+- ✓ Arbitrum Sepolia testnet validation (62m53s, 3,769 opportunities, 0 errors) — v1.0
+- ✓ Multi-chain monorepo structure (adding new chain = 1 config file + 1 switch case) — v1.0
 
 ### Active
 
 <!-- Current scope. Building toward these. -->
 
-- [ ] Research and select optimal chain(s) for small-capital arb ($500-$1,000)
-- [ ] Deploy contracts to selected chain's testnet
-- [ ] Adapt bot configuration for selected chain (RPC, pools, tokens)
-- [ ] Validate arb detection on selected chain's testnet
-- [ ] Multi-chain monorepo structure (chain-specific configs alongside existing Ethereum code)
+- [ ] Mainnet profitability: achieve consistent net-positive arb trades on Arbitrum mainnet
+- [ ] Cross-fee-tier routing (0.05% <-> 0.3% pairs for lower combined fees)
+- [ ] Expanded DEX coverage (Trader Joe, Ramses, Zyberswap) for wider spreads
+- [ ] Optimal input sizing per-opportunity based on pool depth
+- [ ] Transaction execution with on-chain FlashloanExecutor (move beyond dry-run)
 
 ### Out of Scope
 
 <!-- Explicit boundaries. Includes reasoning to prevent re-adding. -->
 
 - Ethereum mainnet deployment — too saturated for small capital, gas costs eat profits
-- Non-EVM chain contracts (this milestone) — may add alongside EVM contracts in future milestones
-- Live mainnet trading with real funds (this milestone) — research + testnet validation only
-- Multi-DEX adapter expansion — existing V2/V3 adapters sufficient for initial chain deployment
+- Non-EVM chain contracts — may add alongside EVM contracts in future milestones
 - Advanced strategies (sandwich, liquidation, JIT) — focus on simple DEX arb first
+- Cross-chain arbitrage — bridge fees erase profit, no atomic execution, 7-day finality
+- WebSocket monitoring — polling sufficient for current iteration speed
+- Multi-RPC failover — single RPC sufficient until production volume warrants it
 
 ## Context
 
-The system is production-ready for Ethereum but Ethereum mainnet is dominated by sophisticated searchers with massive capital and direct builder relationships. With $500-$1,000 starting capital, the strategy is to find chains where:
-- Gas costs are sub-cent (making 0.1% spreads profitable)
-- DEX liquidity exists but competition is lower
-- Flash loan providers are available (Aave V3 is deployed on many L2s/alt-L1s)
-- Uniswap V2/V3 forks are present (reuse existing adapters)
+Shipped v1.0 with 17,418 LOC TypeScript + Solidity contracts. Tech stack: Foundry, ethers.js v6, Vitest, Node.js.
 
-The codebase is EVM-first with Solidity contracts and ethers.js v6. EVM-compatible chains require minimal changes. Non-EVM chains would be implemented as separate bot modules in the same monorepo.
+**Current state:** Bot monitors 22 Arbitrum mainnet pools across Uniswap V3, SushiSwap V2/V3, and Camelot V2/V3. Dynamic pool-aware slippage estimation uses AMM simulation with V2 reserves and V3 virtual liquidity. Mainnet dry-runs show 0.01-1.68% cross-DEX spreads, but most are unprofitable after fees+slippage (same fee-tier pairs have 0.6% minimum cost floor).
 
-Codebase map available at `.planning/codebase/` (7 documents, 2,819 lines).
+**Key finding from mainnet dry-runs:** The profitable path requires cross-fee-tier routing (0.05% + 0.3% = 0.35% cost floor instead of 0.6%), more DEX coverage for wider spreads, and optimal input sizing relative to pool depth. GMX/WETH 1.68% spread was a trap — thin V3 liquidity at the 1% fee tier caused -4.7 ETH simulated loss.
+
+772 tests passing (312 Solidity + 460 TypeScript).
 
 ## Constraints
 
 - **Capital**: $500-$1,000 starting capital — gas costs must be negligible relative to profits
 - **EVM preferred**: Existing contracts and bot reuse with minimal changes
 - **Monorepo**: All chain implementations live in this repository
-- **Timeline**: 1-2 weeks to research + testnet validation
 - **Safety**: 4-layer safety system must be preserved on any new chain
-- **Flash loans**: Target chain must have flash loan providers (Aave V3, or equivalent)
+- **Flash loans**: Balancer V2 (0% fee) preferred; Aave V3 (0.05% fee) as backup
+- **Arbitrum specifics**: FCFS sequencer ordering (latency > gas bidding), no Flashbots, L1 data fees = 95% of gas costs
 
 ## Key Decisions
 
@@ -75,10 +80,17 @@ Codebase map available at `.planning/codebase/` (7 documents, 2,819 lines).
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Move away from Ethereum mainnet | Too saturated for small capital, gas too high | — Pending |
-| EVM-first chain selection | Reuse existing Solidity contracts and ethers.js bot | — Pending |
-| Research + testnet only for v1 | Validate before risking real funds | — Pending |
-| Monorepo architecture | Single repo for all chain implementations | — Pending |
+| Move away from Ethereum mainnet | Too saturated for small capital, gas too high | ✓ Good — Arbitrum gas is $0.01 vs $5-50 on Ethereum |
+| EVM-first chain selection | Reuse existing Solidity contracts and ethers.js bot | ✓ Good — zero contract changes needed |
+| Research + testnet only for v1 | Validate before risking real funds | ✓ Good — caught many issues before mainnet |
+| Monorepo architecture | Single repo for all chain implementations | ✓ Good — loadChainConfig(chainId) pattern works well |
+| Arbitrum chosen over Base/Optimism | 52.6% success rate vs 6.3% (Base), 12% (Optimism) | ✓ Good — validated on both testnet and mainnet |
+| QuickNode as primary RPC | Alchemy lacks trace API on Arbitrum | ✓ Good — trace API available when needed |
+| Dual-component gas model | L1 data fees = 95% of total cost on Arbitrum | ✓ Good — ArbitrumGasEstimator with NodeInterface works |
+| FCFS sequencer ordering | No Flashbots on L2, latency > gas bidding | ✓ Good — simplified MEV strategy |
+| Balancer V2 for flash loans | 0% fee vs Aave's 0.05% | ✓ Good — same address on all EVM chains via CREATE2 |
+| SushiSwap V2 as UniV2 equivalent | Same interface on Arbitrum | ✓ Good — existing adapter works unchanged |
+| Pool-aware dynamic slippage | Static 0.1% model was inaccurate | ✓ Good — catches thin liquidity traps, accurate for deep pools |
 
 ---
-*Last updated: 2026-02-16 after initialization*
+*Last updated: 2026-02-19 after v1.0 milestone*
