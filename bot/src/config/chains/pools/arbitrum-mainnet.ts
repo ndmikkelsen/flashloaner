@@ -218,16 +218,9 @@ export const ARBITRUM_MAINNET_POOLS: PoolDefinition[] = [
     decimals1: 18,
   },
 
-  {
-    label: "PREMIA/WETH UniV3 (0.3%)",
-    dex: "uniswap_v3",
-    poolAddress: "0x4d834a9b910E6392460eBcfB59F8EEf27D5c19Ff",
-    token0: "0x51fC0f6660482Ea73330E414eFd7808811a57Fa2", // PREMIA
-    token1: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH
-    decimals0: 18,
-    decimals1: 18,
-    feeTier: 3000,
-  },
+  // PREMIA/WETH UniV3 (0.3%) removed — pool 0x4d834a9b has zero in-range
+  // liquidity (stale sqrtPriceX96 produces phantom 42% spread vs Camelot V3).
+  // PREMIA Camelot V3 kept as single-pool monitor for future cross-DEX pairing.
 
   // ──── JONES/WETH ─────────────────────────────────────────────
 
