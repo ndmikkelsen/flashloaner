@@ -1,7 +1,7 @@
 # Requirements: Flashloaner v1.1
 
 **Defined:** 2026-02-19
-**Core Value:** The bot must never lose funds beyond gas costs — the 4-layer safety system ensures every transaction either profits or reverts.
+**Core Value:** The bot must never lose funds beyond gas costs -- the 4-layer safety system ensures every transaction either profits or reverts.
 
 ## v1.1 Requirements
 
@@ -86,36 +86,36 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ROUTE-01 | — | Pending |
-| ROUTE-02 | — | Pending |
-| ROUTE-03 | — | Pending |
-| SIZE-01 | — | Pending |
-| SIZE-02 | — | Pending |
-| SIZE-03 | — | Pending |
-| EXEC-01 | — | Pending |
-| EXEC-02 | — | Pending |
-| EXEC-03 | — | Pending |
-| EXEC-04 | — | Pending |
-| EXEC-05 | — | Pending |
-| TRACK-01 | — | Pending |
-| TRACK-02 | — | Pending |
-| TRACK-03 | — | Pending |
-| TRACK-04 | — | Pending |
-| OPS-01 | — | Pending |
-| OPS-02 | — | Pending |
-| OPS-03 | — | Pending |
-| DEX-01 | — | Pending |
-| DEX-02 | — | Pending |
-| DEX-03 | — | Pending |
-| DEX-04 | — | Pending |
-| DEX-05 | — | Pending |
-| DEX-06 | — | Pending |
+| ROUTE-01 | Phase 5 | Pending |
+| ROUTE-02 | Phase 5 | Pending |
+| ROUTE-03 | Phase 5 | Pending |
+| SIZE-01 | Phase 6 | Pending |
+| SIZE-02 | Phase 6 | Pending |
+| SIZE-03 | Phase 6 | Pending |
+| EXEC-01 | Phase 7 | Pending |
+| EXEC-02 | Phase 7 | Pending |
+| EXEC-03 | Phase 7 | Pending |
+| EXEC-04 | Phase 7 | Pending |
+| EXEC-05 | Phase 7 | Pending |
+| TRACK-01 | Phase 8 | Pending |
+| TRACK-02 | Phase 8 | Pending |
+| TRACK-03 | Phase 8 | Pending |
+| TRACK-04 | Phase 8 | Pending |
+| OPS-01 | Phase 8 | Pending |
+| OPS-02 | Phase 8 | Pending |
+| OPS-03 | Phase 8 | Pending |
+| DEX-01 | Phase 9 | Pending |
+| DEX-02 | Phase 9 | Pending |
+| DEX-03 | Phase 9 | Pending |
+| DEX-04 | Phase 10 | Pending |
+| DEX-05 | Phase 10 | Pending |
+| DEX-06 | Phase 10 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 24 total
-- Mapped to phases: 0
-- Unmapped: 24 ⚠️ (awaiting roadmap creation)
+- Mapped to phases: 24
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-19*
-*Last updated: 2026-02-19 after initial definition*
+*Last updated: 2026-02-19 after roadmap creation*
