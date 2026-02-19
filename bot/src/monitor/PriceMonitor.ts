@@ -23,6 +23,10 @@ const UNISWAP_V3_POOL_ABI = [
   "function slot0() view returns (uint160 sqrtPriceX96, int24 tick, uint16 observationIndex, uint16 observationCardinality, uint16 observationCardinalityNext, uint8 feeProtocol, bool unlocked)",
 ];
 
+const ALGEBRA_V3_POOL_ABI = [
+  "function globalState() view returns (uint160 price, int24 tick, uint16 feeZto, uint16 feeOtz, uint16 timepointIndex, uint8 communityFeeToken0, uint8 communityFeeToken1)",
+];
+
 /**
  * Monitors DEX pool prices and detects cross-DEX arbitrage opportunities.
  *
@@ -111,10 +115,12 @@ export class PriceMonitor extends EventEmitter {
     const blockNumber = await this.config.provider.getBlockNumber();
 
     let price: number;
-    if (pool.dex === "uniswap_v3" || pool.dex === "sushiswap_v3") {
+    if (pool.dex === "camelot_v3") {
+      price = await this.fetchAlgebraPrice(pool);
+    } else if (pool.dex === "uniswap_v3" || pool.dex === "sushiswap_v3") {
       price = await this.fetchV3Price(pool);
     } else {
-      // uniswap_v2 and sushiswap use the same pair interface
+      // uniswap_v2, sushiswap, and camelot_v2 use the same pair interface
       price = await this.fetchV2Price(pool);
     }
 
@@ -152,6 +158,22 @@ export class PriceMonitor extends EventEmitter {
       this.config.provider,
     );
     const [sqrtPriceX96] = await contract.slot0();
+
+    return this.calculateV3Price(
+      BigInt(sqrtPriceX96),
+      pool.decimals0,
+      pool.decimals1,
+    );
+  }
+
+  /** Read sqrtPriceX96 from an Algebra V3-style pool (Camelot V3) */
+  private async fetchAlgebraPrice(pool: PoolConfig): Promise<number> {
+    const contract = new Contract(
+      pool.poolAddress,
+      ALGEBRA_V3_POOL_ABI,
+      this.config.provider,
+    );
+    const [sqrtPriceX96] = await contract.globalState();
 
     return this.calculateV3Price(
       BigInt(sqrtPriceX96),

@@ -159,4 +159,139 @@ export const ARBITRUM_MAINNET_POOLS: PoolDefinition[] = [
     decimals0: 18,
     decimals1: 18,
   },
+
+  // ──── PENDLE/WETH ────────────────────────────────────────────
+
+  {
+    label: "PENDLE/WETH Camelot V2",
+    dex: "camelot_v2",
+    poolAddress: "0xBfCa4230115DE8341F3A3d5e8845fFb3337B2Be3",
+    token0: "0x0c880f6761F1af8d9Aa9C466984b80DAb9a8c9e8", // PENDLE
+    token1: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH
+    decimals0: 18,
+    decimals1: 18,
+  },
+
+  {
+    label: "PENDLE/WETH UniV3 (0.3%)",
+    dex: "uniswap_v3",
+    poolAddress: "0xdbaeB7f0DFe3a0AAFD798CCECB5b22E708f7852c",
+    token0: "0x0c880f6761F1af8d9Aa9C466984b80DAb9a8c9e8", // PENDLE
+    token1: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH
+    decimals0: 18,
+    decimals1: 18,
+    feeTier: 3000,
+  },
+
+  // ──── GNS/WETH ───────────────────────────────────────────────
+
+  {
+    label: "GNS/WETH Camelot V3",
+    dex: "camelot_v3",
+    poolAddress: "0x9b6FF025AeE245D314c09F57B72f0dE6E231c3a6",
+    token0: "0x18c11FD286C5EC11c3b683Caa813B77f5163A122", // GNS
+    token1: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH
+    decimals0: 18,
+    decimals1: 18,
+  },
+
+  {
+    label: "GNS/WETH UniV3 (0.3%)",
+    dex: "uniswap_v3",
+    poolAddress: "0xC91B7b39BBB2c733f0e7459348FD0c80259c8471",
+    token0: "0x18c11FD286C5EC11c3b683Caa813B77f5163A122", // GNS
+    token1: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH
+    decimals0: 18,
+    decimals1: 18,
+    feeTier: 3000,
+  },
+
+  // ──── PREMIA/WETH ────────────────────────────────────────────
+
+  {
+    label: "PREMIA/WETH Camelot V3",
+    dex: "camelot_v3",
+    poolAddress: "0xc3e254E39c45c7886A12455cb8207c808486FAC3",
+    token0: "0x51fC0f6660482Ea73330E414eFd7808811a57Fa2", // PREMIA
+    token1: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH
+    decimals0: 18,
+    decimals1: 18,
+  },
+
+  {
+    label: "PREMIA/WETH UniV3 (0.3%)",
+    dex: "uniswap_v3",
+    poolAddress: "0x4d834a9b910E6392460eBcfB59F8EEf27D5c19Ff",
+    token0: "0x51fC0f6660482Ea73330E414eFd7808811a57Fa2", // PREMIA
+    token1: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH
+    decimals0: 18,
+    decimals1: 18,
+    feeTier: 3000,
+  },
+
+  // ──── JONES/WETH ─────────────────────────────────────────────
+
+  {
+    label: "JONES/WETH Camelot V2",
+    dex: "camelot_v2",
+    poolAddress: "0x460c2c075340EbC19Cf4af68E5d83C194E7D21D0",
+    token0: "0x10393c20975cF177a3513071bC110f7962CD67da", // JONES
+    token1: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH
+    decimals0: 18,
+    decimals1: 18,
+  },
+
+  {
+    label: "JONES/WETH SushiV2",
+    dex: "sushiswap",
+    poolAddress: "0xe8EE01aE5959D3231506FcDeF2d5F3E85987a39c",
+    token0: "0x10393c20975cF177a3513071bC110f7962CD67da", // JONES
+    token1: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH
+    decimals0: 18,
+    decimals1: 18,
+  },
+
+  // ──── DPX/WETH ───────────────────────────────────────────────
+
+  {
+    label: "DPX/WETH SushiV2",
+    dex: "sushiswap",
+    poolAddress: "0x0C1Cf6883efA1B496B01f654E247B9b419873054",
+    token0: "0x6C2C06790b3E3E3c38e12Ee22F8183b37a13EE55", // DPX
+    token1: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH
+    decimals0: 18,
+    decimals1: 18,
+  },
+
+  {
+    label: "DPX/WETH Camelot V3",
+    dex: "camelot_v3",
+    poolAddress: "0x59A327d948db1810324a04D69CBe9fe9884F8F28",
+    token0: "0x6C2C06790b3E3E3c38e12Ee22F8183b37a13EE55", // DPX
+    token1: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH
+    decimals0: 18,
+    decimals1: 18,
+  },
+
+  // ──── SPELL/WETH ─────────────────────────────────────────────
+
+  {
+    label: "SPELL/WETH SushiV2",
+    dex: "sushiswap",
+    poolAddress: "0x8f93Eaae544e8f5EB077A1e09C1554067d9e2CA8",
+    token0: "0x3E6648C5a70A150A88bCE65F4aD4d506Fe15d2AF", // SPELL
+    token1: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH
+    decimals0: 18,
+    decimals1: 18,
+  },
+
+  {
+    label: "SPELL/WETH Camelot V2",
+    dex: "camelot_v2",
+    poolAddress: "0xE28881d63f4F0577d4f75eA04F3a3e75FEFfC491",
+    token0: "0x3E6648C5a70A150A88bCE65F4aD4d506Fe15d2AF", // SPELL
+    token1: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH
+    decimals0: 18,
+    decimals1: 18,
+  },
 ];

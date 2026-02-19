@@ -17,6 +17,8 @@ const ADDR = {
   POOL_V2: "0x0000000000000000000000000000000000000001",
   POOL_V3: "0x0000000000000000000000000000000000000002",
   POOL_SUSHI: "0x0000000000000000000000000000000000000003",
+  POOL_CAMELOT_V2: "0x0000000000000000000000000000000000000004",
+  POOL_CAMELOT_V3: "0x0000000000000000000000000000000000000005",
 };
 
 function makePool(overrides: Partial<PoolConfig> = {}): PoolConfig {
@@ -40,6 +42,7 @@ function mockProvider(opts: {
   blockNumber?: number;
   getReservesReturn?: [bigint, bigint, number];
   slot0Return?: [bigint, number, number, number, number, number, boolean];
+  globalStateReturn?: [bigint, number, number, number, number, number, number];
 }) {
   const blockNum = opts.blockNumber ?? 19_000_000;
 
@@ -68,6 +71,16 @@ function mockProvider(opts: {
             0, 0, 0, 0, 0, true,
           ];
         return encodeSlot0(sqrtPrice, tick, obsIdx, obsCar, obsCarNext, feeProt, unlocked);
+      }
+
+      // globalState() selector = 0xe76c01e4
+      if (selector === "0xe76c01e4") {
+        const [sqrtPrice, tick, feeZto, feeOtz, tpIdx, cf0, cf1] =
+          opts.globalStateReturn ?? [
+            BigInt("3543191142285914000000000"),
+            0, 100, 100, 0, 0, 0,
+          ];
+        return encodeGlobalState(sqrtPrice, tick, feeZto, feeOtz, tpIdx, cf0, cf1);
       }
 
       throw new Error(`Unknown selector: ${selector}`);
@@ -115,6 +128,31 @@ function encodeSlot0(
     pad(obsCarNext) +
     pad(feeProt) +
     pad(unlocked ? 1 : 0)
+  );
+}
+
+/** ABI-encode globalState return value (Algebra V3 / Camelot V3) */
+function encodeGlobalState(
+  sqrtPriceX96: bigint,
+  tick: number,
+  feeZto: number,
+  feeOtz: number,
+  timepointIndex: number,
+  communityFeeToken0: number,
+  communityFeeToken1: number,
+): string {
+  const pad = (v: bigint | number) =>
+    BigInt(v).toString(16).padStart(64, "0");
+  const tickBig = tick >= 0 ? BigInt(tick) : (1n << 256n) + BigInt(tick);
+  return (
+    "0x" +
+    pad(sqrtPriceX96) +
+    tickBig.toString(16).padStart(64, "0") +
+    pad(feeZto) +
+    pad(feeOtz) +
+    pad(timepointIndex) +
+    pad(communityFeeToken0) +
+    pad(communityFeeToken1)
   );
 }
 
@@ -316,6 +354,46 @@ describe("PriceMonitor", () => {
       const snapshot = await monitor.fetchPrice(sushiPool);
 
       expect(snapshot.price).toBeCloseTo(2010, 0);
+    });
+
+    it("should fetch Camelot V2 price using V2 interface", async () => {
+      const provider = mockProvider({
+        getReservesReturn: [
+          BigInt("500000000000000000000"),
+          BigInt("1005000000000"),
+          0,
+        ],
+      });
+      const camelotV2Pool = makePool({
+        label: "WETH/USDC CamelotV2",
+        dex: "camelot_v2",
+        poolAddress: ADDR.POOL_CAMELOT_V2,
+      });
+
+      monitor = new PriceMonitor({ provider, pools: [camelotV2Pool] });
+      const snapshot = await monitor.fetchPrice(camelotV2Pool);
+
+      expect(snapshot.price).toBeCloseTo(2010, 0);
+      expect(snapshot.pool.dex).toBe("camelot_v2");
+    });
+
+    it("should fetch Camelot V3 price using Algebra globalState()", async () => {
+      const sqrtPriceX96 = BigInt("3543191142285914000000000");
+      const provider = mockProvider({
+        globalStateReturn: [sqrtPriceX96, -200000, 100, 100, 0, 0, 0],
+      });
+
+      const camelotV3Pool = makePool({
+        label: "WETH/USDC CamelotV3",
+        dex: "camelot_v3",
+        poolAddress: ADDR.POOL_CAMELOT_V3,
+      });
+
+      monitor = new PriceMonitor({ provider, pools: [camelotV3Pool] });
+      const snapshot = await monitor.fetchPrice(camelotV3Pool);
+
+      expect(snapshot.price).toBeCloseTo(2000, 0);
+      expect(snapshot.pool.dex).toBe("camelot_v3");
     });
   });
 

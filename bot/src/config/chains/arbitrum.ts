@@ -41,6 +41,9 @@ export const ARBITRUM_CONFIG: ChainConfig = {
     sushiswapV3: {
       factory: "0x1af415a1EbA07a4986a52B6f2e7dE7003D82231e",
     },
+    camelotV3: {
+      factory: "0x1a3c9B1d2F0529D97f2afC5136Cc23e58f1FD35B",
+    },
   },
 
   // Token addresses (Arbitrum mainnet)
@@ -52,6 +55,12 @@ export const ARBITRUM_CONFIG: ChainConfig = {
     GMX: "0xfc5a1a6eb076a2c7ad06ed22c90d7e710e35ad0a",
     LINK: "0xf97f4df75117a78c1a5a0dbb814af92458539fb4",
     MAGIC: "0x539bde0d7dbd336b79148aa742883198bbf60342",
+    PENDLE: "0x0c880f6761F1af8d9Aa9C466984b80DAb9a8c9e8",
+    GNS: "0x18c11FD286C5EC11c3b683Caa813B77f5163A122",
+    PREMIA: "0x51fC0f6660482Ea73330E414eFd7808811a57Fa2",
+    JONES: "0x10393c20975cF177a3513071bC110f7962CD67da",
+    DPX: "0x6C2C06790b3E3E3c38e12Ee22F8183b37a13EE55",
+    SPELL: "0x3E6648C5a70A150A88bCE65F4aD4d506Fe15d2AF",
   },
 
   // Gas configuration (Arbitrum-specific)

@@ -1,7 +1,7 @@
 import type { Provider } from "ethers";
 
 /** Supported DEX protocols */
-export type DEXProtocol = "uniswap_v2" | "uniswap_v3" | "sushiswap" | "sushiswap_v3";
+export type DEXProtocol = "uniswap_v2" | "uniswap_v3" | "sushiswap" | "sushiswap_v3" | "camelot_v2" | "camelot_v3";
 
 /** A token pair on a specific DEX */
 export interface PoolConfig {

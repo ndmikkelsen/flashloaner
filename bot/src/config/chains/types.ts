@@ -54,6 +54,9 @@ export interface ChainConfig {
       router: string;
       factory: string;
     };
+    camelotV3?: {
+      factory: string;
+    };
   };
 
   // ──── Token Addresses ──────────────────────────────────────────

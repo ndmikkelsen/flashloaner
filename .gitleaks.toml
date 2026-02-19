@@ -52,6 +52,12 @@ regexes = [
     '''0xfc5a1a6eb076a2c7ad06ed22c90d7e710e35ad0a''',  # GMX Arbitrum
     '''0xf97f4df75117a78c1a5a0dbb814af92458539fb4''',  # LINK Arbitrum
     '''0x539bde0d7dbd336b79148aa742883198bbf60342''',  # MAGIC Arbitrum
+    '''0x0c880f6761F1af8d9Aa9C466984b80DAb9a8c9e8''',  # PENDLE Arbitrum
+    '''0x18c11FD286C5EC11c3b683Caa813B77f5163A122''',  # GNS Arbitrum
+    '''0x51fC0f6660482Ea73330E414eFd7808811a57Fa2''',  # PREMIA Arbitrum
+    '''0x10393c20975cF177a3513071bC110f7962CD67da''',  # JONES Arbitrum
+    '''0x6C2C06790b3E3E3c38e12Ee22F8183b37a13EE55''',  # DPX Arbitrum
+    '''0x3E6648C5a70A150A88bCE65F4aD4d506Fe15d2AF''',  # SPELL Arbitrum
     # Public pool addresses on L2 chains (not secrets)
     '''0xC31E54c7a869B9FcBEcc14363CF510d1c41fa443''',  # WETH/USDC UniV3 0.05% Arbitrum
     '''0x641c00a822e8b671738d32a431a4fb6074e5c79d''',  # WETH/USDT UniV3 0.05% Arbitrum
