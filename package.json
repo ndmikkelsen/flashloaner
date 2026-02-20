@@ -15,7 +15,15 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "preflight": "pnpm run typecheck && pnpm run test && gitleaks detect --source . --no-git"
+    "preflight": "pnpm run typecheck && pnpm run test && gitleaks detect --source . --no-git",
+    "// PM2 Process Management": "Install pm2 globally: npm i -g pm2. For log rotation: pm2 install pm2-logrotate && pm2 set pm2-logrotate:max_size 10M && pm2 set pm2-logrotate:retain 7",
+    "pm2:start": "pm2 start ecosystem.config.cjs",
+    "pm2:stop": "pm2 stop flashloaner-arb",
+    "pm2:restart": "pm2 restart flashloaner-arb",
+    "pm2:logs": "pm2 logs flashloaner-arb --lines 100",
+    "pm2:status": "pm2 status",
+    "pm2:monit": "pm2 monit",
+    "pm2:delete": "pm2 delete flashloaner-arb"
   },
   "keywords": [],
   "author": "",
