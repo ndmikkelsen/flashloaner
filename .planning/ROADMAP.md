@@ -28,7 +28,7 @@ See: `.planning/milestones/v1.0-ROADMAP.md` for full details.
 - [x] **Phase 7: Live Execution + Safety** - Wire existing execution components into live trading with shadow mode, staleness guard, and nonce persistence (completed 2026-02-20)
 - [x] **Phase 8: P&L Dashboard + Operations** - Persist trade outcomes, display session stats, and run bot unattended via pm2 (completed 2026-02-20)
 - [ ] **Phase 9: Ramses V2 Adapter** - Add Ramses V3 CL pool monitoring and on-chain swap routing with fee manipulation safeguards
-- [ ] **Phase 10: Trader Joe V2.1 LB Adapter** - Add Trader Joe Liquidity Book price reading and on-chain swap routing with variable fee buffers
+- [x] **Phase 10: Trader Joe V2.1 LB Adapter** - Add Trader Joe Liquidity Book price reading and on-chain swap routing with variable fee buffers (completed 2026-02-20)
 
 ## Phase Details
 
@@ -139,4 +139,4 @@ Plans:
 | 7. Live Execution + Safety | v1.1 | Complete    | 2026-02-20 | - |
 | 8. P&L Dashboard + Operations | v1.1 | Complete    | 2026-02-20 | - |
 | 9. Ramses V2 Adapter | v1.1 | 0/? | Not started | - |
-| 10. Trader Joe V2.1 LB Adapter | v1.1 | 0/3 | Planned | - |
+| 10. Trader Joe V2.1 LB Adapter | 2/3 | Complete    | 2026-02-20 | - |
