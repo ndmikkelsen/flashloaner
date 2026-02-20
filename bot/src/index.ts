@@ -19,6 +19,8 @@ import {
   formatScanSummary,
   type ScanStats,
 } from "./reporting.js";
+import type { TradeStore } from "./dashboard/TradeStore.js";
+import type { TradeOutcome } from "./dashboard/types.js";
 
 export const BOT_VERSION = "0.1.0";
 
@@ -45,6 +47,7 @@ export class FlashloanBot {
   readonly engine?: ExecutionEngine;
   readonly builder?: TransactionBuilder;
   readonly nonceManager?: NonceManager;
+  readonly tradeStore?: TradeStore;
   readonly stats: ScanStats;
   private _status: BotStatus = "idle";
   private shutdownHandlers: Array<() => void> = [];
@@ -57,10 +60,12 @@ export class FlashloanBot {
       executorAddress?: string;
       adapters?: Record<string, string>; // Partial adapter map (only configured DEXs)
       flashLoanProviders?: { aave_v3: string; balancer: string };
-    }
+    },
+    tradeStore?: TradeStore,
   ) {
     this.config = config;
     this.dryRun = dryRun;
+    this.tradeStore = tradeStore;
 
     // Mode detection: DRY_RUN (backward compatible) -> SHADOW_MODE -> LIVE
     const shadowMode = process.env.SHADOW_MODE === "true";
@@ -306,6 +311,21 @@ export class FlashloanBot {
         } else {
           this.log("warn", `[SHADOW] ✗ Simulation failed: ${simResult.reason}`);
           this.log("warn", `[SHADOW] Estimated profit was ${opp.netProfit.toFixed(8)} ETH, but would revert on-chain`);
+
+          // Record simulation revert in trade store
+          this.tradeStore?.append({
+            txHash: `sim-${opp.id}`,
+            timestamp: Date.now(),
+            blockNumber: opp.blockNumber,
+            path: opp.path.label,
+            inputAmount: opp.inputAmount,
+            grossProfit: 0,
+            gasCost: 0,
+            l1DataFee: 0,
+            revertCost: 0,
+            netProfit: 0,
+            status: "simulation_revert",
+          });
         }
         return;
       }
@@ -360,10 +380,42 @@ export class FlashloanBot {
             this.log("info", `[LIVE] ✓ Transaction confirmed: ${result.txHash}`);
             this.log("info", `[LIVE] Gas used: ${result.gasUsed?.toString() ?? "unknown"}`);
             this.nonceManager.markConfirmed(result.txHash!);
+
+            // Record successful trade
+            const gasUsedEth = result.gasUsed ? Number(result.gasUsed) * Number(feeData.gasPrice ?? 0n) / 1e18 : opp.costs.gasCost;
+            this.tradeStore?.append({
+              txHash: result.txHash!,
+              timestamp: Date.now(),
+              blockNumber: opp.blockNumber,
+              path: opp.path.label,
+              inputAmount: opp.inputAmount,
+              grossProfit: opp.grossProfit,
+              gasCost: gasUsedEth,
+              l1DataFee: opp.costs.l1DataFee ?? 0,
+              revertCost: 0,
+              netProfit: opp.grossProfit - gasUsedEth - (opp.costs.l1DataFee ?? 0),
+              status: "success",
+            });
           } else if (result.status === "reverted") {
             this.log("warn", `[LIVE] ✗ Transaction reverted: ${result.txHash}`);
             this.log("warn", `[LIVE] Revert reason: ${result.revertReason ?? "unknown"}`);
             this.nonceManager.markConfirmed(result.txHash!); // Still increment nonce
+
+            // Record reverted trade (gas burned)
+            const revertGasEth = result.gasUsed ? Number(result.gasUsed) * Number(feeData.gasPrice ?? 0n) / 1e18 : opp.costs.gasCost;
+            this.tradeStore?.append({
+              txHash: result.txHash!,
+              timestamp: Date.now(),
+              blockNumber: opp.blockNumber,
+              path: opp.path.label,
+              inputAmount: opp.inputAmount,
+              grossProfit: 0,
+              gasCost: 0,
+              l1DataFee: 0,
+              revertCost: revertGasEth + (opp.costs.l1DataFee ?? 0),
+              netProfit: -(revertGasEth + (opp.costs.l1DataFee ?? 0)),
+              status: "revert",
+            });
           } else {
             this.log("error", `[LIVE] ✗ Transaction failed: ${result.error}`);
           }

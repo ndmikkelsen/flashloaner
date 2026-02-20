@@ -188,6 +188,7 @@ async function main(): Promise<void> {
     },
     dryRun,
     executionConfig,
+    tradeStore,
   );
 
   // ---- Inject Arbitrum gas estimator ----
