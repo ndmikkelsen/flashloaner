@@ -43,12 +43,29 @@ export function formatOpportunityReport(
     `  Spread:       ${spread.toFixed(2)}%`,
     `  Block:        ${opp.blockNumber}`,
     `${"─".repeat(60)}`,
-    `  Input amount: ${opp.inputAmount} (base token)`,
+  ];
+
+  // Show input amount with optimization context
+  if (opp.optimizationResult) {
+    lines.push(`  Input amount: ${opp.inputAmount.toFixed(4)} (optimized)`);
+    lines.push(
+      `    Optimization: ${opp.optimizationResult.iterations} iterations, ` +
+        `${opp.optimizationResult.durationMs.toFixed(1)}ms, ` +
+        `converged=${opp.optimizationResult.converged}`,
+    );
+    if (opp.optimizationResult.fallbackReason) {
+      lines.push(`    Fallback: ${opp.optimizationResult.fallbackReason}`);
+    }
+  } else {
+    lines.push(`  Input amount: ${opp.inputAmount.toFixed(4)} (fixed default)`);
+  }
+
+  lines.push(
     `  Gross profit: ${opp.grossProfit.toFixed(6)}`,
     `  Costs:`,
     `    Flash loan fee: ${costs.flashLoanFee.toFixed(6)}`,
     `    Gas cost:       ${costs.gasCost.toFixed(6)}`,
-  ];
+  );
   if (costs.l1DataFee !== undefined && costs.l1DataFee > 0) {
     lines.push(`    L1 data fee:    ${costs.l1DataFee.toFixed(6)}`);
   }
