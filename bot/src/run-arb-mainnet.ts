@@ -22,6 +22,8 @@ import { FlashloanBot, BOT_VERSION } from "./index.js";
 import { estimateArbitrumGas, gasComponentsToEth } from "./gas/index.js";
 import type { ArbitrageOpportunity } from "./detector/types.js";
 import type { PriceSnapshot, PriceDelta } from "./monitor/types.js";
+import { TradeStore } from "./dashboard/TradeStore.js";
+import type { TradeOutcome } from "./dashboard/types.js";
 
 // ---------------------------------------------------------------------------
 // ANSI color helpers (no dependencies)
@@ -83,6 +85,9 @@ async function main(): Promise<void> {
   // Load chain config using chainId 42161 (Arbitrum One)
   const chain = loadChainConfig(42161);
 
+  // Initialize TradeStore
+  const tradeStore = new TradeStore(); // Uses default path: .data/trades.jsonl
+
   // Execution mode detection
   const dryRun = process.env.DRY_RUN !== "false";
   const shadowMode = process.env.SHADOW_MODE === "true";
@@ -101,6 +106,27 @@ async function main(): Promise<void> {
   console.log(c.cyan(`  WETH:     ${chain.tokens.WETH}`));
   console.log(c.cyan(`  Input:    ${chain.detector.defaultInputAmount} ETH`));
   console.log(c.cyan(`========================================\n`));
+
+  // Display session stats on startup
+  const sessionStats = tradeStore.getStats();
+  if (sessionStats.totalTrades > 0) {
+    console.log(c.bold(`\n[SESSION STATS] Lifetime Performance`));
+    console.log(c.cyan(`  Total trades:    ${sessionStats.totalTrades}`));
+    console.log(c.cyan(`  Success:         ${sessionStats.successCount} (${(sessionStats.winRate * 100).toFixed(1)}% win rate)`));
+    console.log(c.cyan(`  Reverts:         ${sessionStats.revertCount}`));
+    console.log(c.cyan(`  Sim reverts:     ${sessionStats.simulationRevertCount}`));
+    console.log(c.cyan(`  ────────────────────────────────────────`));
+    console.log(c.cyan(`  Gross profit:    ${sessionStats.grossProfitEth.toFixed(6)} ETH`));
+    console.log(c.cyan(`  Gas cost (L2):   ${sessionStats.gasCostEth.toFixed(6)} ETH`));
+    console.log(c.cyan(`  L1 data fee:     ${sessionStats.l1DataFeeEth.toFixed(6)} ETH`));
+    console.log(c.cyan(`  Revert cost:     ${sessionStats.revertCostEth.toFixed(6)} ETH`));
+    console.log(c.cyan(`  ────────────────────────────────────────`));
+    const netColor = sessionStats.netProfitEth >= 0 ? c.green : c.red;
+    console.log(netColor(`  Net P&L:         ${sessionStats.netProfitEth.toFixed(6)} ETH`));
+    console.log(c.cyan(`\n`));
+  } else {
+    console.log(c.dim(`\n[SESSION STATS] No trades yet (first run)\n`));
+  }
 
   // Guard: RPC URL is required
   if (!chain.rpcUrl) {
@@ -271,8 +297,20 @@ async function main(): Promise<void> {
     console.error(c.red(`[${ts()}] [ERROR] Detector: ${err instanceof Error ? err.message : String(err)}`));
   });
 
-  // ---- Stats interval (every 60s) ----
-  const statsInterval = setInterval(logStats, 60_000);
+  // ---- Stats intervals ----
+  const priceStatsInterval = setInterval(logStats, 60_000); // Existing price/opportunity stats every 60s
+
+  const tradeStatsInterval = setInterval(() => {
+    const sessionStats = tradeStore.getStats();
+    if (sessionStats.totalTrades > 0) {
+      console.log(c.bold(`\n[SESSION UPDATE] Trade Stats`));
+      console.log(c.cyan(`  Total: ${sessionStats.totalTrades} | Win rate: ${(sessionStats.winRate * 100).toFixed(1)}%`));
+      const netColor = sessionStats.netProfitEth >= 0 ? c.green : c.red;
+      console.log(netColor(`  Net P&L: ${sessionStats.netProfitEth.toFixed(6)} ETH`));
+      console.log(c.dim(`  (Gross: ${sessionStats.grossProfitEth.toFixed(6)} | Gas: ${sessionStats.gasCostEth.toFixed(6)} | L1: ${sessionStats.l1DataFeeEth.toFixed(6)} | Revert: ${sessionStats.revertCostEth.toFixed(6)})`));
+      console.log(c.cyan(``));
+    }
+  }, 300_000); // Every 5 minutes
 
   // ---- Graceful shutdown ----
   let shuttingDown = false;
@@ -281,8 +319,18 @@ async function main(): Promise<void> {
     shuttingDown = true;
 
     console.log(c.bold(`\n[${ts()}] [SHUTDOWN] Stopping Arbitrum One monitor...`));
-    clearInterval(statsInterval);
+    clearInterval(priceStatsInterval);
+    clearInterval(tradeStatsInterval);
     await bot.stop();
+
+    // Display final session stats
+    const finalStats = tradeStore.getStats();
+    if (finalStats.totalTrades > 0) {
+      console.log(c.bold(`\n[${ts()}] [SHUTDOWN] Final Session Stats:`));
+      console.log(c.cyan(`  Total trades: ${finalStats.totalTrades} | Win rate: ${(finalStats.winRate * 100).toFixed(1)}%`));
+      const netColor = finalStats.netProfitEth >= 0 ? c.green : c.red;
+      console.log(netColor(`  Net P&L: ${finalStats.netProfitEth.toFixed(6)} ETH`));
+    }
 
     console.log(c.bold(`\n[${ts()}] [SHUTDOWN] Final stats:`));
     logStats();
