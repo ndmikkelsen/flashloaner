@@ -133,8 +133,8 @@ Plans:
 | 2. Infrastructure Setup | v1.0 | 4/4 | Complete | 2026-02-17 |
 | 3. Bot Adaptation | v1.0 | 4/4 | Complete | 2026-02-17 |
 | 4. Testnet Validation | v1.0 | 2/2 | Complete | 2026-02-18 |
-| 5. Cross-Fee-Tier Routing | v1.1 | Complete    | 2026-02-20 | - |
-| 6. Optimal Input Sizing | v1.1 | 0/? | Not started | - |
+| 5. Cross-Fee-Tier Routing | v1.1 | 2/2 | Complete | 2026-02-20 |
+| 6. Optimal Input Sizing | v1.1 | 2/3 | In progress | - |
 | 7. Live Execution + Safety | v1.1 | 0/? | Not started | - |
 | 8. P&L Dashboard + Operations | v1.1 | 0/? | Not started | - |
 | 9. Ramses V2 Adapter | v1.1 | 0/? | Not started | - |

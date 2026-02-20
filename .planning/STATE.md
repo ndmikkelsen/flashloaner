@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 ## Current Position
 
 Phase: 6 of 10 (Optimal Input Sizing)
-Plan: 1 of 3 in current phase
+Plan: 2 of 3 in current phase
 Status: In progress
-Last activity: 2026-02-20 -- Completed 06-01-PLAN.md (Input Optimizer Core) -- Phase 6 in progress
+Last activity: 2026-02-20 -- Completed 06-02-PLAN.md (Detector Integration) -- Phase 6 in progress
 
-Progress: [=============.........] 67% (14/~21 plans -- v1.0: 11 complete, v1.1: 3/~10 complete)
+Progress: [==============........] 71% (15/~21 plans -- v1.0: 11 complete, v1.1: 4/~10 complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 14 (v1.0: 11, v1.1: 3)
-- Average duration: ~34 min (weighted)
-- Total execution time: ~8h 12m (v1.0: 8h, v1.1: 12m)
+- Total plans completed: 15 (v1.0: 11, v1.1: 4)
+- Average duration: ~33 min (weighted)
+- Total execution time: ~8h 17m (v1.0: 8h, v1.1: 17m)
 
 **By Phase:**
 
@@ -40,11 +40,13 @@ Progress: [=============.........] 67% (14/~21 plans -- v1.0: 11 complete, v1.1:
 | Phase 05-cross-fee-tier-routing P01 | 149 | 2 | 2 |
 | Phase 05-cross-fee-tier-routing P02 | 152 | 2 | 2 |
 | Phase 06-optimal-input-sizing P01 | 409 | 3 | 3 |
+| Phase 06-optimal-input-sizing P02 | 317 | 3 | 5 |
 
 **Recent Trend:**
 - v1.0 phases: steady ~45m per plan
 - v1.1 Phase 5 (complete): 2.5m per plan (pool discovery + validation, no new implementation)
-- Trend: Fast v1.1 infrastructure tasks due to existing robust codebase
+- v1.1 Phase 6 (in progress): ~6m per plan (new optimizer implementation + integration)
+- Trend: v1.1 faster than v1.0 due to robust codebase, but new algorithms slower than validation
 
 ## Accumulated Context
 
@@ -63,6 +65,8 @@ New for v1.1:
 - [Phase 06-optimal-input-sizing]: Ternary search with maxIterations=20 and convergenceThreshold=1.0 unit for [1, 1000] range
 - [Phase 06-optimal-input-sizing]: 100ms timeout ensures production safety with fallback to conservative 10-unit input
 - [Phase 06-optimal-input-sizing]: Virtual reserve computation differs for V2 (actual reserves) vs V3 (L and sqrtPriceX96)
+- [Phase 06-optimal-input-sizing]: OpportunityDetector optimizes only when reserve data available (hasReserveData check)
+- [Phase 06-optimal-input-sizing]: Optimizer integration uses profit function wrapper (buildProfitFunction) encapsulating cost estimation
 
 ### Pending Todos
 
@@ -76,5 +80,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed 06-01-PLAN.md (Input Optimizer Core) -- Phase 6 in progress (1/3 plans)
-Resume file: .planning/phases/06-optimal-input-sizing/06-02-PLAN.md
+Stopped at: Completed 06-02-PLAN.md (Detector Integration) -- Phase 6 in progress (2/3 plans)
+Resume file: .planning/phases/06-optimal-input-sizing/06-03-PLAN.md
