@@ -19,6 +19,9 @@ function toError(err: unknown): Error {
   return new Error(String(err));
 }
 
+/** Maximum allowed detection-to-execution latency in milliseconds */
+const MAX_STALENESS_MS = 200;
+
 const DEFAULT_FLASH_LOAN_FEES: FlashLoanFees = {
   aaveV3: 0.0005, // 0.05%
   dydx: 0,
@@ -95,6 +98,21 @@ export class OpportunityDetector extends EventEmitter {
   /** Whether the detector is attached to a PriceMonitor */
   get isAttached(): boolean {
     return this.monitor !== null;
+  }
+
+  /**
+   * Check if an opportunity is too stale to execute.
+   *
+   * @param opportunity - The opportunity to check
+   * @returns { fresh: boolean; latencyMs: number } - Fresh if latency <= 200ms
+   */
+  checkStaleness(opportunity: ArbitrageOpportunity): { fresh: boolean; latencyMs: number } {
+    const now = Date.now();
+    const latencyMs = now - opportunity.timestamp;
+    return {
+      fresh: latencyMs <= MAX_STALENESS_MS,
+      latencyMs,
+    };
   }
 
   /** Handle a price delta event from PriceMonitor */
