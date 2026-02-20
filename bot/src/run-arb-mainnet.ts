@@ -148,6 +148,20 @@ async function main(): Promise<void> {
     const tag = profitable ? "OPPORTUNITY" : "OPPORTUNITY (unprofitable)";
     console.log(col(`[${ts()}] [${tag}] ================================`));
     console.log(col(`  Path:       ${opp.path.label}`));
+    // Show individual step fee breakdown for cross-tier visibility
+    for (let i = 0; i < opp.path.steps.length; i++) {
+      const step = opp.path.steps[i];
+      const feeRate = step.feeTier !== undefined
+        ? `${(step.feeTier / 10000).toFixed(2)}%`
+        : "0.30% (V2)";
+      const direction = i === 0 ? "Buy" : "Sell";
+      console.log(col(`  ${direction} fee:   ${feeRate} on ${step.dex}`));
+    }
+    const combinedFee = opp.path.steps.reduce((sum, s) => {
+      const rate = s.feeTier !== undefined ? s.feeTier / 1_000_000 : 0.003;
+      return sum + rate;
+    }, 0);
+    console.log(col(`  Cost floor: ~${(combinedFee * 100).toFixed(2)}% (trading fees only)`));
     console.log(col(`  Input:      ${opp.inputAmount} ETH`));
     console.log(col(`  Gross:      ${opp.grossProfit.toFixed(8)} ETH`));
     console.log(col(`  Gas (L2):   ${opp.costs.gasCost.toFixed(8)} ETH`));
