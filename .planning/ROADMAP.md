@@ -74,9 +74,9 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 07-01: TBD
-- [ ] 07-02: TBD
-- [ ] 07-03: TBD
+- [x] 07-01-PLAN.md -- Shadow Mode Validation and Staleness Protection
+- [ ] 07-02-PLAN.md -- TBD
+- [ ] 07-03-PLAN.md -- TBD
 
 ### Phase 8: P&L Dashboard + Operations
 **Goal**: Every trade outcome persists to disk with three-bucket accounting, session stats display on startup, and the bot runs unattended for 24+ hours via pm2
@@ -135,8 +135,8 @@ Plans:
 | 3. Bot Adaptation | v1.0 | 4/4 | Complete | 2026-02-17 |
 | 4. Testnet Validation | v1.0 | 2/2 | Complete | 2026-02-18 |
 | 5. Cross-Fee-Tier Routing | v1.1 | 2/2 | Complete | 2026-02-20 |
-| 6. Optimal Input Sizing | v1.1 | Complete    | 2026-02-20 | - |
-| 7. Live Execution + Safety | v1.1 | 0/? | Not started | - |
+| 6. Optimal Input Sizing | v1.1 | 3/3 | Complete | 2026-02-20 |
+| 7. Live Execution + Safety | v1.1 | 1/3 | In progress | - |
 | 8. P&L Dashboard + Operations | v1.1 | 0/? | Not started | - |
 | 9. Ramses V2 Adapter | v1.1 | 0/? | Not started | - |
 | 10. Trader Joe V2.1 LB Adapter | v1.1 | 0/3 | Planned | - |
