@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-19)
 
 **Core value:** The bot must never lose funds beyond gas costs -- the 4-layer safety system (off-chain estimate, eth_call simulation, on-chain ProfitValidator, MEV protection) ensures every transaction either profits or reverts.
-**Current focus:** Phase 7 -- Live Execution Safety
+**Current focus:** Phase 8 -- P&L Dashboard Operations
 
 ## Current Position
 
-Phase: 7 of 10 (Live Execution Safety)
-Plan: 3 of 3 in current phase
-Status: Complete (phase finished)
-Last activity: 2026-02-20 -- Completed 07-03-PLAN.md (Live Execution Wiring) -- Phase 7 complete
+Phase: 8 of 10 (P&L Dashboard Operations)
+Plan: 2 of 3 in current phase
+Status: In progress
+Last activity: 2026-02-20 -- Completed 08-02-PLAN.md (PM2 Process Management)
 
-Progress: [==================....] 86% (19/~22 plans -- v1.0: 11 complete, v1.1: 8/~11 complete)
+Progress: [==================....] 87% (20/~23 plans -- v1.0: 11 complete, v1.1: 9/~12 complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 19 (v1.0: 11, v1.1: 8)
-- Average duration: ~27 min (weighted)
-- Total execution time: ~8h 42m (v1.0: 8h, v1.1: 42m)
+- Total plans completed: 20 (v1.0: 11, v1.1: 9)
+- Average duration: ~25 min (weighted)
+- Total execution time: ~8h 44m (v1.0: 8h, v1.1: 44m)
 
 **By Phase:**
 
@@ -34,22 +34,25 @@ Progress: [==================....] 86% (19/~22 plans -- v1.0: 11 complete, v1.1:
 | 5. Cross-Fee-Tier Routing | 2 | ~5m | ~2.5m |
 | 6. Optimal Input Sizing | 3 | ~15m | ~5m |
 | 7. Live Execution Safety | 3 | ~17m | ~5.7m |
+| 8. P&L Dashboard Operations | 1 | ~2.4m | ~2.4m |
 
 **Recent Plans:**
 
 | Plan | Duration (s) | Tasks | Files |
 |------|-------------|-------|-------|
-| Phase 06-optimal-input-sizing P03 | 171 | 2 | 2 |
 | Phase 07-live-execution-safety P01 | 197 | 3 | 4 |
 | Phase 07-live-execution-safety P02 | 133 | 3 | 4 |
 | Phase 07-live-execution-safety P03 | 445 | 3 | 6 |
+| Phase 08-pnl-dashboard-operations P01 | 145 | 3 | 3 |
+| Phase 08-pnl-dashboard-operations P02 | 133 | 3 | 4 |
 
 **Recent Trend:**
 - v1.0 phases: steady ~45m per plan
 - v1.1 Phase 5 (complete): 2.5m per plan (pool discovery + validation, no new implementation)
 - v1.1 Phase 6 (complete): ~5m per plan (new optimizer implementation + integration + testing)
 - v1.1 Phase 7 (COMPLETE): ~5.7m per plan (safety infrastructure with testing and integration)
-- Trend: v1.1 maintaining fast velocity as safety modules are well-scoped and testable
+- v1.1 Phase 8 (in progress): 2.4m per plan so far (persistence layer with JSONL storage)
+- Trend: v1.1 maintaining fast velocity as infrastructure is well-scoped and testable
 
 ## Accumulated Context
 
@@ -79,6 +82,9 @@ New for v1.1:
 - [Phase 07-live-execution-safety]: Mark nonce on 'submitted' event for crash-safe tracking without placeholder txHash
 - [Phase 07-live-execution-safety]: Fix ExecutionEngine TransactionReceipt status to handle null (ethers.js v6 compatibility)
 - [Phase 07-live-execution-safety]: Document env vars in run-arb-mainnet.ts header (root .env files denied access)
+- [Phase 08-01]: JSONL append-only format for trade persistence (simpler, crash-safe, no corruption risk)
+- [Phase 08-01]: Three-bucket P&L accounting separates grossProfit, gasCost+l1DataFee, and revertCost
+- [Phase 08-01]: In-memory cache with disk persistence for fast queries without DB overhead
 
 ### Pending Todos
 
@@ -92,5 +98,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed 07-03-PLAN.md (Live Execution Wiring) -- Phase 7 complete (3/3 plans)
-Resume file: Continue with Phase 8 (Multi-DEX Routing) or Phase 9 (Profit Monitoring)
+Stopped at: Completed 08-01-PLAN.md (Trade Persistence with JSONL Storage) -- Phase 8 plan 1/3 complete
+Resume file: Continue with 08-02-PLAN.md (Log Rotation with PM2)
