@@ -44,6 +44,17 @@ export const ARBITRUM_MAINNET_POOLS: PoolDefinition[] = [
     feeTier: 500,
   },
 
+  {
+    label: "WETH/USDT UniV3 (0.3%)",
+    dex: "uniswap_v3",
+    poolAddress: "0xc82819F72A9e77E2c0c3A69B3196478f44303cf4",
+    token0: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH
+    token1: "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9", // USDT
+    decimals0: 18,
+    decimals1: 6,
+    feeTier: 3000,
+  },
+
   // ──── ARB/WETH ─────────────────────────────────────────────────
 
   {
@@ -90,6 +101,17 @@ export const ARBITRUM_MAINNET_POOLS: PoolDefinition[] = [
   },
 
   // ──── LINK/WETH ────────────────────────────────────────────────
+
+  {
+    label: "LINK/WETH UniV3 (0.05%)",
+    dex: "uniswap_v3",
+    poolAddress: "0x91308bC9Ce8Ca2db82aA30C65619856cC939d907",
+    token0: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH
+    token1: "0xf97f4df75117a78c1a5a0dbb814af92458539fb4", // LINK
+    decimals0: 18,
+    decimals1: 18,
+    feeTier: 500,
+  },
 
   {
     label: "LINK/WETH UniV3 (0.3%)",
