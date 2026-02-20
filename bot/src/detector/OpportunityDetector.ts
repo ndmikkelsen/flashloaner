@@ -145,6 +145,14 @@ export class OpportunityDetector extends EventEmitter {
   }
 
   /**
+   * Check if a swap path includes any Trader Joe LB steps.
+   * Used to apply higher profit threshold for LB opportunities.
+   */
+  private usesTraderJoeLB(path: SwapPath): boolean {
+    return path.steps.some((step) => step.dex === "traderjoe_lb");
+  }
+
+  /**
    * Analyze a price delta and emit an opportunity if profitable.
    * This is the main entry point for processing detected price differences.
    */
@@ -184,15 +192,24 @@ export class OpportunityDetector extends EventEmitter {
     const netProfit = grossProfit - costs.totalCost;
     const netProfitPercent = (netProfit / inputAmount) * 100;
 
-    // Apply 2x threshold for Ramses opportunities due to fee manipulation risk
-    const effectiveThreshold = this.involvesRamses(delta)
-      ? this.config.minProfitThreshold * 2
-      : this.config.minProfitThreshold;
+    // Apply higher thresholds for risky DEXes
+    // Ramses: 2x threshold (fee manipulation risk)
+    // Trader Joe LB: 1.33x threshold (fee volatility)
+    let effectiveThreshold = this.config.minProfitThreshold;
+    let thresholdLabel = "";
+
+    if (this.involvesRamses(delta)) {
+      effectiveThreshold = this.config.minProfitThreshold * 2;
+      thresholdLabel = " (2x for Ramses)";
+    } else if (this.usesTraderJoeLB(path)) {
+      effectiveThreshold = this.config.minProfitThreshold * 1.33;
+      thresholdLabel = " (1.33x for Trader Joe LB)";
+    }
 
     if (netProfit < effectiveThreshold) {
       this.emit(
         "opportunityRejected",
-        `Net profit ${netProfit.toFixed(6)} below threshold ${effectiveThreshold.toFixed(6)}${this.involvesRamses(delta) ? ' (2x for Ramses)' : ''}`,
+        `Net profit ${netProfit.toFixed(6)} below threshold ${effectiveThreshold.toFixed(6)}${thresholdLabel}`,
         delta,
       );
       return null;
@@ -283,15 +300,24 @@ export class OpportunityDetector extends EventEmitter {
     const netProfit = grossProfit - costs.totalCost;
     const netProfitPercent = (netProfit / inputAmount) * 100;
 
-    // Apply 2x threshold for Ramses opportunities due to fee manipulation risk
-    const effectiveThreshold = this.involvesRamses(delta)
-      ? this.config.minProfitThreshold * 2
-      : this.config.minProfitThreshold;
+    // Apply higher thresholds for risky DEXes
+    // Ramses: 2x threshold (fee manipulation risk)
+    // Trader Joe LB: 1.33x threshold (fee volatility)
+    let effectiveThreshold = this.config.minProfitThreshold;
+    let thresholdLabel = "";
+
+    if (this.involvesRamses(delta)) {
+      effectiveThreshold = this.config.minProfitThreshold * 2;
+      thresholdLabel = " (2x for Ramses)";
+    } else if (this.usesTraderJoeLB(path)) {
+      effectiveThreshold = this.config.minProfitThreshold * 1.33;
+      thresholdLabel = " (1.33x for Trader Joe LB)";
+    }
 
     if (netProfit < effectiveThreshold) {
       this.emit(
         "opportunityRejected",
-        `Net profit ${netProfit.toFixed(6)} below threshold ${effectiveThreshold.toFixed(6)}${this.involvesRamses(delta) ? ' (2x for Ramses)' : ''}`,
+        `Net profit ${netProfit.toFixed(6)} below threshold ${effectiveThreshold.toFixed(6)}${thresholdLabel}`,
         delta,
       );
       return null;
@@ -432,9 +458,22 @@ export class OpportunityDetector extends EventEmitter {
    * Get the trading fee rate for a swap step.
    * V3 pools: feeTier is in hundredths of a bip (500 = 0.05%, 3000 = 0.3%, 10000 = 1%)
    * V2/Camelot V2 pools: standard 0.3% fee
+   * Trader Joe LB: feeTier is binStep in basis points (15 = 0.15%, 25 = 0.25%)
+   *   PLUS 50% buffer to account for volatility accumulator
    */
   private getSwapFeeRate(step: SwapStep): number {
+    if (step.dex === "traderjoe_lb") {
+      // LB: feeTier is binStep in basis points
+      // Apply 50% buffer: effective fee = base fee * 1.5
+      if (step.feeTier === undefined) {
+        throw new Error("Trader Joe LB swap step missing feeTier (binStep)");
+      }
+      const baseFee = step.feeTier / 10_000; // Convert basis points to decimal
+      return baseFee * 1.5; // 50% buffer
+    }
+
     if (step.feeTier !== undefined) {
+      // UniV3/SushiV3/CamelotV3: feeTier in hundredths of a bip
       return step.feeTier / 1_000_000;
     }
     // V2-style pools (SushiSwap V2, Camelot V2, Uniswap V2): standard 0.3%
