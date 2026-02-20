@@ -274,7 +274,7 @@ export class PriceMonitor extends EventEmitter {
     if (pool.dex === "camelot_v3") {
       return algebraIface.encodeFunctionData("globalState");
     }
-    if (pool.dex === "uniswap_v3" || pool.dex === "sushiswap_v3") {
+    if (pool.dex === "uniswap_v3" || pool.dex === "sushiswap_v3" || pool.dex === "ramses_v3") {
       return v3Iface.encodeFunctionData("slot0");
     }
     return v2Iface.encodeFunctionData("getReserves");
@@ -297,7 +297,7 @@ export class PriceMonitor extends EventEmitter {
         sqrtPriceX96,
       };
     }
-    if (pool.dex === "uniswap_v3" || pool.dex === "sushiswap_v3") {
+    if (pool.dex === "uniswap_v3" || pool.dex === "sushiswap_v3" || pool.dex === "ramses_v3") {
       const decoded = v3Iface.decodeFunctionResult("slot0", returnData);
       const sqrtPriceX96 = BigInt(decoded[0]);
       return {
@@ -333,7 +333,7 @@ export class PriceMonitor extends EventEmitter {
       };
     }
 
-    if (pool.dex === "uniswap_v3" || pool.dex === "sushiswap_v3") {
+    if (pool.dex === "uniswap_v3" || pool.dex === "sushiswap_v3" || pool.dex === "ramses_v3") {
       const data = await this.fetchV3Price(pool);
       return {
         pool, price: data.price, inversePrice: 1 / data.price,
