@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 ## Current Position
 
 Phase: 7 of 10 (Live Execution Safety)
-Plan: 1 of 3 in current phase
-Status: Complete (plan finished)
-Last activity: 2026-02-20 -- Completed 07-01-PLAN.md (Shadow Mode Validation and Staleness Protection)
+Plan: 3 of 3 in current phase
+Status: Complete (phase finished)
+Last activity: 2026-02-20 -- Completed 07-03-PLAN.md (Live Execution Wiring) -- Phase 7 complete
 
-Progress: [================......] 81% (17/~21 plans -- v1.0: 11 complete, v1.1: 6/~10 complete)
+Progress: [==================....] 86% (19/~22 plans -- v1.0: 11 complete, v1.1: 8/~11 complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 17 (v1.0: 11, v1.1: 6)
-- Average duration: ~30 min (weighted)
-- Total execution time: ~8h 25m (v1.0: 8h, v1.1: 25m)
+- Total plans completed: 19 (v1.0: 11, v1.1: 8)
+- Average duration: ~27 min (weighted)
+- Total execution time: ~8h 42m (v1.0: 8h, v1.1: 42m)
 
 **By Phase:**
 
@@ -33,22 +33,22 @@ Progress: [================......] 81% (17/~21 plans -- v1.0: 11 complete, v1.1:
 | 4. Testnet Validation | 2 | ~1.5h | ~45m |
 | 5. Cross-Fee-Tier Routing | 2 | ~5m | ~2.5m |
 | 6. Optimal Input Sizing | 3 | ~15m | ~5m |
-| 7. Live Execution Safety | 1 | ~3.3m | ~3.3m |
+| 7. Live Execution Safety | 3 | ~17m | ~5.7m |
 
 **Recent Plans:**
 
 | Plan | Duration (s) | Tasks | Files |
 |------|-------------|-------|-------|
-| Phase 06-optimal-input-sizing P01 | 409 | 3 | 3 |
-| Phase 06-optimal-input-sizing P02 | 317 | 3 | 5 |
 | Phase 06-optimal-input-sizing P03 | 171 | 2 | 2 |
 | Phase 07-live-execution-safety P01 | 197 | 3 | 4 |
+| Phase 07-live-execution-safety P02 | 133 | 3 | 4 |
+| Phase 07-live-execution-safety P03 | 445 | 3 | 6 |
 
 **Recent Trend:**
 - v1.0 phases: steady ~45m per plan
 - v1.1 Phase 5 (complete): 2.5m per plan (pool discovery + validation, no new implementation)
 - v1.1 Phase 6 (complete): ~5m per plan (new optimizer implementation + integration + testing)
-- v1.1 Phase 7 (in progress): ~3.3m per plan so far (safety infrastructure with testing)
+- v1.1 Phase 7 (COMPLETE): ~5.7m per plan (safety infrastructure with testing and integration)
 - Trend: v1.1 maintaining fast velocity as safety modules are well-scoped and testable
 
 ## Accumulated Context
@@ -75,6 +75,10 @@ New for v1.1:
 - [Phase 07-live-execution-safety]: 200ms staleness threshold balances freshness with execution latency on L2
 - [Phase 07-live-execution-safety]: Shadow mode uses SHADOW_MODE env var for explicit opt-in (DRY_RUN backward compatible)
 - [Phase 07-live-execution-safety]: Three-mode architecture: dry-run (report) | shadow (simulate) | live (execute)
+- [Phase 07-live-execution-safety]: Fill missing DEX protocols with zero address in adapter map for TransactionBuilder compatibility
+- [Phase 07-live-execution-safety]: Mark nonce on 'submitted' event for crash-safe tracking without placeholder txHash
+- [Phase 07-live-execution-safety]: Fix ExecutionEngine TransactionReceipt status to handle null (ethers.js v6 compatibility)
+- [Phase 07-live-execution-safety]: Document env vars in run-arb-mainnet.ts header (root .env files denied access)
 
 ### Pending Todos
 
@@ -88,5 +92,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed 07-01-PLAN.md (Shadow Mode Validation and Staleness Protection) -- Phase 7 in progress (1/3 plans)
-Resume file: Continue with 07-02-PLAN.md
+Stopped at: Completed 07-03-PLAN.md (Live Execution Wiring) -- Phase 7 complete (3/3 plans)
+Resume file: Continue with Phase 8 (Multi-DEX Routing) or Phase 9 (Profit Monitoring)
