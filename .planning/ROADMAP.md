@@ -23,7 +23,7 @@ See: `.planning/milestones/v1.0-ROADMAP.md` for full details.
 
 **Milestone Goal:** Achieve consistent net-positive arbitrage trading on Arbitrum mainnet with flash-loan-only execution (zero capital risk beyond gas). Success bar: 24+ hours net-positive P&L.
 
-- [ ] **Phase 5: Cross-Fee-Tier Routing** - Expand pool pair matrix with cross-fee-tier combinations to reduce cost floor from 0.60% to 0.35%
+- [x] **Phase 5: Cross-Fee-Tier Routing** - Expand pool pair matrix with cross-fee-tier combinations to reduce cost floor from 0.60% to 0.35% (completed 2026-02-20)
 - [ ] **Phase 6: Optimal Input Sizing** - Right-size trade amounts per opportunity based on pool depth instead of fixed defaults
 - [ ] **Phase 7: Live Execution + Safety** - Wire existing execution components into live trading with shadow mode, staleness guard, and nonce persistence
 - [ ] **Phase 8: P&L Dashboard + Operations** - Persist trade outcomes, display session stats, and run bot unattended via pm2
@@ -132,7 +132,7 @@ Plans:
 | 2. Infrastructure Setup | v1.0 | 4/4 | Complete | 2026-02-17 |
 | 3. Bot Adaptation | v1.0 | 4/4 | Complete | 2026-02-17 |
 | 4. Testnet Validation | v1.0 | 2/2 | Complete | 2026-02-18 |
-| 5. Cross-Fee-Tier Routing | v1.1 | 0/? | Not started | - |
+| 5. Cross-Fee-Tier Routing | v1.1 | Complete    | 2026-02-20 | - |
 | 6. Optimal Input Sizing | v1.1 | 0/? | Not started | - |
 | 7. Live Execution + Safety | v1.1 | 0/? | Not started | - |
 | 8. P&L Dashboard + Operations | v1.1 | 0/? | Not started | - |
