@@ -1,7 +1,9 @@
 import "dotenv/config";
-import { JsonRpcProvider } from "ethers";
+import { JsonRpcProvider, type Wallet } from "ethers";
 import { PriceMonitor } from "./monitor/PriceMonitor.js";
 import { OpportunityDetector } from "./detector/OpportunityDetector.js";
+import { ExecutionEngine } from "./engine/ExecutionEngine.js";
+import { TransactionBuilder } from "./builder/TransactionBuilder.js";
 import {
   parseEnv,
   buildConfig,
@@ -38,6 +40,9 @@ export class FlashloanBot {
   readonly monitor: PriceMonitor;
   readonly detector: OpportunityDetector;
   readonly dryRun: boolean;
+  readonly mode: "dry-run" | "shadow" | "live";
+  readonly engine?: ExecutionEngine;
+  readonly builder?: TransactionBuilder;
   readonly stats: ScanStats;
   private _status: BotStatus = "idle";
   private shutdownHandlers: Array<() => void> = [];
@@ -45,6 +50,13 @@ export class FlashloanBot {
   constructor(config: BotConfig, dryRun = true) {
     this.config = config;
     this.dryRun = dryRun;
+
+    // Mode detection: DRY_RUN (backward compatible) -> SHADOW_MODE -> LIVE
+    const shadowMode = process.env.SHADOW_MODE === "true";
+    const liveMode = !dryRun && !shadowMode;
+
+    this.mode = dryRun ? "dry-run" : shadowMode ? "shadow" : "live";
+
     this.stats = {
       pollCount: 0,
       opportunitiesFound: 0,
@@ -76,16 +88,29 @@ export class FlashloanBot {
       gasPerSwap: config.detector.gasPerSwap,
     });
 
+    // Initialize execution components in SHADOW or LIVE mode
+    if (this.mode === "shadow" || this.mode === "live") {
+      // Builder requires executor address, adapters, flash loan providers
+      // For now, we'll initialize these in a future plan when wiring live execution
+      // Shadow mode only needs the engine's simulateTransaction capability
+      this.engine = undefined; // TODO: Initialize in Plan 03 (live wiring)
+      this.builder = undefined; // TODO: Initialize in Plan 03 (live wiring)
+    }
+
     this.wireEvents();
   }
 
   /** Create a bot from environment variables */
-  static fromEnv(overrides: Partial<BotConfig> = {}, dryRun = true): FlashloanBot {
+  static fromEnv(overrides: Partial<BotConfig> = {}, dryRun?: boolean): FlashloanBot {
     const envVars = parseEnv(process.env);
     // Use mainnet pools by default if none provided
     const pools = overrides.pools ?? MAINNET_POOLS;
     const config = buildConfig(envVars, { ...overrides, pools });
-    return new FlashloanBot(config, dryRun);
+
+    // Backward compatibility: DRY_RUN env var or explicit parameter
+    const isDryRun = dryRun ?? (process.env.DRY_RUN !== "false");
+
+    return new FlashloanBot(config, isDryRun);
   }
 
   /** Current bot status */
@@ -112,7 +137,7 @@ export class FlashloanBot {
     this.log("info", `Flashloan Bot v${BOT_VERSION} starting...`);
     this.log("info", `Chain ID: ${this.config.network.chainId}`);
     this.log("info", `Monitoring ${this.config.pools.length} pools`);
-    this.log("info", `Dry-run mode: ${this.dryRun}`);
+    this.log("info", `Mode: ${this.mode.toUpperCase()}`);
 
     // List monitored pools
     for (const pool of this.config.pools) {
@@ -183,9 +208,40 @@ export class FlashloanBot {
       this.log("error", `Detector error: ${err instanceof Error ? err.message : String(err)}`);
     });
 
-    this.detector.on("opportunityFound", (opp) => {
+    this.detector.on("opportunityFound", async (opp) => {
       this.stats.opportunitiesFound++;
-      console.log(formatOpportunityReport(opp, this.dryRun));
+
+      // DRY_RUN mode: just report
+      if (this.mode === "dry-run") {
+        console.log(formatOpportunityReport(opp, true));
+        return;
+      }
+
+      // SHADOW mode: simulate via eth_call, log estimated vs simulated
+      if (this.mode === "shadow") {
+        console.log(formatOpportunityReport(opp, true));
+
+        // TODO: In Plan 03, add actual eth_call simulation here
+        // For now, just log that shadow mode is active
+        this.log("info", `[SHADOW] Would simulate opportunity ${opp.id} via eth_call`);
+        this.log("info", `[SHADOW] Estimated profit: ${opp.netProfit.toFixed(8)} ETH`);
+        return;
+      }
+
+      // LIVE mode: check staleness and execute
+      if (this.mode === "live") {
+        const staleness = this.detector.checkStaleness(opp);
+        if (!staleness.fresh) {
+          this.log("warn", `[STALE] Opportunity ${opp.id} is too stale (${staleness.latencyMs}ms > 200ms). Aborting.`);
+          return;
+        }
+
+        console.log(formatOpportunityReport(opp, false));
+        this.log("info", `[LIVE] Latency: ${staleness.latencyMs}ms (fresh)`);
+
+        // TODO: In Plan 03, add actual transaction submission here
+        this.log("info", `[LIVE] Would submit transaction for ${opp.id}`);
+      }
     });
 
     this.detector.on("opportunityRejected", (reason, delta) => {
