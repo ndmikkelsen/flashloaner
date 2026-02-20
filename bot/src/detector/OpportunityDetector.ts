@@ -10,6 +10,8 @@ import type {
   SwapPath,
   SwapStep,
 } from "./types.js";
+import { InputOptimizer } from "../optimizer/InputOptimizer.js";
+import type { OptimizationResult } from "../optimizer/types.js";
 
 /** Safely coerce an unknown caught value to an Error */
 function toError(err: unknown): Error {
@@ -35,6 +37,7 @@ export class OpportunityDetector extends EventEmitter {
   private gasEstimatorFn: ((numSwaps: number) => Promise<{ gasCost: number; l1DataFee?: number }>) | undefined;
   private monitor: PriceMonitor | null = null;
   private stalePools = new Set<string>();
+  private optimizer: InputOptimizer;
 
   constructor(config: OpportunityDetectorConfig = {}) {
     super();
@@ -50,6 +53,16 @@ export class OpportunityDetector extends EventEmitter {
       },
     };
     this.gasEstimatorFn = config.gasEstimatorFn;
+
+    // Initialize optimizer with conservative defaults
+    this.optimizer = new InputOptimizer({
+      maxIterations: 3,
+      timeoutMs: 100,
+      fallbackAmount: this.config.defaultInputAmount,
+      minAmount: 1,
+      maxAmount: Math.min(1000, this.config.defaultInputAmount * 100),
+      convergenceThreshold: 0.01,
+    });
   }
 
   /**
@@ -121,7 +134,25 @@ export class OpportunityDetector extends EventEmitter {
     }
 
     const path = this.buildSwapPath(delta);
-    const inputAmount = this.config.defaultInputAmount;
+
+    // Optimize input amount based on pool depth
+    let inputAmount: number;
+    let optimizationResult: OptimizationResult | undefined;
+
+    // Check if we have reserve data for optimization
+    const hasReserveData = path.steps.some(
+      (s) => s.virtualReserveIn !== undefined && s.virtualReserveIn > 0,
+    );
+
+    if (hasReserveData) {
+      const profitFn = this.buildProfitFunction(path);
+      optimizationResult = this.optimizer.optimize(path, profitFn);
+      inputAmount = optimizationResult.optimalAmount;
+    } else {
+      // No reserve data: fall back to fixed amount
+      inputAmount = this.config.defaultInputAmount;
+    }
+
     const grossProfit = this.calculateGrossProfit(path, inputAmount);
     const costs = this.estimateCosts(path, inputAmount);
     const netProfit = grossProfit - costs.totalCost;
@@ -140,6 +171,7 @@ export class OpportunityDetector extends EventEmitter {
       id: randomUUID(),
       path,
       inputAmount,
+      optimizationResult,
       grossProfit,
       costs,
       netProfit,
@@ -196,7 +228,25 @@ export class OpportunityDetector extends EventEmitter {
     }
 
     const path = this.buildSwapPath(delta);
-    const inputAmount = this.config.defaultInputAmount;
+
+    // Optimize input amount based on pool depth
+    let inputAmount: number;
+    let optimizationResult: OptimizationResult | undefined;
+
+    // Check if we have reserve data for optimization
+    const hasReserveData = path.steps.some(
+      (s) => s.virtualReserveIn !== undefined && s.virtualReserveIn > 0,
+    );
+
+    if (hasReserveData) {
+      const profitFn = this.buildProfitFunction(path);
+      optimizationResult = this.optimizer.optimize(path, profitFn);
+      inputAmount = optimizationResult.optimalAmount;
+    } else {
+      // No reserve data: fall back to fixed amount
+      inputAmount = this.config.defaultInputAmount;
+    }
+
     const grossProfit = this.calculateGrossProfit(path, inputAmount);
     const costs = await this.estimateCostsWithL1(path, inputAmount);
     const netProfit = grossProfit - costs.totalCost;
@@ -215,6 +265,7 @@ export class OpportunityDetector extends EventEmitter {
       id: randomUUID(),
       path,
       inputAmount,
+      optimizationResult,
       grossProfit,
       costs,
       netProfit,
@@ -441,6 +492,18 @@ export class OpportunityDetector extends EventEmitter {
   /** Check if a pool is marked as stale */
   private isPoolStale(snapshot: PriceSnapshot): boolean {
     return this.stalePools.has(snapshot.pool.poolAddress.toLowerCase());
+  }
+
+  /**
+   * Build a profit function for input optimization.
+   * Wraps existing cost estimation logic to compute net profit for any input amount.
+   */
+  private buildProfitFunction(path: SwapPath): (inputAmount: number) => number {
+    return (inputAmount: number) => {
+      const grossProfit = this.calculateGrossProfit(path, inputAmount);
+      const costs = this.estimateCosts(path, inputAmount);
+      return grossProfit - costs.totalCost;
+    };
   }
 
   /**
