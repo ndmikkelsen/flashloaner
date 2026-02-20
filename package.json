@@ -23,7 +23,9 @@
     "pm2:logs": "pm2 logs flashloaner-arb --lines 100",
     "pm2:status": "pm2 status",
     "pm2:monit": "pm2 monit",
-    "pm2:delete": "pm2 delete flashloaner-arb"
+    "pm2:delete": "pm2 delete flashloaner-arb",
+    "report": "tsx bot/src/dashboard/report-cli.ts",
+    "report:last": "tsx bot/src/dashboard/report-cli.ts --last"
   },
   "keywords": [],
   "author": "",
