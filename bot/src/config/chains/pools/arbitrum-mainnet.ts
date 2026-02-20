@@ -330,4 +330,57 @@ export const ARBITRUM_MAINNET_POOLS: PoolDefinition[] = [
   // SPELL/WETH Camelot V2 removed — 0.285 WETH reserve ($770 TVL). A 5 ETH trade
   // drains 94% of the pool, causing catastrophic price impact. The 1.03% spread is
   // real but unexecutable. SPELL SushiV2 kept for monitoring (37 WETH reserve).
+
+  // ──── Trader Joe Liquidity Book ────────────────────────────
+
+  {
+    label: "WETH/USDC Trader Joe LB (0.15%)",
+    dex: "traderjoe_lb",
+    // TODO: Verify pool address from LBFactory.getLBPairInformation():
+    // cast call 0x8e42f2F4101563bF679975178e880FD87d3eFd4e \
+    //   "getLBPairInformation(address,address,uint256)" \
+    //   0x82af49447d8a07e3bd95bd0d56f35241523fbab1 \
+    //   0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8 \
+    //   15 --rpc-url $ARBITRUM_RPC_URL
+    poolAddress: "0x0000000000000000000000000000000000000000", // PLACEHOLDER - needs verification
+    token0: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH (tokenX)
+    token1: "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8", // USDC.e (tokenY)
+    decimals0: 18,
+    decimals1: 6,
+    feeTier: 15, // binStep in basis points (0.15%)
+  },
+
+  {
+    label: "WETH/USDT Trader Joe LB (0.15%)",
+    dex: "traderjoe_lb",
+    // TODO: Verify pool address from LBFactory.getLBPairInformation():
+    // cast call 0x8e42f2F4101563bF679975178e880FD87d3eFd4e \
+    //   "getLBPairInformation(address,address,uint256)" \
+    //   0x82af49447d8a07e3bd95bd0d56f35241523fbab1 \
+    //   0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9 \
+    //   15 --rpc-url $ARBITRUM_RPC_URL
+    poolAddress: "0x0000000000000000000000000000000000000000", // PLACEHOLDER - needs verification
+    token0: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH (tokenX)
+    token1: "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9", // USDT (tokenY)
+    decimals0: 18,
+    decimals1: 6,
+    feeTier: 15, // binStep in basis points (0.15%)
+  },
+
+  {
+    label: "ARB/WETH Trader Joe LB (0.25%)",
+    dex: "traderjoe_lb",
+    // TODO: Verify pool address from LBFactory.getLBPairInformation():
+    // cast call 0x8e42f2F4101563bF679975178e880FD87d3eFd4e \
+    //   "getLBPairInformation(address,address,uint256)" \
+    //   0x82af49447d8a07e3bd95bd0d56f35241523fbab1 \
+    //   0x912ce59144191c1204e64559fe8253a0e49e6548 \
+    //   25 --rpc-url $ARBITRUM_RPC_URL
+    poolAddress: "0x0000000000000000000000000000000000000000", // PLACEHOLDER - needs verification
+    token0: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH (tokenX - lower address)
+    token1: "0x912ce59144191c1204e64559fe8253a0e49e6548", // ARB (tokenY)
+    decimals0: 18,
+    decimals1: 18,
+    feeTier: 25, // binStep in basis points (0.25%)
+  },
 ];
