@@ -715,4 +715,313 @@ describe("OpportunityDetector", () => {
       expect(result!.grossProfit).toBeCloseTo(4.37, 1);
     });
   });
+
+  // ---- Optimal input sizing ----
+
+  describe("optimal input sizing", () => {
+    it("should use optimizer when V2 reserve data is available", () => {
+      detector = new OpportunityDetector({
+        minProfitThreshold: 0,
+        gasPriceGwei: 0,
+        maxSlippage: 0,
+        defaultInputAmount: 10,
+      });
+      detector.on("error", () => {});
+
+      // Build delta with V2 reserves
+      const buyPool = makePool({ poolAddress: ADDR.POOL_V2 });
+      const sellPool = makePool({
+        label: "WETH/USDC Sushi",
+        dex: "sushiswap",
+        poolAddress: ADDR.POOL_SUSHI,
+      });
+
+      const buySnapshot: PriceSnapshot = {
+        pool: buyPool,
+        price: 2000,
+        inversePrice: 1 / 2000,
+        blockNumber: 19_000_000,
+        timestamp: Date.now(),
+        reserves: [
+          BigInt("1000000000000000000000"),  // 1000 WETH
+          BigInt("2000000000000"),           // 2,000,000 USDC
+        ],
+      };
+
+      const sellSnapshot: PriceSnapshot = {
+        pool: sellPool,
+        price: 2020,
+        inversePrice: 1 / 2020,
+        blockNumber: 19_000_000,
+        timestamp: Date.now(),
+        reserves: [
+          BigInt("1000000000000000000000"),  // 1000 WETH
+          BigInt("2020000000000"),           // 2,020,000 USDC
+        ],
+      };
+
+      const delta: PriceDelta = {
+        pair: `${buyPool.token0}/${buyPool.token1}`,
+        buyPool: buySnapshot,
+        sellPool: sellSnapshot,
+        deltaPercent: 1.0,
+        timestamp: Date.now(),
+      };
+
+      const result = detector.analyzeDelta(delta);
+
+      expect(result).not.toBeNull();
+      expect(result!.optimizationResult).toBeDefined();
+      expect(result!.optimizationResult!.converged).toBe(true);
+      expect(result!.inputAmount).toBeGreaterThan(0);
+      // Optimal amount should differ from default (10) for this pool depth
+      expect(result!.inputAmount).not.toBe(10);
+    });
+
+    it("should fall back to defaultInputAmount when no reserve data", () => {
+      detector = new OpportunityDetector({
+        minProfitThreshold: 0,
+        gasPriceGwei: 0,
+        maxSlippage: 0,
+        defaultInputAmount: 25,
+      });
+      detector.on("error", () => {});
+
+      // Delta with no reserve data
+      const delta = makeDelta({ buyPrice: 2000, sellPrice: 2100 });
+      const result = detector.analyzeDelta(delta);
+
+      expect(result).not.toBeNull();
+      expect(result!.optimizationResult).toBeUndefined();
+      expect(result!.inputAmount).toBe(25); // Uses defaultInputAmount
+    });
+
+    it("should optimize larger amounts for deep pools", () => {
+      detector = new OpportunityDetector({
+        minProfitThreshold: 0,
+        gasPriceGwei: 0,
+        maxSlippage: 0,
+        defaultInputAmount: 10,
+      });
+      detector.on("error", () => {});
+
+      const buyPool = makePool({ poolAddress: ADDR.POOL_V2 });
+      const sellPool = makePool({
+        label: "WETH/USDC Sushi",
+        dex: "sushiswap",
+        poolAddress: ADDR.POOL_SUSHI,
+      });
+
+      // Very deep pool: 10,000 WETH / 20M USDC
+      const buySnapshot: PriceSnapshot = {
+        pool: buyPool,
+        price: 2000,
+        inversePrice: 1 / 2000,
+        blockNumber: 19_000_000,
+        timestamp: Date.now(),
+        reserves: [
+          BigInt("10000000000000000000000"),  // 10,000 WETH
+          BigInt("20000000000000"),            // 20,000,000 USDC
+        ],
+      };
+
+      const sellSnapshot: PriceSnapshot = {
+        pool: sellPool,
+        price: 2100,
+        inversePrice: 1 / 2100,
+        blockNumber: 19_000_000,
+        timestamp: Date.now(),
+        reserves: [
+          BigInt("10000000000000000000000"),  // 10,000 WETH
+          BigInt("21000000000000"),            // 21,000,000 USDC
+        ],
+      };
+
+      const delta: PriceDelta = {
+        pair: `${buyPool.token0}/${buyPool.token1}`,
+        buyPool: buySnapshot,
+        sellPool: sellSnapshot,
+        deltaPercent: 5.0,
+        timestamp: Date.now(),
+      };
+
+      const result = detector.analyzeDelta(delta);
+
+      expect(result).not.toBeNull();
+      expect(result!.optimizationResult).toBeDefined();
+      expect(result!.optimizationResult!.converged).toBe(true);
+      // Deep pool + large spread should allow larger size
+      expect(result!.inputAmount).toBeGreaterThan(10);
+    });
+
+    it("should optimize smaller amounts for thin pools", () => {
+      detector = new OpportunityDetector({
+        minProfitThreshold: 0,
+        gasPriceGwei: 0,
+        maxSlippage: 0.005,
+        defaultInputAmount: 100,
+      });
+      detector.on("error", () => {});
+
+      const buyPool = makePool({ poolAddress: ADDR.POOL_V2 });
+      const sellPool = makePool({
+        label: "WETH/USDC Sushi",
+        dex: "sushiswap",
+        poolAddress: ADDR.POOL_SUSHI,
+      });
+
+      // Thin pool: only 10 WETH / 20k USDC
+      const buySnapshot: PriceSnapshot = {
+        pool: buyPool,
+        price: 2000,
+        inversePrice: 1 / 2000,
+        blockNumber: 19_000_000,
+        timestamp: Date.now(),
+        reserves: [
+          BigInt("10000000000000000000"),  // 10 WETH
+          BigInt("20000000000"),           // 20,000 USDC
+        ],
+      };
+
+      const sellSnapshot: PriceSnapshot = {
+        pool: sellPool,
+        price: 2020,
+        inversePrice: 1 / 2020,
+        blockNumber: 19_000_000,
+        timestamp: Date.now(),
+        reserves: [
+          BigInt("10000000000000000000"),  // 10 WETH
+          BigInt("20200000000"),           // 20,200 USDC
+        ],
+      };
+
+      const delta: PriceDelta = {
+        pair: `${buyPool.token0}/${buyPool.token1}`,
+        buyPool: buySnapshot,
+        sellPool: sellSnapshot,
+        deltaPercent: 1.0,
+        timestamp: Date.now(),
+      };
+
+      const result = detector.analyzeDelta(delta);
+
+      expect(result).not.toBeNull();
+      expect(result!.optimizationResult).toBeDefined();
+      // Thin pool should optimize to smaller size than default
+      expect(result!.inputAmount).toBeLessThan(100);
+    });
+
+    it("should complete optimization within 100ms", () => {
+      detector = new OpportunityDetector({
+        minProfitThreshold: 0,
+        gasPriceGwei: 0,
+        maxSlippage: 0,
+        defaultInputAmount: 10,
+      });
+      detector.on("error", () => {});
+
+      const buyPool = makePool({ poolAddress: ADDR.POOL_V2 });
+      const sellPool = makePool({
+        label: "WETH/USDC Sushi",
+        dex: "sushiswap",
+        poolAddress: ADDR.POOL_SUSHI,
+      });
+
+      const buySnapshot: PriceSnapshot = {
+        pool: buyPool,
+        price: 2000,
+        inversePrice: 1 / 2000,
+        blockNumber: 19_000_000,
+        timestamp: Date.now(),
+        reserves: [
+          BigInt("1000000000000000000000"),
+          BigInt("2000000000000"),
+        ],
+      };
+
+      const sellSnapshot: PriceSnapshot = {
+        pool: sellPool,
+        price: 2020,
+        inversePrice: 1 / 2020,
+        blockNumber: 19_000_000,
+        timestamp: Date.now(),
+        reserves: [
+          BigInt("1000000000000000000000"),
+          BigInt("2020000000000"),
+        ],
+      };
+
+      const delta: PriceDelta = {
+        pair: `${buyPool.token0}/${buyPool.token1}`,
+        buyPool: buySnapshot,
+        sellPool: sellSnapshot,
+        deltaPercent: 1.0,
+        timestamp: Date.now(),
+      };
+
+      const result = detector.analyzeDelta(delta);
+
+      expect(result).not.toBeNull();
+      expect(result!.optimizationResult).toBeDefined();
+      expect(result!.optimizationResult!.durationMs).toBeLessThan(100);
+    });
+
+    it("should store optimization metadata in opportunity", () => {
+      detector = new OpportunityDetector({
+        minProfitThreshold: 0,
+        gasPriceGwei: 0,
+        maxSlippage: 0,
+        defaultInputAmount: 10,
+      });
+      detector.on("error", () => {});
+
+      const buyPool = makePool({ poolAddress: ADDR.POOL_V2 });
+      const sellPool = makePool({
+        label: "WETH/USDC Sushi",
+        dex: "sushiswap",
+        poolAddress: ADDR.POOL_SUSHI,
+      });
+
+      const buySnapshot: PriceSnapshot = {
+        pool: buyPool,
+        price: 2000,
+        inversePrice: 1 / 2000,
+        blockNumber: 19_000_000,
+        timestamp: Date.now(),
+        reserves: [
+          BigInt("1000000000000000000000"),
+          BigInt("2000000000000"),
+        ],
+      };
+
+      const sellSnapshot: PriceSnapshot = {
+        pool: sellPool,
+        price: 2020,
+        inversePrice: 1 / 2020,
+        blockNumber: 19_000_000,
+        timestamp: Date.now(),
+        reserves: [
+          BigInt("1000000000000000000000"),
+          BigInt("2020000000000"),
+        ],
+      };
+
+      const delta: PriceDelta = {
+        pair: `${buyPool.token0}/${buyPool.token1}`,
+        buyPool: buySnapshot,
+        sellPool: sellSnapshot,
+        deltaPercent: 1.0,
+        timestamp: Date.now(),
+      };
+
+      const result = detector.analyzeDelta(delta);
+
+      expect(result).not.toBeNull();
+      expect(result!.optimizationResult).toBeDefined();
+      expect(result!.optimizationResult!.optimalAmount).toBe(result!.inputAmount);
+      expect(result!.optimizationResult!.expectedProfit).toBeCloseTo(result!.netProfit, 2);
+      expect(result!.optimizationResult!.iterations).toBeGreaterThan(0);
+      expect(result!.optimizationResult!.converged).toBeDefined();
+    });
+  });
 });

@@ -56,12 +56,12 @@ export class OpportunityDetector extends EventEmitter {
 
     // Initialize optimizer with conservative defaults
     this.optimizer = new InputOptimizer({
-      maxIterations: 3,
+      maxIterations: 20,
       timeoutMs: 100,
       fallbackAmount: this.config.defaultInputAmount,
       minAmount: 1,
       maxAmount: Math.min(1000, this.config.defaultInputAmount * 100),
-      convergenceThreshold: 0.01,
+      convergenceThreshold: 1.0,
     });
   }
 
