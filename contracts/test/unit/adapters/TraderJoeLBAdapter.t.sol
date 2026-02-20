@@ -8,6 +8,7 @@ import {IDEXAdapter} from "../../../src/interfaces/IDEXAdapter.sol";
 
 contract TraderJoeLBAdapterTest is Test {
     TraderJoeLBAdapter public adapter;
+    bool public skipForkTests;
 
     // Arbitrum mainnet addresses
     address constant LB_ROUTER = 0xb4315e873dBcf96Ffd0acd8EA43f689D8c20fB30;
@@ -22,14 +23,24 @@ contract TraderJoeLBAdapterTest is Test {
     address user = makeAddr("user");
 
     function setUp() public {
-        // Fork Arbitrum mainnet
-        vm.createSelectFork(vm.envString("ARBITRUM_MAINNET_RPC_URL"));
+        // Fork Arbitrum mainnet (skip if RPC URL not available)
+        try vm.envString("ARBITRUM_MAINNET_RPC_URL") returns (string memory rpcUrl) {
+            vm.createSelectFork(rpcUrl);
+            skipForkTests = false;
+        } catch {
+            skipForkTests = true;
+        }
 
-        adapter = new TraderJoeLBAdapter(LB_ROUTER);
+        if (!skipForkTests) {
+            adapter = new TraderJoeLBAdapter(LB_ROUTER);
 
-        // Fund user with tokens
-        deal(WETH, user, 100 ether);
-        deal(USDC, user, 100_000e6);
+            // Fund user with tokens
+            deal(WETH, user, 100 ether);
+            deal(USDC, user, 100_000e6);
+        } else {
+            // Deploy adapter without fork for non-fork tests
+            adapter = new TraderJoeLBAdapter(LB_ROUTER);
+        }
     }
 
     function testConstructorRevertsOnZeroAddress() public {
@@ -38,6 +49,7 @@ contract TraderJoeLBAdapterTest is Test {
     }
 
     function testSwapSingleHopLB() public {
+        vm.skip(skipForkTests);
         // Swap 1 WETH -> USDC on LB pool
         // Using binStep 15 (0.15%) which is a common Trader Joe LB bin step
         uint256 amountIn = 1 ether;
@@ -58,6 +70,7 @@ contract TraderJoeLBAdapterTest is Test {
     }
 
     function testSwapRevertsOnZeroAmountIn() public {
+        vm.skip(skipForkTests);
         bytes memory extraData = abi.encode(uint24(15));
         vm.startPrank(user);
         IERC20(WETH).approve(address(adapter), 1 ether);
@@ -68,6 +81,7 @@ contract TraderJoeLBAdapterTest is Test {
     }
 
     function testSwapRevertsOnZeroAddressTokenIn() public {
+        vm.skip(skipForkTests);
         uint256 amountIn = 1 ether;
         bytes memory extraData = abi.encode(uint24(15));
 
@@ -78,6 +92,7 @@ contract TraderJoeLBAdapterTest is Test {
     }
 
     function testSwapRevertsOnZeroAddressTokenOut() public {
+        vm.skip(skipForkTests);
         uint256 amountIn = 1 ether;
         bytes memory extraData = abi.encode(uint24(15));
 
@@ -89,6 +104,7 @@ contract TraderJoeLBAdapterTest is Test {
     }
 
     function testSwapRevertsOnSlippage() public {
+        vm.skip(skipForkTests);
         uint256 amountIn = 1 ether;
         uint24 binStep = 15;
         bytes memory extraData = abi.encode(binStep);
@@ -113,6 +129,7 @@ contract TraderJoeLBAdapterTest is Test {
     }
 
     function testSwapEmitsEvent() public {
+        vm.skip(skipForkTests);
         uint256 amountIn = 1 ether;
         uint24 binStep = 15;
         bytes memory extraData = abi.encode(binStep);
@@ -129,6 +146,7 @@ contract TraderJoeLBAdapterTest is Test {
     }
 
     function testSwapWithDifferentBinStep() public {
+        vm.skip(skipForkTests);
         // Try binStep 20 (0.20%)
         uint256 amountIn = 1 ether;
         uint24 binStep = 20;
@@ -149,6 +167,7 @@ contract TraderJoeLBAdapterTest is Test {
     }
 
     function testMultiHopRevertsWithStub() public {
+        vm.skip(skipForkTests);
         // Multi-hop is not yet supported
         uint256 amountIn = 1 ether;
         uint24[] memory binSteps = new uint24[](2);
