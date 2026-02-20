@@ -54,11 +54,12 @@ Plans:
   1. Bot computes a per-opportunity input amount derived from pool liquidity depth (not a fixed default) for both V2 and V3 pool types
   2. Optimization completes within 100ms and falls back to conservative fixed size if timeout or iteration cap is hit
   3. Dry-run output shows varying input sizes across opportunities (not uniform amounts), with sizes correlated to pool depth
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 06-01: TBD
-- [ ] 06-02: TBD
+- [ ] 06-01-PLAN.md -- Create InputOptimizer module with ternary search
+- [ ] 06-02-PLAN.md -- Integrate optimizer into OpportunityDetector
+- [ ] 06-03-PLAN.md -- Enhance dry-run output with sizing visibility + integration tests
 
 ### Phase 7: Live Execution + Safety
 **Goal**: Bot executes real arbitrage transactions on Arbitrum mainnet via FlashloanExecutor, with shadow validation, staleness protection, and crash-safe nonce management
@@ -132,8 +133,8 @@ Plans:
 | 2. Infrastructure Setup | v1.0 | 4/4 | Complete | 2026-02-17 |
 | 3. Bot Adaptation | v1.0 | 4/4 | Complete | 2026-02-17 |
 | 4. Testnet Validation | v1.0 | 2/2 | Complete | 2026-02-18 |
-| 5. Cross-Fee-Tier Routing | v1.1 | Complete    | 2026-02-20 | - |
-| 6. Optimal Input Sizing | v1.1 | 0/? | Not started | - |
+| 5. Cross-Fee-Tier Routing | v1.1 | 2/2 | Complete | 2026-02-20 |
+| 6. Optimal Input Sizing | v1.1 | 0/3 | Not started | - |
 | 7. Live Execution + Safety | v1.1 | 0/? | Not started | - |
 | 8. P&L Dashboard + Operations | v1.1 | 0/? | Not started | - |
 | 9. Ramses V2 Adapter | v1.1 | 0/? | Not started | - |
