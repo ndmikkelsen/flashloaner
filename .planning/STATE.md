@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 ## Current Position
 
 Phase: 6 of 10 (Optimal Input Sizing)
-Plan: 0 of ? in current phase (plans TBD)
-Status: Ready to plan
-Last activity: 2026-02-20 -- Phase 5 (Cross-Fee-Tier Routing) complete, verified, 2/2 plans
+Plan: 1 of 3 in current phase
+Status: In progress
+Last activity: 2026-02-20 -- Completed 06-01-PLAN.md (Input Optimizer Core) -- Phase 6 in progress
 
-Progress: [=============.........] 62% (13/~21 plans -- v1.0: 11 complete, v1.1: 2/~10 complete)
+Progress: [=============.........] 67% (14/~21 plans -- v1.0: 11 complete, v1.1: 3/~10 complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 13 (v1.0: 11, v1.1: 2)
-- Average duration: ~37 min (weighted)
-- Total execution time: ~8h 5m (v1.0: 8h, v1.1: 5m)
+- Total plans completed: 14 (v1.0: 11, v1.1: 3)
+- Average duration: ~34 min (weighted)
+- Total execution time: ~8h 12m (v1.0: 8h, v1.1: 12m)
 
 **By Phase:**
 
@@ -39,6 +39,7 @@ Progress: [=============.........] 62% (13/~21 plans -- v1.0: 11 complete, v1.1:
 |------|-------------|-------|-------|
 | Phase 05-cross-fee-tier-routing P01 | 149 | 2 | 2 |
 | Phase 05-cross-fee-tier-routing P02 | 152 | 2 | 2 |
+| Phase 06-optimal-input-sizing P01 | 409 | 3 | 3 |
 
 **Recent Trend:**
 - v1.0 phases: steady ~45m per plan
@@ -59,6 +60,9 @@ New for v1.1:
 - [Phase 05-cross-fee-tier-routing]: Added WETH/USDT UniV3 0.3% and LINK/WETH UniV3 0.05% pools for cross-fee-tier coverage
 - [Phase 05-cross-fee-tier-routing]: Cross-fee-tier routing produces ~0.35% cost floor vs ~0.60% same-tier (62.5% profit advantage)
 - [Phase 05-cross-fee-tier-routing]: Dry-run output shows per-step fee rates and combined cost floor for operator visibility
+- [Phase 06-optimal-input-sizing]: Ternary search with maxIterations=20 and convergenceThreshold=1.0 unit for [1, 1000] range
+- [Phase 06-optimal-input-sizing]: 100ms timeout ensures production safety with fallback to conservative 10-unit input
+- [Phase 06-optimal-input-sizing]: Virtual reserve computation differs for V2 (actual reserves) vs V3 (L and sqrtPriceX96)
 
 ### Pending Todos
 
@@ -72,5 +76,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed 05-02-PLAN.md (Cross-Fee-Tier Routing Tests & Visibility) -- Phase 5 COMPLETE
-Resume file: .planning/ROADMAP.md (proceed to Phase 6: Multi-DEX Coverage)
+Stopped at: Completed 06-01-PLAN.md (Input Optimizer Core) -- Phase 6 in progress (1/3 plans)
+Resume file: .planning/phases/06-optimal-input-sizing/06-02-PLAN.md
