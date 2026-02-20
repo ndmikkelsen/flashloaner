@@ -1,7 +1,7 @@
 import type { Provider } from "ethers";
 
 /** Supported DEX protocols */
-export type DEXProtocol = "uniswap_v2" | "uniswap_v3" | "sushiswap" | "sushiswap_v3" | "camelot_v2" | "camelot_v3" | "ramses_v3";
+export type DEXProtocol = "uniswap_v2" | "uniswap_v3" | "sushiswap" | "sushiswap_v3" | "camelot_v2" | "camelot_v3" | "ramses_v3" | "traderjoe_lb";
 
 /** A token pair on a specific DEX */
 export interface PoolConfig {
@@ -40,6 +40,8 @@ export interface PriceSnapshot {
   liquidity?: bigint;
   /** V3: sqrtPriceX96 for virtual reserve computation */
   sqrtPriceX96?: bigint;
+  /** Trader Joe LB: Active bin ID */
+  activeId?: number;
 }
 
 /** Emitted when a price delta exceeds the configured threshold */
