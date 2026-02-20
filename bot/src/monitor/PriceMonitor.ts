@@ -317,7 +317,7 @@ export class PriceMonitor extends EventEmitter {
 
   /** Check if a pool uses V3-style concentrated liquidity */
   private isV3Pool(pool: PoolConfig): boolean {
-    return pool.dex === "uniswap_v3" || pool.dex === "sushiswap_v3" || pool.dex === "camelot_v3";
+    return pool.dex === "uniswap_v3" || pool.dex === "sushiswap_v3" || pool.dex === "camelot_v3" || pool.dex === "ramses_v3";
   }
 
   /** Fetch the current price from a single pool */
