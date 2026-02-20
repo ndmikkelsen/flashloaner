@@ -26,7 +26,7 @@ See: `.planning/milestones/v1.0-ROADMAP.md` for full details.
 - [x] **Phase 5: Cross-Fee-Tier Routing** - Expand pool pair matrix with cross-fee-tier combinations to reduce cost floor from 0.60% to 0.35% (completed 2026-02-20)
 - [x] **Phase 6: Optimal Input Sizing** - Right-size trade amounts per opportunity based on pool depth instead of fixed defaults (completed 2026-02-20)
 - [x] **Phase 7: Live Execution + Safety** - Wire existing execution components into live trading with shadow mode, staleness guard, and nonce persistence (completed 2026-02-20)
-- [ ] **Phase 8: P&L Dashboard + Operations** - Persist trade outcomes, display session stats, and run bot unattended via pm2
+- [x] **Phase 8: P&L Dashboard + Operations** - Persist trade outcomes, display session stats, and run bot unattended via pm2 (completed 2026-02-20)
 - [ ] **Phase 9: Ramses V2 Adapter** - Add Ramses V3 CL pool monitoring and on-chain swap routing with fee manipulation safeguards
 - [ ] **Phase 10: Trader Joe V2.1 LB Adapter** - Add Trader Joe Liquidity Book price reading and on-chain swap routing with variable fee buffers
 
@@ -137,6 +137,6 @@ Plans:
 | 5. Cross-Fee-Tier Routing | v1.1 | 2/2 | Complete | 2026-02-20 |
 | 6. Optimal Input Sizing | v1.1 | 3/3 | Complete | 2026-02-20 |
 | 7. Live Execution + Safety | v1.1 | Complete    | 2026-02-20 | - |
-| 8. P&L Dashboard + Operations | v1.1 | 0/? | Not started | - |
+| 8. P&L Dashboard + Operations | v1.1 | Complete    | 2026-02-20 | - |
 | 9. Ramses V2 Adapter | v1.1 | 0/? | Not started | - |
 | 10. Trader Joe V2.1 LB Adapter | v1.1 | 0/3 | Planned | - |
