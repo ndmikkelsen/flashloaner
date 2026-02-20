@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 ## Current Position
 
 Phase: 8 of 10 (P&L Dashboard Operations)
-Plan: 2 of 3 in current phase
-Status: In progress
-Last activity: 2026-02-20 -- Completed 08-02-PLAN.md (PM2 Process Management)
+Plan: 3 of 3 in current phase
+Status: Phase 8 complete
+Last activity: 2026-02-20 -- Completed 08-03-PLAN.md (Runtime Trade Stats & Report CLI)
 
-Progress: [==================....] 87% (20/~23 plans -- v1.0: 11 complete, v1.1: 9/~12 complete)
+Progress: [===================...] 91% (21/~23 plans -- v1.0: 11 complete, v1.1: 10/~12 complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 20 (v1.0: 11, v1.1: 9)
-- Average duration: ~25 min (weighted)
-- Total execution time: ~8h 44m (v1.0: 8h, v1.1: 44m)
+- Total plans completed: 21 (v1.0: 11, v1.1: 10)
+- Average duration: ~23 min (weighted)
+- Total execution time: ~8h 47m (v1.0: 8h, v1.1: 47m)
 
 **By Phase:**
 
@@ -34,24 +34,24 @@ Progress: [==================....] 87% (20/~23 plans -- v1.0: 11 complete, v1.1:
 | 5. Cross-Fee-Tier Routing | 2 | ~5m | ~2.5m |
 | 6. Optimal Input Sizing | 3 | ~15m | ~5m |
 | 7. Live Execution Safety | 3 | ~17m | ~5.7m |
-| 8. P| 8. P&L Dashboard Operations | 1 | ~2.4m | ~2.4m |L Dashboard Operations | 2 | ~4.6m | ~2.3m |
+| 8. P&L Dashboard Operations | 3 | ~7.3m | ~2.4m |
 
 **Recent Plans:**
 
 | Plan | Duration (s) | Tasks | Files |
 |------|-------------|-------|-------|
-| Phase 07-live-execution-safety P01 | 197 | 3 | 4 |
 | Phase 07-live-execution-safety P02 | 133 | 3 | 4 |
 | Phase 07-live-execution-safety P03 | 445 | 3 | 6 |
 | Phase 08-pnl-dashboard-operations P01 | 145 | 3 | 3 |
 | Phase 08-pnl-dashboard-operations P02 | 133 | 3 | 4 |
+| Phase 08-pnl-dashboard-operations P03 | 165 | 3 | 3 |
 
 **Recent Trend:**
 - v1.0 phases: steady ~45m per plan
 - v1.1 Phase 5 (complete): 2.5m per plan (pool discovery + validation, no new implementation)
 - v1.1 Phase 6 (complete): ~5m per plan (new optimizer implementation + integration + testing)
-- v1.1 Phase 7 (COMPLETE): ~5.7m per plan (safety infrastructure with testing and integration)
-- v1.1 Phase 8 (in progress): 2.4m per plan so far (persistence layer with JSONL storage)
+- v1.1 Phase 7 (complete): ~5.7m per plan (safety infrastructure with testing and integration)
+- v1.1 Phase 8 (COMPLETE): ~2.4m per plan (persistence layer, PM2 setup, runtime stats/reporting)
 - Trend: v1.1 maintaining fast velocity as infrastructure is well-scoped and testable
 
 ## Accumulated Context
@@ -85,6 +85,11 @@ New for v1.1:
 - [Phase 08-01]: JSONL append-only format for trade persistence (simpler, crash-safe, no corruption risk)
 - [Phase 08-01]: Three-bucket P&L accounting separates grossProfit, gasCost+l1DataFee, and revertCost
 - [Phase 08-01]: In-memory cache with disk persistence for fast queries without DB overhead
+- [Phase 08-02]: PM2 ecosystem config uses .cjs extension for ESM compatibility
+- [Phase 08-02]: Log rotation via pm2-logrotate module (10MB max size, 7 days retention)
+- [Phase 08-03]: 5-minute interval for periodic stats (balance visibility with log noise)
+- [Phase 08-03]: Separate priceStatsInterval and tradeStatsInterval for independent frequency control
+- [Phase 08-03]: Report CLI reads TradeStore directly without bot initialization overhead
 
 ### Pending Todos
 
@@ -98,5 +103,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed 08-01-PLAN.md (Trade Persistence with JSONL Storage) -- Phase 8 plan 1/3 complete
-Resume file: Continue with 08-02-PLAN.md (Log Rotation with PM2)
+Stopped at: Completed 08-03-PLAN.md (Runtime Trade Stats & Report CLI) -- Phase 8 complete (3/3 plans)
+Resume file: Phase 8 complete. Next: Phase 9 (Ramses V2 Adapter) or Phase 10 (Trader Joe V2.1 LB Adapter)
