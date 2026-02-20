@@ -50,7 +50,7 @@ export interface ExecutionSigner {
 
 /** Minimal transaction receipt interface */
 export interface TransactionReceipt {
-  status: number;
+  status: number | null; // null for pending transactions
   blockNumber: number;
   gasUsed: bigint;
   gasPrice?: bigint;
@@ -256,7 +256,7 @@ export class ExecutionEngine extends EventEmitter {
         this.parseProfitFromReceipt(txHash, receipt);
 
         return result;
-      } else {
+      } else if (receipt.status === 0) {
         // Reverted
         this.recordFailure();
         const result = this.makeResult("reverted", {
@@ -270,6 +270,15 @@ export class ExecutionEngine extends EventEmitter {
 
         this.updateTracked(txHash, "reverted");
         this.emit("reverted", result);
+        return result;
+      } else {
+        // Null status (shouldn't happen after wait() resolves)
+        this.recordFailure();
+        const result = this.makeResult("failed", {
+          txHash,
+          error: "Transaction status is null after confirmation",
+        });
+        this.emit("failed", result);
         return result;
       }
     } catch (err) {

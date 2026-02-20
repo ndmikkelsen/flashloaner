@@ -4,6 +4,7 @@ import { PriceMonitor } from "./monitor/PriceMonitor.js";
 import { OpportunityDetector } from "./detector/OpportunityDetector.js";
 import { ExecutionEngine } from "./engine/ExecutionEngine.js";
 import { TransactionBuilder } from "./builder/TransactionBuilder.js";
+import { NonceManager } from "./nonce/NonceManager.js";
 import {
   parseEnv,
   buildConfig,
@@ -43,11 +44,21 @@ export class FlashloanBot {
   readonly mode: "dry-run" | "shadow" | "live";
   readonly engine?: ExecutionEngine;
   readonly builder?: TransactionBuilder;
+  readonly nonceManager?: NonceManager;
   readonly stats: ScanStats;
   private _status: BotStatus = "idle";
   private shutdownHandlers: Array<() => void> = [];
 
-  constructor(config: BotConfig, dryRun = true) {
+  constructor(
+    config: BotConfig,
+    dryRun = true,
+    executionConfig?: {
+      wallet?: Wallet;
+      executorAddress?: string;
+      adapters?: Record<string, string>; // Partial adapter map (only configured DEXs)
+      flashLoanProviders?: { aave_v3: string; balancer: string };
+    }
+  ) {
     this.config = config;
     this.dryRun = dryRun;
 
@@ -90,11 +101,63 @@ export class FlashloanBot {
 
     // Initialize execution components in SHADOW or LIVE mode
     if (this.mode === "shadow" || this.mode === "live") {
-      // Builder requires executor address, adapters, flash loan providers
-      // For now, we'll initialize these in a future plan when wiring live execution
-      // Shadow mode only needs the engine's simulateTransaction capability
-      this.engine = undefined; // TODO: Initialize in Plan 03 (live wiring)
-      this.builder = undefined; // TODO: Initialize in Plan 03 (live wiring)
+      if (!executionConfig?.wallet) {
+        throw new Error("Wallet is required for shadow/live mode");
+      }
+
+      if (!executionConfig?.executorAddress) {
+        throw new Error("Executor address is required for shadow/live mode");
+      }
+
+      if (!executionConfig?.adapters) {
+        throw new Error("Adapters config is required for shadow/live mode");
+      }
+
+      if (!executionConfig?.flashLoanProviders) {
+        throw new Error("Flash loan providers config is required for shadow/live mode");
+      }
+
+      // Build full adapter map (required by TransactionBuilder)
+      // Fill missing DEX protocols with zero address (they won't be used)
+      const fullAdapterMap = {
+        uniswap_v2: executionConfig.adapters.uniswap_v2 ?? "0x0000000000000000000000000000000000000000",
+        uniswap_v3: executionConfig.adapters.uniswap_v3 ?? "0x0000000000000000000000000000000000000000",
+        sushiswap: executionConfig.adapters.sushiswap ?? "0x0000000000000000000000000000000000000000",
+        sushiswap_v3: executionConfig.adapters.sushiswap_v3 ?? "0x0000000000000000000000000000000000000000",
+        camelot_v2: executionConfig.adapters.camelot_v2 ?? "0x0000000000000000000000000000000000000000",
+        camelot_v3: executionConfig.adapters.camelot_v3 ?? "0x0000000000000000000000000000000000000000",
+      };
+
+      this.builder = new TransactionBuilder({
+        executorAddress: executionConfig.executorAddress,
+        adapters: fullAdapterMap,
+        flashLoanProviders: executionConfig.flashLoanProviders,
+        chainId: config.network.chainId,
+      });
+
+      this.engine = new ExecutionEngine(executionConfig.wallet, {
+        confirmations: 1,
+        confirmationTimeoutMs: 120_000,
+        maxConsecutiveFailures: 5,
+        dryRun: this.mode === "shadow", // Shadow mode uses engine in dry-run
+      });
+
+      this.nonceManager = new NonceManager({
+        provider: new JsonRpcProvider(config.network.rpcUrl),
+        address: executionConfig.wallet.address,
+        statePath: ".data/nonce.json",
+        pendingTimeoutMs: 300_000, // 5 minutes
+      });
+
+      // Sync nonce manager with on-chain state
+      void this.nonceManager.syncWithOnChain();
+
+      // Track nonce on transaction submission
+      this.engine.on("submitted", (txHash: string) => {
+        if (this.nonceManager) {
+          this.nonceManager.markSubmitted(txHash);
+        }
+      });
     }
 
     this.wireEvents();
@@ -221,10 +284,29 @@ export class FlashloanBot {
       if (this.mode === "shadow") {
         console.log(formatOpportunityReport(opp, true));
 
-        // TODO: In Plan 03, add actual eth_call simulation here
-        // For now, just log that shadow mode is active
-        this.log("info", `[SHADOW] Would simulate opportunity ${opp.id} via eth_call`);
-        this.log("info", `[SHADOW] Estimated profit: ${opp.netProfit.toFixed(8)} ETH`);
+        if (!this.builder || !this.engine) {
+          this.log("error", "[SHADOW] Builder or engine not initialized");
+          return;
+        }
+
+        // Build the transaction
+        const tx = this.builder.buildArbitrageTransaction(opp, "aave_v3");
+
+        // Simulate via eth_call (free, no gas cost)
+        const simResult = await this.engine.simulateTransaction({
+          ...tx,
+          gas: { maxFeePerGas: 0n, maxPriorityFeePerGas: 0n, gasLimit: 500_000n },
+          nonce: 0,
+        });
+
+        if (simResult.success) {
+          this.log("info", `[SHADOW] ✓ Simulation succeeded for ${opp.id}`);
+          this.log("info", `[SHADOW] Estimated profit: ${opp.netProfit.toFixed(8)} ETH`);
+          this.log("info", `[SHADOW] Would broadcast in live mode`);
+        } else {
+          this.log("warn", `[SHADOW] ✗ Simulation failed: ${simResult.reason}`);
+          this.log("warn", `[SHADOW] Estimated profit was ${opp.netProfit.toFixed(8)} ETH, but would revert on-chain`);
+        }
         return;
       }
 
@@ -239,8 +321,55 @@ export class FlashloanBot {
         console.log(formatOpportunityReport(opp, false));
         this.log("info", `[LIVE] Latency: ${staleness.latencyMs}ms (fresh)`);
 
-        // TODO: In Plan 03, add actual transaction submission here
-        this.log("info", `[LIVE] Would submit transaction for ${opp.id}`);
+        if (!this.builder || !this.engine || !this.nonceManager) {
+          this.log("error", "[LIVE] Builder, engine, or nonce manager not initialized");
+          return;
+        }
+
+        try {
+          // Get next nonce (waits for pending transactions if any)
+          const nonceResult = await this.nonceManager.getNextNonce();
+          if (nonceResult.hadPending) {
+            this.log("info", `[LIVE] Resolved pending transaction (status: ${nonceResult.pendingStatus})`);
+          }
+
+          // Build transaction
+          const tx = this.builder.buildArbitrageTransaction(opp, "aave_v3");
+
+          // Get current gas parameters from provider
+          const provider = new JsonRpcProvider(this.config.network.rpcUrl);
+          const feeData = await provider.getFeeData();
+          const baseFeeGwei = Number(feeData.gasPrice ?? 0n) / 1e9;
+          const priorityFeeGwei = 0.01; // 0.01 gwei tip on Arbitrum
+
+          // Calculate gas settings
+          const gasSettings = this.builder.calculateGasSettings(
+            baseFeeGwei,
+            priorityFeeGwei,
+            500_000, // Conservative gas limit
+          );
+
+          // Prepare transaction with gas and nonce
+          const preparedTx = this.builder.prepareTransaction(tx, gasSettings, nonceResult.nonce);
+
+          // Submit transaction
+          this.log("info", `[LIVE] Submitting transaction for ${opp.id}...`);
+          const result = await this.engine.executeTransaction(preparedTx);
+
+          if (result.status === "confirmed") {
+            this.log("info", `[LIVE] ✓ Transaction confirmed: ${result.txHash}`);
+            this.log("info", `[LIVE] Gas used: ${result.gasUsed?.toString() ?? "unknown"}`);
+            this.nonceManager.markConfirmed(result.txHash!);
+          } else if (result.status === "reverted") {
+            this.log("warn", `[LIVE] ✗ Transaction reverted: ${result.txHash}`);
+            this.log("warn", `[LIVE] Revert reason: ${result.revertReason ?? "unknown"}`);
+            this.nonceManager.markConfirmed(result.txHash!); // Still increment nonce
+          } else {
+            this.log("error", `[LIVE] ✗ Transaction failed: ${result.error}`);
+          }
+        } catch (err) {
+          this.log("error", `[LIVE] Execution error: ${err instanceof Error ? err.message : String(err)}`);
+        }
       }
     });
 
