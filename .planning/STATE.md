@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-19)
 
 **Core value:** The bot must never lose funds beyond gas costs -- the 4-layer safety system (off-chain estimate, eth_call simulation, on-chain ProfitValidator, MEV protection) ensures every transaction either profits or reverts.
-**Current focus:** Phase 5 -- Cross-Fee-Tier Routing
+**Current focus:** Phase 6 -- Optimal Input Sizing
 
 ## Current Position
 
-Phase: 5 of 10 (Cross-Fee-Tier Routing)
-Plan: 2 of 2 in current phase
-Status: Complete
-Last activity: 2026-02-20 -- Completed 05-02-PLAN.md (Cross-Fee-Tier Routing Tests & Visibility)
+Phase: 6 of 10 (Optimal Input Sizing)
+Plan: 0 of ? in current phase (plans TBD)
+Status: Ready to plan
+Last activity: 2026-02-20 -- Phase 5 (Cross-Fee-Tier Routing) complete, verified, 2/2 plans
 
 Progress: [=============.........] 62% (13/~21 plans -- v1.0: 11 complete, v1.1: 2/~10 complete)
 
