@@ -12,6 +12,15 @@ import {IDEXAdapter} from "./interfaces/IDEXAdapter.sol";
 /// @dev Inherits FlashloanReceiver for flash loan callbacks, implements
 ///      IFlashloanExecutor for the full arbitrage interface. Supports multi-hop
 ///      swap routing through registered DEX adapters with profit validation.
+///
+/// Adapters to register via registerAdapter():
+/// - UniswapV2Adapter (Uniswap V2, SushiSwap V2)
+/// - UniswapV3Adapter (Uniswap V3, SushiSwap V3)
+/// - CamelotV2Adapter (Camelot V2)
+/// - CamelotV3Adapter (Camelot V3)
+/// - RamsesV3Adapter (Ramses V3)
+/// - TraderJoeLBAdapter (Trader Joe LB V2.1, Arbitrum only)
+///   Requires: LBRouter at 0xb4315e873dbcf96ffd0acd8ea43f689d8c20fb30
 contract FlashloanExecutor is FlashloanReceiver, IFlashloanExecutor {
     using SafeERC20 for IERC20;
 
