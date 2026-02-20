@@ -1,4 +1,5 @@
 import type { DEXProtocol, PriceDelta } from "../monitor/types.js";
+import type { OptimizationResult } from "../optimizer/types.js";
 
 /** A single swap step in an arbitrage path */
 export interface SwapStep {
@@ -55,6 +56,8 @@ export interface ArbitrageOpportunity {
   path: SwapPath;
   /** Input amount in base token (human-readable, e.g. 10.5 ETH) */
   inputAmount: number;
+  /** Optimization result for input amount sizing. Undefined when using fixed defaultInputAmount. */
+  optimizationResult?: OptimizationResult;
   /** Expected gross revenue (before costs) in base token */
   grossProfit: number;
   /** Cost breakdown */
