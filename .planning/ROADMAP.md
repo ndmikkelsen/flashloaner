@@ -24,7 +24,7 @@ See: `.planning/milestones/v1.0-ROADMAP.md` for full details.
 **Milestone Goal:** Achieve consistent net-positive arbitrage trading on Arbitrum mainnet with flash-loan-only execution (zero capital risk beyond gas). Success bar: 24+ hours net-positive P&L.
 
 - [x] **Phase 5: Cross-Fee-Tier Routing** - Expand pool pair matrix with cross-fee-tier combinations to reduce cost floor from 0.60% to 0.35% (completed 2026-02-20)
-- [ ] **Phase 6: Optimal Input Sizing** - Right-size trade amounts per opportunity based on pool depth instead of fixed defaults
+- [x] **Phase 6: Optimal Input Sizing** - Right-size trade amounts per opportunity based on pool depth instead of fixed defaults (completed 2026-02-20)
 - [ ] **Phase 7: Live Execution + Safety** - Wire existing execution components into live trading with shadow mode, staleness guard, and nonce persistence
 - [ ] **Phase 8: P&L Dashboard + Operations** - Persist trade outcomes, display session stats, and run bot unattended via pm2
 - [ ] **Phase 9: Ramses V2 Adapter** - Add Ramses V3 CL pool monitoring and on-chain swap routing with fee manipulation safeguards
@@ -43,8 +43,8 @@ See: `.planning/milestones/v1.0-ROADMAP.md` for full details.
 **Plans**: 2 plans
 
 Plans:
-- [ ] 05-01-PLAN.md -- Expand pool config with cross-fee-tier pools + coverage tests
-- [ ] 05-02-PLAN.md -- Cross-fee-tier routing tests + dry-run fee visibility
+- [x] 05-01-PLAN.md -- Expand pool config with cross-fee-tier pools + coverage tests
+- [x] 05-02-PLAN.md -- Cross-fee-tier routing tests + dry-run fee visibility
 
 ### Phase 6: Optimal Input Sizing
 **Goal**: Bot computes optimal trade size per opportunity based on pool liquidity depth, replacing fixed defaults with right-sized amounts
@@ -57,8 +57,9 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 06-01: TBD
-- [ ] 06-02: TBD
+- [x] 06-01-PLAN.md -- Input Optimizer Core (ternary search implementation)
+- [x] 06-02-PLAN.md -- Detector Integration (OpportunityDetector with InputOptimizer)
+- [x] 06-03-PLAN.md -- Dry-Run Enhancement & Integration Test (visibility + E2E validation)
 
 ### Phase 7: Live Execution + Safety
 **Goal**: Bot executes real arbitrage transactions on Arbitrum mainnet via FlashloanExecutor, with shadow validation, staleness protection, and crash-safe nonce management
