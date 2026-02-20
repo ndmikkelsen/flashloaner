@@ -1,5 +1,22 @@
+/**
+ * Arbitrum One Mainnet Entry Point
+ *
+ * Execution Modes (controlled by environment variables):
+ * - DRY_RUN=true (default): Report opportunities without submitting transactions
+ * - SHADOW_MODE=true: Simulate transactions via eth_call to validate profit estimates
+ * - DRY_RUN=false: Enable live transaction submission (requires PRIVATE_KEY)
+ *
+ * Environment Variables:
+ * - RPC_URL: Arbitrum One RPC endpoint (required)
+ * - PRIVATE_KEY: Wallet private key for signing transactions (required for shadow/live modes)
+ * - EXECUTOR_ADDRESS: FlashloanExecutor contract address (required for shadow/live modes)
+ * - ADAPTER_UNISWAP_V2: UniswapV2Adapter contract address
+ * - ADAPTER_UNISWAP_V3: UniswapV3Adapter contract address
+ * - ADAPTER_SUSHISWAP: SushiSwapAdapter contract address
+ * - LOG_LEVEL: Logging level (debug, info, warn, error)
+ */
 import "dotenv/config";
-import { JsonRpcProvider } from "ethers";
+import { JsonRpcProvider, Wallet } from "ethers";
 import { loadChainConfig } from "./config/index.js";
 import { FlashloanBot, BOT_VERSION } from "./index.js";
 import { estimateArbitrumGas, gasComponentsToEth } from "./gas/index.js";
@@ -66,11 +83,18 @@ async function main(): Promise<void> {
   // Load chain config using chainId 42161 (Arbitrum One)
   const chain = loadChainConfig(42161);
 
+  // Execution mode detection
+  const dryRun = process.env.DRY_RUN !== "false";
+  const shadowMode = process.env.SHADOW_MODE === "true";
+  const liveMode = !dryRun && !shadowMode;
+
+  const mode = dryRun ? "DRY-RUN" : shadowMode ? "SHADOW" : "LIVE";
+
   const rpcStatus = chain.rpcUrl ? "configured" : "MISSING";
 
   console.log(c.cyan(`\n========================================`));
   console.log(c.cyan(`  Flashloan Bot v${BOT_VERSION} — ARBITRUM ONE`));
-  console.log(c.cyan(`  Report-only (no transactions)`));
+  console.log(c.cyan(`  Mode:     ${mode}`));
   console.log(c.cyan(`  Chain:    ${chain.chainName} (chainId ${chain.chainId})`));
   console.log(c.cyan(`  RPC:      ${rpcStatus}`));
   console.log(c.cyan(`  Pools:    ${chain.pools.length} configured`));
@@ -86,15 +110,59 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  // Load wallet in shadow/live modes
+  let wallet: Wallet | undefined;
+  if (shadowMode || liveMode) {
+    const privateKey = process.env.PRIVATE_KEY;
+    if (!privateKey) {
+      console.error(`[ERROR] PRIVATE_KEY environment variable is required for ${mode} mode.`);
+      console.error(`[ERROR] Set PRIVATE_KEY to your wallet's private key (0x...)`);
+      process.exit(1);
+    }
+
+    const provider = new JsonRpcProvider(chain.rpcUrl);
+    wallet = new Wallet(privateKey, provider);
+
+    console.log(c.cyan(`  Wallet:   ${wallet.address}`));
+    console.log(c.cyan(`  Balance:  (checking...)`));
+
+    const balance = await provider.getBalance(wallet.address);
+    const balanceEth = Number(balance) / 1e18;
+    console.log(c.cyan(`            ${balanceEth.toFixed(6)} ETH\n`));
+
+    if (balanceEth < 0.01) {
+      console.warn(c.yellow(`[WARN] Low wallet balance (${balanceEth.toFixed(6)} ETH). Ensure you have enough ETH for gas.`));
+    }
+  }
+
+  // Execution config (adapters, executor address, flash loan providers)
+  const executionConfig = (shadowMode || liveMode) && wallet ? {
+    wallet,
+    executorAddress: process.env.EXECUTOR_ADDRESS ?? "0x0000000000000000000000000000000000000000", // TODO: Set in .env
+    adapters: {
+      uniswap_v2: process.env.ADAPTER_UNISWAP_V2 ?? "0x0000000000000000000000000000000000000000",
+      uniswap_v3: process.env.ADAPTER_UNISWAP_V3 ?? "0x0000000000000000000000000000000000000000",
+      sushiswap: process.env.ADAPTER_SUSHISWAP ?? "0x0000000000000000000000000000000000000000",
+    },
+    flashLoanProviders: {
+      aave_v3: chain.protocols.aaveV3Pool,
+      balancer: chain.protocols.balancerVault,
+    },
+  } : undefined;
+
   // Construct FlashloanBot directly with chain config values (NOT fromEnv())
   // This avoids the default config path that hardcodes Ethereum/Sepolia values.
-  const bot = new FlashloanBot({
-    network: { rpcUrl: chain.rpcUrl, chainId: chain.chainId },
-    pools: chain.pools,
-    monitor: chain.monitor,
-    detector: chain.detector,
-    logLevel: (process.env.LOG_LEVEL as "debug" | "info" | "warn" | "error") ?? "debug",
-  });
+  const bot = new FlashloanBot(
+    {
+      network: { rpcUrl: chain.rpcUrl, chainId: chain.chainId },
+      pools: chain.pools,
+      monitor: chain.monitor,
+      detector: chain.detector,
+      logLevel: (process.env.LOG_LEVEL as "debug" | "info" | "warn" | "error") ?? "debug",
+    },
+    dryRun,
+    executionConfig,
+  );
 
   // ---- Inject Arbitrum gas estimator ----
   // Uses NodeInterface precompile at 0xC8 for accurate L1+L2 cost breakdown.
