@@ -137,6 +137,14 @@ export class OpportunityDetector extends EventEmitter {
   };
 
   /**
+   * Check if a price delta involves a Ramses pool (either buy or sell side).
+   * Returns true if either pool.dex is "ramses_v3".
+   */
+  private involvesRamses(delta: PriceDelta): boolean {
+    return delta.buyPool.pool.dex === "ramses_v3" || delta.sellPool.pool.dex === "ramses_v3";
+  }
+
+  /**
    * Analyze a price delta and emit an opportunity if profitable.
    * This is the main entry point for processing detected price differences.
    */
@@ -176,10 +184,15 @@ export class OpportunityDetector extends EventEmitter {
     const netProfit = grossProfit - costs.totalCost;
     const netProfitPercent = (netProfit / inputAmount) * 100;
 
-    if (netProfit < this.config.minProfitThreshold) {
+    // Apply 2x threshold for Ramses opportunities due to fee manipulation risk
+    const effectiveThreshold = this.involvesRamses(delta)
+      ? this.config.minProfitThreshold * 2
+      : this.config.minProfitThreshold;
+
+    if (netProfit < effectiveThreshold) {
       this.emit(
         "opportunityRejected",
-        `Net profit ${netProfit.toFixed(6)} below threshold ${this.config.minProfitThreshold}`,
+        `Net profit ${netProfit.toFixed(6)} below threshold ${effectiveThreshold.toFixed(6)}${this.involvesRamses(delta) ? ' (2x for Ramses)' : ''}`,
         delta,
       );
       return null;
@@ -270,10 +283,15 @@ export class OpportunityDetector extends EventEmitter {
     const netProfit = grossProfit - costs.totalCost;
     const netProfitPercent = (netProfit / inputAmount) * 100;
 
-    if (netProfit < this.config.minProfitThreshold) {
+    // Apply 2x threshold for Ramses opportunities due to fee manipulation risk
+    const effectiveThreshold = this.involvesRamses(delta)
+      ? this.config.minProfitThreshold * 2
+      : this.config.minProfitThreshold;
+
+    if (netProfit < effectiveThreshold) {
       this.emit(
         "opportunityRejected",
-        `Net profit ${netProfit.toFixed(6)} below threshold ${this.config.minProfitThreshold}`,
+        `Net profit ${netProfit.toFixed(6)} below threshold ${effectiveThreshold.toFixed(6)}${this.involvesRamses(delta) ? ' (2x for Ramses)' : ''}`,
         delta,
       );
       return null;
