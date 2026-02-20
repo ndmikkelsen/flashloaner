@@ -1,11 +1,18 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { FlashloanBot } from "../../src/index.js";
 import { OpportunityDetector } from "../../src/detector/OpportunityDetector.js";
+import { Wallet } from "ethers";
 import type { ArbitrageOpportunity } from "../../src/detector/types.js";
 import type { BotConfig } from "../../src/config/types.js";
 
 describe("Shadow Mode & Staleness Guard", () => {
   let mockConfig: BotConfig;
+  let mockExecutionConfig: {
+    wallet: Wallet;
+    executorAddress: string;
+    adapters: Record<string, string>;
+    flashLoanProviders: { aave_v3: string; balancer: string };
+  };
 
   beforeEach(() => {
     mockConfig = {
@@ -27,6 +34,22 @@ describe("Shadow Mode & Staleness Guard", () => {
       },
       logLevel: "info",
     };
+
+    // Mock execution config for shadow/live mode tests
+    const TEST_PRIVATE_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"; // Anvil default key #0
+    mockExecutionConfig = {
+      wallet: new Wallet(TEST_PRIVATE_KEY),
+      executorAddress: "0x0000000000000000000000000000000000000001",
+      adapters: {
+        uniswap_v2: "0x0000000000000000000000000000000000000002",
+        uniswap_v3: "0x0000000000000000000000000000000000000003",
+        sushiswap: "0x0000000000000000000000000000000000000004",
+      },
+      flashLoanProviders: {
+        aave_v3: "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
+        balancer: "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+      },
+    };
   });
 
   describe("Mode Detection", () => {
@@ -37,14 +60,14 @@ describe("Shadow Mode & Staleness Guard", () => {
 
     it("should use shadow mode when SHADOW_MODE=true", () => {
       process.env.SHADOW_MODE = "true";
-      const bot = new FlashloanBot(mockConfig, false);
+      const bot = new FlashloanBot(mockConfig, false, mockExecutionConfig);
       expect(bot.mode).toBe("shadow");
       delete process.env.SHADOW_MODE;
     });
 
     it("should use live mode when both DRY_RUN and SHADOW_MODE are false", () => {
       process.env.SHADOW_MODE = "false";
-      const bot = new FlashloanBot(mockConfig, false);
+      const bot = new FlashloanBot(mockConfig, false, mockExecutionConfig);
       expect(bot.mode).toBe("live");
       delete process.env.SHADOW_MODE;
     });
