@@ -31,6 +31,23 @@ export const ARBITRUM_MAINNET_POOLS: PoolDefinition[] = [
     feeTier: 3000,
   },
 
+  {
+    label: "WETH/USDC Ramses V3 (0.05%)",
+    dex: "ramses_v3",
+    // TODO: Verify pool address from Ramses Factory getPool() call:
+    // cast call 0xd0019e86edB35E1fedaaB03aED5c3c60f115d28b \
+    //   "getPool(address,address,uint24)(address)" \
+    //   0x82af49447d8a07e3bd95bd0d56f35241523fbab1 \
+    //   0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8 \
+    //   500 --rpc-url $ARBITRUM_RPC_URL
+    poolAddress: "0x0000000000000000000000000000000000000000", // PLACEHOLDER - needs verification
+    token0: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH (lower address = token0)
+    token1: "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8", // USDC.e
+    decimals0: 18,
+    decimals1: 6,
+    feeTier: 500,
+  },
+
   // ──── WETH/USDT ────────────────────────────────────────────────
 
   {
@@ -53,6 +70,23 @@ export const ARBITRUM_MAINNET_POOLS: PoolDefinition[] = [
     decimals0: 18,
     decimals1: 6,
     feeTier: 3000,
+  },
+
+  {
+    label: "WETH/USDT Ramses V3 (0.05%)",
+    dex: "ramses_v3",
+    // TODO: Verify pool address from Ramses Factory getPool() call:
+    // cast call 0xd0019e86edB35E1fedaaB03aED5c3c60f115d28b \
+    //   "getPool(address,address,uint24)(address)" \
+    //   0x82af49447d8a07e3bd95bd0d56f35241523fbab1 \
+    //   0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9 \
+    //   500 --rpc-url $ARBITRUM_RPC_URL
+    poolAddress: "0x0000000000000000000000000000000000000000", // PLACEHOLDER - needs verification
+    token0: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH
+    token1: "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9", // USDT
+    decimals0: 18,
+    decimals1: 6,
+    feeTier: 500,
   },
 
   // ──── ARB/WETH ─────────────────────────────────────────────────
