@@ -131,6 +131,7 @@ export class FlashloanBot {
         sushiswap_v3: executionConfig.adapters.sushiswap_v3 ?? "0x0000000000000000000000000000000000000000",
         camelot_v2: executionConfig.adapters.camelot_v2 ?? "0x0000000000000000000000000000000000000000",
         camelot_v3: executionConfig.adapters.camelot_v3 ?? "0x0000000000000000000000000000000000000000",
+        ramses_v3: executionConfig.adapters.ramses_v3 ?? "0x0000000000000000000000000000000000000000",
       };
 
       this.builder = new TransactionBuilder({
