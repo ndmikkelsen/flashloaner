@@ -27,6 +27,10 @@ const ALGEBRA_V3_POOL_ABI = [
   "function globalState() view returns (uint160 price, int24 tick, uint16 feeZto, uint16 feeOtz, uint16 timepointIndex, uint8 communityFeeToken0, uint8 communityFeeToken1)",
 ];
 
+const TRADER_JOE_LB_PAIR_ABI = [
+  "function getActiveId() view returns (uint24 activeId)",
+];
+
 const LIQUIDITY_ABI = [
   "function liquidity() view returns (uint128)",
 ];
@@ -35,6 +39,7 @@ const LIQUIDITY_ABI = [
 const v2Iface = new Interface(UNISWAP_V2_PAIR_ABI);
 const v3Iface = new Interface(UNISWAP_V3_POOL_ABI);
 const algebraIface = new Interface(ALGEBRA_V3_POOL_ABI);
+const lbPairIface = new Interface(TRADER_JOE_LB_PAIR_ABI);
 const liquidityIface = new Interface(LIQUIDITY_ABI);
 
 // Multicall3 — deployed at same address on all EVM chains
@@ -193,6 +198,7 @@ export class PriceMonitor extends EventEmitter {
       reserves?: [bigint, bigint];
       sqrtPriceX96?: bigint;
       liquidity?: bigint;
+      activeId?: number;
     }>();
 
     for (let i = 0; i < N; i++) {
@@ -258,6 +264,7 @@ export class PriceMonitor extends EventEmitter {
         ...(data.reserves && { reserves: data.reserves }),
         ...(data.liquidity !== undefined && { liquidity: data.liquidity }),
         ...(data.sqrtPriceX96 !== undefined && { sqrtPriceX96: data.sqrtPriceX96 }),
+        ...(data.activeId !== undefined && { activeId: data.activeId }),
       };
 
       this.consecutiveErrors.set(key, 0);
@@ -271,6 +278,9 @@ export class PriceMonitor extends EventEmitter {
 
   /** Get the encoded call data for reading price from a pool */
   private getCallDataForPool(pool: PoolConfig): string {
+    if (pool.dex === "traderjoe_lb") {
+      return lbPairIface.encodeFunctionData("getActiveId");
+    }
     if (pool.dex === "camelot_v3") {
       return algebraIface.encodeFunctionData("globalState");
     }
@@ -285,7 +295,19 @@ export class PriceMonitor extends EventEmitter {
     price: number;
     reserves?: [bigint, bigint];
     sqrtPriceX96?: bigint;
+    activeId?: number;
   } {
+    if (pool.dex === "traderjoe_lb") {
+      const decoded = lbPairIface.decodeFunctionResult("getActiveId", returnData);
+      const activeId = Number(decoded[0]);
+      if (!pool.feeTier) {
+        throw new Error(`Trader Joe LB pool ${pool.label} missing feeTier (binStep)`);
+      }
+      return {
+        price: this.calculateLBPrice(activeId, pool.feeTier, pool.decimals0, pool.decimals1),
+        activeId,
+      };
+    }
     if (pool.dex === "camelot_v3") {
       const decoded = algebraIface.decodeFunctionResult(
         "globalState",
@@ -323,6 +345,15 @@ export class PriceMonitor extends EventEmitter {
   /** Fetch the current price from a single pool */
   async fetchPrice(pool: PoolConfig): Promise<PriceSnapshot> {
     const blockNumber = await this.config.provider.getBlockNumber();
+
+    if (pool.dex === "traderjoe_lb") {
+      const data = await this.fetchLBPrice(pool);
+      return {
+        pool, price: data.price, inversePrice: 1 / data.price,
+        blockNumber, timestamp: Date.now(),
+        activeId: data.activeId,
+      };
+    }
 
     if (pool.dex === "camelot_v3") {
       const data = await this.fetchAlgebraPrice(pool);
@@ -406,6 +437,26 @@ export class PriceMonitor extends EventEmitter {
     };
   }
 
+  /** Read active bin ID from a Trader Joe LB pair */
+  private async fetchLBPrice(pool: PoolConfig): Promise<{ price: number; activeId: number }> {
+    const contract = new Contract(
+      pool.poolAddress,
+      TRADER_JOE_LB_PAIR_ABI,
+      this.config.provider,
+    );
+    const activeId = await contract.getActiveId();
+    const activeIdNum = Number(activeId);
+
+    if (!pool.feeTier) {
+      throw new Error(`Trader Joe LB pool ${pool.label} missing feeTier (binStep)`);
+    }
+
+    return {
+      price: this.calculateLBPrice(activeIdNum, pool.feeTier, pool.decimals0, pool.decimals1),
+      activeId: activeIdNum,
+    };
+  }
+
   /** Fetch in-range liquidity from a V3 pool (non-critical, returns undefined on failure) */
   private async fetchLiquidity(pool: PoolConfig): Promise<bigint | undefined> {
     try {
@@ -454,6 +505,38 @@ export class PriceMonitor extends EventEmitter {
     const sqrtPrice = Number(sqrtPriceX96) / Number(Q96);
     const rawPrice = sqrtPrice * sqrtPrice;
     return rawPrice * 10 ** (decimals0 - decimals1);
+  }
+
+  /**
+   * Calculate price from Trader Joe LB active bin ID.
+   *
+   * Formula: price = (1 + binStep/10000)^(activeId - 2^23) * 10^(decimals0 - decimals1)
+   *
+   * Where:
+   * - binStep is the fee tier in basis points (e.g., 25 = 0.25%)
+   * - activeId is the current active bin (uint24, centered at 2^23 = 8388608)
+   * - 2^23 is the price anchor point (activeId 8388608 = price ratio 1:1)
+   *
+   * Implementation uses logarithms to avoid overflow:
+   * price = exp((activeId - 2^23) * ln(1 + binStep/10000)) * 10^(decimals0 - decimals1)
+   */
+  calculateLBPrice(
+    activeId: number,
+    binStep: number,
+    decimals0: number,
+    decimals1: number,
+  ): number {
+    const PRICE_ANCHOR = 2 ** 23; // 8388608 (center point where price = 1:1)
+    const binStepDecimal = binStep / 10_000; // Convert basis points to decimal
+    const exponent = activeId - PRICE_ANCHOR;
+
+    // Compute (1 + binStep/10000)^exponent using logarithms
+    // price_ratio = exp(exponent * ln(1 + binStepDecimal))
+    const priceRatio = Math.exp(exponent * Math.log(1 + binStepDecimal));
+
+    // Adjust for token decimals
+    const decimalAdjustment = 10 ** (decimals0 - decimals1);
+    return priceRatio * decimalAdjustment;
   }
 
   /**
