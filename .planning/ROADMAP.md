@@ -103,11 +103,11 @@ Plans:
   1. Bot reads Ramses V3 CL pool prices via slot0() and detects cross-DEX spreads between Ramses and existing pools
   2. On-chain RamsesV2Adapter successfully routes swaps through Ramses SwapRouter in fork tests
   3. All Ramses opportunities require 2x the standard minimum profit threshold before the bot considers execution
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 09-01: TBD
-- [ ] 09-02: TBD
+- [ ] 09-01-PLAN.md -- On-chain RamsesV2Adapter + fork tests + bot type extension
+- [ ] 09-02-PLAN.md -- Bot integration (pool config, PriceMonitor routing, 2x profit threshold)
 
 ### Phase 10: Trader Joe V2.1 LB Adapter
 **Goal**: Bot reads Trader Joe Liquidity Book active bin prices and routes swaps through a dedicated on-chain adapter, with 50% fee buffer to account for variable fee volatility
@@ -137,5 +137,5 @@ Plans:
 | 6. Optimal Input Sizing | v1.1 | 0/3 | Not started | - |
 | 7. Live Execution + Safety | v1.1 | 0/? | Not started | - |
 | 8. P&L Dashboard + Operations | v1.1 | 0/? | Not started | - |
-| 9. Ramses V2 Adapter | v1.1 | 0/? | Not started | - |
+| 9. Ramses V2 Adapter | v1.1 | 0/2 | Not started | - |
 | 10. Trader Joe V2.1 LB Adapter | v1.1 | 0/? | Not started | - |
