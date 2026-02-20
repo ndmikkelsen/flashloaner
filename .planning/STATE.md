@@ -34,7 +34,7 @@ Progress: [==================....] 87% (20/~23 plans -- v1.0: 11 complete, v1.1:
 | 5. Cross-Fee-Tier Routing | 2 | ~5m | ~2.5m |
 | 6. Optimal Input Sizing | 3 | ~15m | ~5m |
 | 7. Live Execution Safety | 3 | ~17m | ~5.7m |
-| 8. P&L Dashboard Operations | 1 | ~2.4m | ~2.4m |
+| 8. P| 8. P&L Dashboard Operations | 1 | ~2.4m | ~2.4m |L Dashboard Operations | 2 | ~4.6m | ~2.3m |
 
 **Recent Plans:**
 
