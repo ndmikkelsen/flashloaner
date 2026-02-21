@@ -1,6 +1,6 @@
 /** Configuration for InputOptimizer */
 export interface InputOptimizerConfig {
-  /** Maximum iterations for ternary search. Default: 3 */
+  /** Maximum iterations for ternary search. Default: 20 */
   maxIterations?: number;
   /** Timeout in milliseconds. Default: 100 */
   timeoutMs?: number;
@@ -10,7 +10,7 @@ export interface InputOptimizerConfig {
   minAmount?: number;
   /** Maximum input amount to consider. Default: 1000 */
   maxAmount?: number;
-  /** Convergence threshold (stop when search space < this). Default: 0.01 */
+  /** Convergence threshold (stop when search space < this). Default: 1.0 */
   convergenceThreshold?: number;
 }
 

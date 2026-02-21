@@ -31,22 +31,8 @@ export const ARBITRUM_MAINNET_POOLS: PoolDefinition[] = [
     feeTier: 3000,
   },
 
-  {
-    label: "WETH/USDC Ramses V3 (0.05%)",
-    dex: "ramses_v3",
-    // TODO: Verify pool address from Ramses Factory getPool() call:
-    // cast call 0xd0019e86edB35E1fedaaB03aED5c3c60f115d28b \
-    //   "getPool(address,address,uint24)(address)" \
-    //   0x82af49447d8a07e3bd95bd0d56f35241523fbab1 \
-    //   0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8 \
-    //   500 --rpc-url $ARBITRUM_RPC_URL
-    poolAddress: "0x0000000000000000000000000000000000000000", // PLACEHOLDER - needs verification
-    token0: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH (lower address = token0)
-    token1: "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8", // USDC.e
-    decimals0: 18,
-    decimals1: 6,
-    feeTier: 500,
-  },
+  // Ramses V3 WETH/USDC: REMOVED — only native USDC pool exists (0xaF4CD193...)
+  // with zero in-range liquidity (verified 2026-02-21). Re-add if Ramses gets liquidity.
 
   // ──── WETH/USDT ────────────────────────────────────────────────
 
@@ -72,22 +58,8 @@ export const ARBITRUM_MAINNET_POOLS: PoolDefinition[] = [
     feeTier: 3000,
   },
 
-  {
-    label: "WETH/USDT Ramses V3 (0.05%)",
-    dex: "ramses_v3",
-    // TODO: Verify pool address from Ramses Factory getPool() call:
-    // cast call 0xd0019e86edB35E1fedaaB03aED5c3c60f115d28b \
-    //   "getPool(address,address,uint24)(address)" \
-    //   0x82af49447d8a07e3bd95bd0d56f35241523fbab1 \
-    //   0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9 \
-    //   500 --rpc-url $ARBITRUM_RPC_URL
-    poolAddress: "0x0000000000000000000000000000000000000000", // PLACEHOLDER - needs verification
-    token0: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH
-    token1: "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9", // USDT
-    decimals0: 18,
-    decimals1: 6,
-    feeTier: 500,
-  },
+  // Ramses V3 WETH/USDT: REMOVED — no pool exists on Ramses V3 CL factory
+  // (verified 2026-02-21). Re-add if Ramses deploys WETH/USDT CL pool.
 
   // ──── ARB/WETH ─────────────────────────────────────────────────
 
@@ -336,13 +308,9 @@ export const ARBITRUM_MAINNET_POOLS: PoolDefinition[] = [
   {
     label: "WETH/USDC Trader Joe LB (0.15%)",
     dex: "traderjoe_lb",
-    // TODO: Verify pool address from LBFactory.getLBPairInformation():
-    // cast call 0x8e42f2F4101563bF679975178e880FD87d3eFd4e \
-    //   "getLBPairInformation(address,address,uint256)" \
-    //   0x82af49447d8a07e3bd95bd0d56f35241523fbab1 \
-    //   0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8 \
-    //   15 --rpc-url $ARBITRUM_RPC_URL
-    poolAddress: "0x0000000000000000000000000000000000000000", // PLACEHOLDER - needs verification
+    // Verified via LBFactory.getLBPairInformation() 2026-02-21
+    // tokenX=WETH, tokenY=USDC.e, activeId=8375236
+    poolAddress: "0x94d53BE52706a155d27440C4a2434BEa772a6f7C",
     token0: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH (tokenX)
     token1: "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8", // USDC.e (tokenY)
     decimals0: 18,
@@ -353,13 +321,9 @@ export const ARBITRUM_MAINNET_POOLS: PoolDefinition[] = [
   {
     label: "WETH/USDT Trader Joe LB (0.15%)",
     dex: "traderjoe_lb",
-    // TODO: Verify pool address from LBFactory.getLBPairInformation():
-    // cast call 0x8e42f2F4101563bF679975178e880FD87d3eFd4e \
-    //   "getLBPairInformation(address,address,uint256)" \
-    //   0x82af49447d8a07e3bd95bd0d56f35241523fbab1 \
-    //   0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9 \
-    //   15 --rpc-url $ARBITRUM_RPC_URL
-    poolAddress: "0x0000000000000000000000000000000000000000", // PLACEHOLDER - needs verification
+    // Verified via LBFactory.getLBPairInformation() 2026-02-21
+    // tokenX=WETH, tokenY=USDT, activeId=8375236
+    poolAddress: "0xd387c40a72703B38A5181573724bcaF2Ce6038a5",
     token0: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH (tokenX)
     token1: "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9", // USDT (tokenY)
     decimals0: 18,
@@ -368,19 +332,16 @@ export const ARBITRUM_MAINNET_POOLS: PoolDefinition[] = [
   },
 
   {
-    label: "ARB/WETH Trader Joe LB (0.25%)",
+    label: "ARB/WETH Trader Joe LB (0.10%)",
     dex: "traderjoe_lb",
-    // TODO: Verify pool address from LBFactory.getLBPairInformation():
-    // cast call 0x8e42f2F4101563bF679975178e880FD87d3eFd4e \
-    //   "getLBPairInformation(address,address,uint256)" \
-    //   0x82af49447d8a07e3bd95bd0d56f35241523fbab1 \
-    //   0x912ce59144191c1204e64559fe8253a0e49e6548 \
-    //   25 --rpc-url $ARBITRUM_RPC_URL
-    poolAddress: "0x0000000000000000000000000000000000000000", // PLACEHOLDER - needs verification
-    token0: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH (tokenX - lower address)
-    token1: "0x912ce59144191c1204e64559fe8253a0e49e6548", // ARB (tokenY)
+    // Verified via LBFactory.getLBPairInformation() 2026-02-21
+    // tokenX=ARB (0x912CE...), tokenY=WETH (0x82aF...), activeId=8380154
+    // Note: token ordering follows LBPair (tokenX/tokenY), not hex sort
+    poolAddress: "0x0Be4aC7dA6cd4bAD60d96FbC6d091e1098aFA358",
+    token0: "0x912ce59144191c1204e64559fe8253a0e49e6548", // ARB (tokenX)
+    token1: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH (tokenY)
     decimals0: 18,
     decimals1: 18,
-    feeTier: 25, // binStep in basis points (0.25%)
+    feeTier: 10, // binStep in basis points (0.10%)
   },
 ];

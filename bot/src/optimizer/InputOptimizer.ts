@@ -12,12 +12,12 @@ export class InputOptimizer {
 
   constructor(config: InputOptimizerConfig = {}) {
     this.config = {
-      maxIterations: config.maxIterations ?? 3,
+      maxIterations: config.maxIterations ?? 20,
       timeoutMs: config.timeoutMs ?? 100,
       fallbackAmount: config.fallbackAmount ?? 10,
       minAmount: config.minAmount ?? 1,
       maxAmount: config.maxAmount ?? 1000,
-      convergenceThreshold: config.convergenceThreshold ?? 0.01,
+      convergenceThreshold: config.convergenceThreshold ?? 1.0,
     };
   }
 
@@ -36,6 +36,7 @@ export class InputOptimizer {
     let iterations = 0;
     let bestAmount = this.config.fallbackAmount;
     let bestProfit = profitFunction(bestAmount);
+    let convergedEarly = false;
 
     // Ternary search: find maximum of unimodal profit function
     while (iterations < this.config.maxIterations) {
@@ -53,6 +54,7 @@ export class InputOptimizer {
 
       // Check convergence
       if (right - left < this.config.convergenceThreshold) {
+        convergedEarly = true;
         break;
       }
 
@@ -85,19 +87,7 @@ export class InputOptimizer {
 
     const durationMs = Date.now() - startTime;
 
-    // Check if we hit iteration cap
-    if (iterations >= this.config.maxIterations) {
-      return {
-        optimalAmount: bestAmount,
-        expectedProfit: bestProfit,
-        iterations,
-        durationMs,
-        converged: false,
-        fallbackReason: "max_iterations",
-      };
-    }
-
-    // Check if no profitable size exists
+    // Check if no profitable size exists (check this first - it's a more critical failure)
     if (bestProfit <= 0) {
       return {
         optimalAmount: this.config.fallbackAmount,
@@ -106,6 +96,18 @@ export class InputOptimizer {
         durationMs,
         converged: false,
         fallbackReason: "no_profitable_size",
+      };
+    }
+
+    // Check if we hit iteration cap without converging
+    if (!convergedEarly && iterations >= this.config.maxIterations) {
+      return {
+        optimalAmount: bestAmount,
+        expectedProfit: bestProfit,
+        iterations,
+        durationMs,
+        converged: false,
+        fallbackReason: "max_iterations",
       };
     }
 
