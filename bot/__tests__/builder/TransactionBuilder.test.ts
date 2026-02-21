@@ -20,6 +20,11 @@ import {
 const UNI_V2_ADAPTER = "0x1111111111111111111111111111111111111111";
 const UNI_V3_ADAPTER = "0x2222222222222222222222222222222222222222";
 const SUSHI_ADAPTER = "0x3333333333333333333333333333333333333333";
+const SUSHI_V3_ADAPTER = "0x4444444444444444444444444444444444444444";
+const CAMELOT_V2_ADAPTER = "0x5555555555555555555555555555555555555555";
+const CAMELOT_V3_ADAPTER = "0x6666666666666666666666666666666666666666";
+const RAMSES_V3_ADAPTER = "0x7777777777777777777777777777777777777777";
+const TRADERJOE_LB_ADAPTER = "0x8888888888888888888888888888888888888888";
 const AAVE_V3_POOL = ADDRESSES.AAVE_POOL;
 const BALANCER_VAULT = "0xBA12222222228d8Ba445958a75a0704d566BF2C8";
 
@@ -29,6 +34,11 @@ const defaultConfig: TransactionBuilderConfig = {
     uniswap_v2: UNI_V2_ADAPTER,
     uniswap_v3: UNI_V3_ADAPTER,
     sushiswap: SUSHI_ADAPTER,
+    sushiswap_v3: SUSHI_V3_ADAPTER,
+    camelot_v2: CAMELOT_V2_ADAPTER,
+    camelot_v3: CAMELOT_V3_ADAPTER,
+    ramses_v3: RAMSES_V3_ADAPTER,
+    traderjoe_lb: TRADERJOE_LB_ADAPTER,
   },
   flashLoanProviders: {
     aave_v3: AAVE_V3_POOL,
@@ -380,6 +390,46 @@ describe("TransactionBuilder", () => {
       const data = builder.encodeExtraData(step);
       const decoded = abiCoder.decode(["uint24"], data);
       expect(decoded[0]).toBe(3000n);
+    });
+
+    it("encodes fee tier for sushiswap_v3", () => {
+      const step = makeSwapStep({ dex: "sushiswap_v3", feeTier: 3000 });
+      const data = builder.encodeExtraData(step);
+      const decoded = abiCoder.decode(["uint24"], data);
+      expect(decoded[0]).toBe(3000n);
+    });
+
+    it("encodes fee tier for camelot_v3", () => {
+      const step = makeSwapStep({ dex: "camelot_v3", feeTier: 500 });
+      const data = builder.encodeExtraData(step);
+      const decoded = abiCoder.decode(["uint24"], data);
+      expect(decoded[0]).toBe(500n);
+    });
+
+    it("encodes fee tier for ramses_v3", () => {
+      const step = makeSwapStep({ dex: "ramses_v3", feeTier: 500 });
+      const data = builder.encodeExtraData(step);
+      const decoded = abiCoder.decode(["uint24"], data);
+      expect(decoded[0]).toBe(500n);
+    });
+
+    it("encodes binStep for traderjoe_lb", () => {
+      const step = makeSwapStep({ dex: "traderjoe_lb", feeTier: 15 });
+      const data = builder.encodeExtraData(step);
+      const decoded = abiCoder.decode(["uint24"], data);
+      expect(decoded[0]).toBe(15n);
+    });
+
+    it("defaults to binStep 15 for traderjoe_lb without feeTier", () => {
+      const step = makeSwapStep({ dex: "traderjoe_lb", feeTier: undefined });
+      const data = builder.encodeExtraData(step);
+      const decoded = abiCoder.decode(["uint24"], data);
+      expect(decoded[0]).toBe(15n);
+    });
+
+    it("returns 0x for camelot_v2", () => {
+      const step = makeSwapStep({ dex: "camelot_v2" });
+      expect(builder.encodeExtraData(step)).toBe("0x");
     });
   });
 

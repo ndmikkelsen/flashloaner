@@ -12,7 +12,11 @@
  * - EXECUTOR_ADDRESS: FlashloanExecutor contract address (required for shadow/live modes)
  * - ADAPTER_UNISWAP_V2: UniswapV2Adapter contract address
  * - ADAPTER_UNISWAP_V3: UniswapV3Adapter contract address
- * - ADAPTER_SUSHISWAP: SushiSwapAdapter contract address
+ * - ADAPTER_SUSHISWAP: SushiSwapV2Adapter contract address (reuses UniswapV2Adapter with Sushi router)
+ * - ADAPTER_SUSHISWAP_V3: SushiSwapV3Adapter contract address (reuses UniswapV3Adapter with Sushi router)
+ * - ADAPTER_CAMELOT_V2: CamelotV2Adapter contract address (reuses UniswapV2Adapter with Camelot router)
+ * - ADAPTER_CAMELOT_V3: CamelotV3Adapter contract address
+ * - ADAPTER_TRADERJOE_LB: TraderJoeLBAdapter contract address
  * - LOG_LEVEL: Logging level (debug, info, warn, error)
  */
 import "dotenv/config";
@@ -169,6 +173,10 @@ async function main(): Promise<void> {
       uniswap_v2: process.env.ADAPTER_UNISWAP_V2 ?? "0x0000000000000000000000000000000000000000",
       uniswap_v3: process.env.ADAPTER_UNISWAP_V3 ?? "0x0000000000000000000000000000000000000000",
       sushiswap: process.env.ADAPTER_SUSHISWAP ?? "0x0000000000000000000000000000000000000000",
+      sushiswap_v3: process.env.ADAPTER_SUSHISWAP_V3 ?? "0x0000000000000000000000000000000000000000",
+      camelot_v2: process.env.ADAPTER_CAMELOT_V2 ?? "0x0000000000000000000000000000000000000000",
+      camelot_v3: process.env.ADAPTER_CAMELOT_V3 ?? "0x0000000000000000000000000000000000000000",
+      traderjoe_lb: process.env.ADAPTER_TRADERJOE_LB ?? "0x0000000000000000000000000000000000000000",
     },
     flashLoanProviders: {
       aave_v3: chain.protocols.aaveV3Pool,

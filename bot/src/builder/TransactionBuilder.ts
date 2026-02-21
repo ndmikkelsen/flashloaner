@@ -199,15 +199,25 @@ export class TransactionBuilder {
   /**
    * Encode adapter-specific extra data for a swap step.
    *
-   * - uniswap_v2 / sushiswap: empty bytes (direct swap)
-   * - uniswap_v3: abi.encode(uint24 feeTier)
+   * - uniswap_v2 / sushiswap / camelot_v2: empty bytes (direct swap)
+   * - uniswap_v3 / sushiswap_v3 / camelot_v3 / ramses_v3: abi.encode(uint24 feeTier)
+   * - traderjoe_lb: abi.encode(uint24 binStep)
    */
   encodeExtraData(step: SwapStep): string {
-    if (step.dex === "uniswap_v3") {
+    if (
+      step.dex === "uniswap_v3" ||
+      step.dex === "sushiswap_v3" ||
+      step.dex === "camelot_v3" ||
+      step.dex === "ramses_v3"
+    ) {
       const feeTier = step.feeTier ?? 3000;
       return abiCoder.encode(["uint24"], [feeTier]);
     }
-    // V2 and SushiSwap use empty extra data for direct swaps
+    if (step.dex === "traderjoe_lb") {
+      const binStep = step.feeTier ?? 15;
+      return abiCoder.encode(["uint24"], [binStep]);
+    }
+    // V2-style DEXes (uniswap_v2, sushiswap, camelot_v2) use empty extra data
     return "0x";
   }
 

@@ -7,6 +7,7 @@ import {CircuitBreaker} from "../src/safety/CircuitBreaker.sol";
 import {ProfitValidator} from "../src/safety/ProfitValidator.sol";
 import {UniswapV2Adapter} from "../src/adapters/UniswapV2Adapter.sol";
 import {UniswapV3Adapter} from "../src/adapters/UniswapV3Adapter.sol";
+import {TraderJoeLBAdapter} from "../src/adapters/TraderJoeLBAdapter.sol";
 
 /// @title Deploy
 /// @notice Production deployment script for the flashloan arbitrage system.
@@ -26,6 +27,12 @@ import {UniswapV3Adapter} from "../src/adapters/UniswapV3Adapter.sol";
 ///   UNISWAP_V3_ROUTER     - Uniswap V3 SwapRouter address
 ///   UNISWAP_V3_QUOTER     - Uniswap V3 QuoterV2 address
 ///
+/// Optional environment variables (for additional DEX adapters):
+///   SUSHISWAP_V2_ROUTER   - SushiSwap V2 Router address (deploys UniswapV2Adapter with Sushi router)
+///   SUSHISWAP_V3_ROUTER   - SushiSwap V3 SwapRouter address (deploys UniswapV3Adapter with Sushi V3 router)
+///   SUSHISWAP_V3_QUOTER   - SushiSwap V3 QuoterV2 address
+///   TRADERJOE_LB_ROUTER   - Trader Joe LBRouter V2.1 address
+///
 /// Optional environment variables (with defaults):
 ///   MIN_PROFIT_WEI        - Minimum profit threshold (default: 0.01 ether)
 ///   MAX_GAS_PRICE         - Maximum gas price (default: 100 gwei)
@@ -44,6 +51,11 @@ contract Deploy is Script {
         address uniswapV2Router;
         address uniswapV3Router;
         address uniswapV3Quoter;
+        // Optional additional DEX routers (zero address = skip deployment)
+        address sushiswapV2Router;
+        address sushiswapV3Router;
+        address sushiswapV3Quoter;
+        address traderjoeLBRouter;
     }
 
     struct DeploymentConfig {
@@ -60,6 +72,10 @@ contract Deploy is Script {
         ProfitValidator profitValidator;
         UniswapV2Adapter uniswapV2Adapter;
         UniswapV3Adapter uniswapV3Adapter;
+        // Optional additional adapters (address(0) if not deployed)
+        UniswapV2Adapter sushiswapV2Adapter;
+        UniswapV3Adapter sushiswapV3Adapter;
+        TraderJoeLBAdapter traderjoeLBAdapter;
     }
 
     // ══════════════════════════════════════════════════════════════════════════════
@@ -107,7 +123,11 @@ contract Deploy is Script {
             balancerVault: vm.envAddress("BALANCER_VAULT"),
             uniswapV2Router: vm.envAddress("UNISWAP_V2_ROUTER"),
             uniswapV3Router: vm.envAddress("UNISWAP_V3_ROUTER"),
-            uniswapV3Quoter: vm.envAddress("UNISWAP_V3_QUOTER")
+            uniswapV3Quoter: vm.envAddress("UNISWAP_V3_QUOTER"),
+            sushiswapV2Router: vm.envOr("SUSHISWAP_V2_ROUTER", address(0)),
+            sushiswapV3Router: vm.envOr("SUSHISWAP_V3_ROUTER", address(0)),
+            sushiswapV3Quoter: vm.envOr("SUSHISWAP_V3_QUOTER", address(0)),
+            traderjoeLBRouter: vm.envOr("TRADERJOE_LB_ROUTER", address(0))
         });
 
         return config;
@@ -166,7 +186,7 @@ contract Deploy is Script {
         );
         console2.log(unicode"✓ FlashloanExecutor deployed:", address(executor));
 
-        console2.log(unicode"\n━━━ Step 3: Deploy DEX Adapters ━━━");
+        console2.log(unicode"\n━━━ Step 3: Deploy Core DEX Adapters ━━━");
 
         UniswapV2Adapter uniswapV2Adapter = new UniswapV2Adapter(chain.uniswapV2Router);
         console2.log(unicode"✓ UniswapV2Adapter deployed:", address(uniswapV2Adapter));
@@ -177,6 +197,35 @@ contract Deploy is Script {
         );
         console2.log(unicode"✓ UniswapV3Adapter deployed:", address(uniswapV3Adapter));
 
+        console2.log(unicode"\n━━━ Step 3b: Deploy Optional DEX Adapters ━━━");
+
+        // SushiSwap V2: reuses UniswapV2Adapter with SushiSwap router
+        UniswapV2Adapter sushiswapV2Adapter;
+        if (chain.sushiswapV2Router != address(0)) {
+            sushiswapV2Adapter = new UniswapV2Adapter(chain.sushiswapV2Router);
+            console2.log(unicode"✓ SushiSwapV2Adapter deployed:", address(sushiswapV2Adapter));
+        } else {
+            console2.log(unicode"⊘ SushiSwapV2Adapter skipped (SUSHISWAP_V2_ROUTER not set)");
+        }
+
+        // SushiSwap V3: reuses UniswapV3Adapter with SushiSwap V3 router
+        UniswapV3Adapter sushiswapV3Adapter;
+        if (chain.sushiswapV3Router != address(0)) {
+            sushiswapV3Adapter = new UniswapV3Adapter(chain.sushiswapV3Router, chain.sushiswapV3Quoter);
+            console2.log(unicode"✓ SushiSwapV3Adapter deployed:", address(sushiswapV3Adapter));
+        } else {
+            console2.log(unicode"⊘ SushiSwapV3Adapter skipped (SUSHISWAP_V3_ROUTER not set)");
+        }
+
+        // Trader Joe LB: dedicated adapter for Liquidity Book pools
+        TraderJoeLBAdapter traderjoeLBAdapter;
+        if (chain.traderjoeLBRouter != address(0)) {
+            traderjoeLBAdapter = new TraderJoeLBAdapter(chain.traderjoeLBRouter);
+            console2.log(unicode"✓ TraderJoeLBAdapter deployed:", address(traderjoeLBAdapter));
+        } else {
+            console2.log(unicode"⊘ TraderJoeLBAdapter skipped (TRADERJOE_LB_ROUTER not set)");
+        }
+
         console2.log(unicode"\n━━━ Step 4: Register Adapters ━━━");
 
         executor.registerAdapter(address(uniswapV2Adapter));
@@ -184,6 +233,21 @@ contract Deploy is Script {
 
         executor.registerAdapter(address(uniswapV3Adapter));
         console2.log(unicode"✓ Registered UniswapV3Adapter");
+
+        if (address(sushiswapV2Adapter) != address(0)) {
+            executor.registerAdapter(address(sushiswapV2Adapter));
+            console2.log(unicode"✓ Registered SushiSwapV2Adapter");
+        }
+
+        if (address(sushiswapV3Adapter) != address(0)) {
+            executor.registerAdapter(address(sushiswapV3Adapter));
+            console2.log(unicode"✓ Registered SushiSwapV3Adapter");
+        }
+
+        if (address(traderjoeLBAdapter) != address(0)) {
+            executor.registerAdapter(address(traderjoeLBAdapter));
+            console2.log(unicode"✓ Registered TraderJoeLBAdapter");
+        }
 
         console2.log(unicode"\n━━━ Step 5: Verify Configuration ━━━");
 
@@ -200,7 +264,10 @@ contract Deploy is Script {
             circuitBreaker: circuitBreaker,
             profitValidator: profitValidator,
             uniswapV2Adapter: uniswapV2Adapter,
-            uniswapV3Adapter: uniswapV3Adapter
+            uniswapV3Adapter: uniswapV3Adapter,
+            sushiswapV2Adapter: sushiswapV2Adapter,
+            sushiswapV3Adapter: sushiswapV3Adapter,
+            traderjoeLBAdapter: traderjoeLBAdapter
         });
     }
 
@@ -278,6 +345,15 @@ contract Deploy is Script {
         console2.log("  ProfitValidator:    ", address(contracts.profitValidator));
         console2.log("  UniswapV2Adapter:   ", address(contracts.uniswapV2Adapter));
         console2.log("  UniswapV3Adapter:   ", address(contracts.uniswapV3Adapter));
+        if (address(contracts.sushiswapV2Adapter) != address(0)) {
+            console2.log("  SushiSwapV2Adapter: ", address(contracts.sushiswapV2Adapter));
+        }
+        if (address(contracts.sushiswapV3Adapter) != address(0)) {
+            console2.log("  SushiSwapV3Adapter: ", address(contracts.sushiswapV3Adapter));
+        }
+        if (address(contracts.traderjoeLBAdapter) != address(0)) {
+            console2.log("  TraderJoeLBAdapter: ", address(contracts.traderjoeLBAdapter));
+        }
         console2.log("");
         console2.log("Next Steps:");
         console2.log("  1. Verify contracts on explorer (if --verify failed):");
@@ -318,7 +394,10 @@ contract Deploy is Script {
             '    "CircuitBreaker": "', vm.toString(address(contracts.circuitBreaker)), '",\n',
             '    "ProfitValidator": "', vm.toString(address(contracts.profitValidator)), '",\n',
             '    "UniswapV2Adapter": "', vm.toString(address(contracts.uniswapV2Adapter)), '",\n',
-            '    "UniswapV3Adapter": "', vm.toString(address(contracts.uniswapV3Adapter)), '"\n',
+            '    "UniswapV3Adapter": "', vm.toString(address(contracts.uniswapV3Adapter)), '",\n',
+            '    "SushiSwapV2Adapter": "', vm.toString(address(contracts.sushiswapV2Adapter)), '",\n',
+            '    "SushiSwapV3Adapter": "', vm.toString(address(contracts.sushiswapV3Adapter)), '",\n',
+            '    "TraderJoeLBAdapter": "', vm.toString(address(contracts.traderjoeLBAdapter)), '"\n',
             '  },\n'
         );
 
