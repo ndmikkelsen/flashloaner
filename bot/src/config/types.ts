@@ -34,6 +34,8 @@ export interface PoolDefinition {
   decimals0: number;
   decimals1: number;
   feeTier?: number;
+  /** Invert raw on-chain price (for TJ LB pools where tokenX/tokenY != hex sort order) */
+  invertPrice?: boolean;
 }
 
 /** PriceMonitor configuration subset */

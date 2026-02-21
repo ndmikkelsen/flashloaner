@@ -21,6 +21,9 @@ export interface PoolConfig {
   decimals1: number;
   /** Uniswap V3 fee tier (bps) — only for uniswap_v3 */
   feeTier?: number;
+  /** Invert the raw on-chain price. Used when Trader Joe LB tokenX/tokenY ordering
+   *  doesn't match the hex-sorted token0/token1 convention. */
+  invertPrice?: boolean;
 }
 
 /** A snapshot of a pool's price at a point in time */

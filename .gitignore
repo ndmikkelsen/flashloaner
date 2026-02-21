@@ -5,6 +5,7 @@
 .env.server-backup
 .env.arbitrum-sepolia
 .env.arbitrum
+.env.arbitrum-mainnet
 .env.base-sepolia
 .env.base
 

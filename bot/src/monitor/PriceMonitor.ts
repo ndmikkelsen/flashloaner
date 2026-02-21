@@ -303,10 +303,11 @@ export class PriceMonitor extends EventEmitter {
       if (!pool.feeTier) {
         throw new Error(`Trader Joe LB pool ${pool.label} missing feeTier (binStep)`);
       }
-      return {
-        price: this.calculateLBPrice(activeId, pool.feeTier, pool.decimals0, pool.decimals1),
-        activeId,
-      };
+      let price = this.calculateLBPrice(activeId, pool.feeTier, pool.decimals0, pool.decimals1);
+      if (pool.invertPrice) {
+        price = price > 0 ? 1 / price : 0;
+      }
+      return { price, activeId };
     }
     if (pool.dex === "camelot_v3") {
       const decoded = algebraIface.decodeFunctionResult(
@@ -451,10 +452,16 @@ export class PriceMonitor extends EventEmitter {
       throw new Error(`Trader Joe LB pool ${pool.label} missing feeTier (binStep)`);
     }
 
-    return {
-      price: this.calculateLBPrice(activeIdNum, pool.feeTier, pool.decimals0, pool.decimals1),
-      activeId: activeIdNum,
-    };
+    let price = this.calculateLBPrice(activeIdNum, pool.feeTier, pool.decimals0, pool.decimals1);
+
+    // LB bin price gives tokenY/tokenX. When token0/token1 (hex-sorted) doesn't
+    // match the LB pair's tokenX/tokenY ordering, the raw price is inverted
+    // relative to our convention (price = token1 per token0).
+    if (pool.invertPrice) {
+      price = price > 0 ? 1 / price : 0;
+    }
+
+    return { price, activeId: activeIdNum };
   }
 
   /** Fetch in-range liquidity from a V3 pool (non-critical, returns undefined on failure) */

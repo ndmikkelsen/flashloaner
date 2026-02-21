@@ -116,12 +116,13 @@ contract Deploy is Script {
         uint256 chainId = block.chainid;
 
         // Load from environment variables (supports any chain)
+        // V2 router is optional — Uniswap V2 was never deployed on Arbitrum
         ChainConfig memory config = ChainConfig({
             chainId: chainId,
             name: getChainName(chainId),
             aavePool: vm.envAddress("AAVE_V3_POOL"),
             balancerVault: vm.envAddress("BALANCER_VAULT"),
-            uniswapV2Router: vm.envAddress("UNISWAP_V2_ROUTER"),
+            uniswapV2Router: vm.envOr("UNISWAP_V2_ROUTER", address(0)),
             uniswapV3Router: vm.envAddress("UNISWAP_V3_ROUTER"),
             uniswapV3Quoter: vm.envAddress("UNISWAP_V3_QUOTER"),
             sushiswapV2Router: vm.envOr("SUSHISWAP_V2_ROUTER", address(0)),
@@ -188,8 +189,14 @@ contract Deploy is Script {
 
         console2.log(unicode"\n━━━ Step 3: Deploy Core DEX Adapters ━━━");
 
-        UniswapV2Adapter uniswapV2Adapter = new UniswapV2Adapter(chain.uniswapV2Router);
-        console2.log(unicode"✓ UniswapV2Adapter deployed:", address(uniswapV2Adapter));
+        // Uniswap V2: optional (not deployed on Arbitrum)
+        UniswapV2Adapter uniswapV2Adapter;
+        if (chain.uniswapV2Router != address(0)) {
+            uniswapV2Adapter = new UniswapV2Adapter(chain.uniswapV2Router);
+            console2.log(unicode"✓ UniswapV2Adapter deployed:", address(uniswapV2Adapter));
+        } else {
+            console2.log(unicode"⊘ UniswapV2Adapter skipped (UNISWAP_V2_ROUTER not set)");
+        }
 
         UniswapV3Adapter uniswapV3Adapter = new UniswapV3Adapter(
             chain.uniswapV3Router,
@@ -228,8 +235,10 @@ contract Deploy is Script {
 
         console2.log(unicode"\n━━━ Step 4: Register Adapters ━━━");
 
-        executor.registerAdapter(address(uniswapV2Adapter));
-        console2.log(unicode"✓ Registered UniswapV2Adapter");
+        if (address(uniswapV2Adapter) != address(0)) {
+            executor.registerAdapter(address(uniswapV2Adapter));
+            console2.log(unicode"✓ Registered UniswapV2Adapter");
+        }
 
         executor.registerAdapter(address(uniswapV3Adapter));
         console2.log(unicode"✓ Registered UniswapV3Adapter");
@@ -254,7 +263,9 @@ contract Deploy is Script {
         require(executor.owner() == deployer, "Deploy: Executor owner mismatch");
         require(executor.botWallet() == config.botWallet, "Deploy: Bot wallet mismatch");
         require(executor.minProfit() == config.minProfit, "Deploy: Min profit mismatch");
-        require(executor.approvedAdapters(address(uniswapV2Adapter)), "Deploy: V2 adapter not approved");
+        if (address(uniswapV2Adapter) != address(0)) {
+            require(executor.approvedAdapters(address(uniswapV2Adapter)), "Deploy: V2 adapter not approved");
+        }
         require(executor.approvedAdapters(address(uniswapV3Adapter)), "Deploy: V3 adapter not approved");
         require(!executor.paused(), "Deploy: Executor should not be paused");
         console2.log(unicode"✓ All configuration checks passed");
@@ -284,7 +295,7 @@ contract Deploy is Script {
         require(config.botWallet != address(0), "Deploy: BOT_WALLET_ADDRESS not set");
         require(chain.aavePool != address(0), "Deploy: AAVE_V3_POOL not set");
         require(chain.balancerVault != address(0), "Deploy: BALANCER_VAULT not set");
-        require(chain.uniswapV2Router != address(0), "Deploy: UNISWAP_V2_ROUTER not set");
+        // UNISWAP_V2_ROUTER is optional (not deployed on Arbitrum)
         require(chain.uniswapV3Router != address(0), "Deploy: UNISWAP_V3_ROUTER not set");
         require(chain.uniswapV3Quoter != address(0), "Deploy: UNISWAP_V3_QUOTER not set");
         require(config.minProfit > 0, "Deploy: MIN_PROFIT_WEI must be > 0");
@@ -319,7 +330,9 @@ contract Deploy is Script {
         console2.log("Protocol Addresses:");
         console2.log("  Aave Pool:     ", chain.aavePool);
         console2.log("  Balancer Vault:", chain.balancerVault);
-        console2.log("  Uniswap V2:    ", chain.uniswapV2Router);
+        if (chain.uniswapV2Router != address(0)) {
+            console2.log("  Uniswap V2:    ", chain.uniswapV2Router);
+        }
         console2.log("  Uniswap V3:    ", chain.uniswapV3Router);
         console2.log("  V3 Quoter:     ", chain.uniswapV3Quoter);
         console2.log("");
@@ -343,7 +356,9 @@ contract Deploy is Script {
         console2.log("  FlashloanExecutor:  ", address(contracts.executor));
         console2.log("  CircuitBreaker:     ", address(contracts.circuitBreaker));
         console2.log("  ProfitValidator:    ", address(contracts.profitValidator));
-        console2.log("  UniswapV2Adapter:   ", address(contracts.uniswapV2Adapter));
+        if (address(contracts.uniswapV2Adapter) != address(0)) {
+            console2.log("  UniswapV2Adapter:   ", address(contracts.uniswapV2Adapter));
+        }
         console2.log("  UniswapV3Adapter:   ", address(contracts.uniswapV3Adapter));
         if (address(contracts.sushiswapV2Adapter) != address(0)) {
             console2.log("  SushiSwapV2Adapter: ", address(contracts.sushiswapV2Adapter));

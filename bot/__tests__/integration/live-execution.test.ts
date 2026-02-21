@@ -20,6 +20,7 @@ describe("Live Execution Integration (Fork)", () => {
 
   let provider: JsonRpcProvider;
   let wallet: Wallet;
+  let forkAvailable = false;
 
   beforeAll(async () => {
     provider = new JsonRpcProvider(FORK_RPC);
@@ -28,14 +29,15 @@ describe("Live Execution Integration (Fork)", () => {
     // Verify fork is running
     try {
       await provider.getBlockNumber();
+      forkAvailable = true;
     } catch (err) {
       console.warn("Fork not available, skipping live execution tests");
-      return;
     }
   });
 
   describe("Shadow Mode", () => {
     it("should instantiate bot with ExecutionEngine in shadow mode", async () => {
+      if (!forkAvailable) return;
       const config: BotConfig = {
         network: { rpcUrl: FORK_RPC, chainId: 42161 },
         pools: [],
@@ -88,6 +90,7 @@ describe("Live Execution Integration (Fork)", () => {
 
   describe("Live Mode", () => {
     it("should instantiate bot with ExecutionEngine in live mode", async () => {
+      if (!forkAvailable) return;
       const config: BotConfig = {
         network: { rpcUrl: FORK_RPC, chainId: 42161 },
         pools: [],
@@ -138,6 +141,7 @@ describe("Live Execution Integration (Fork)", () => {
     });
 
     it("should sync nonce manager with on-chain nonce on initialization", async () => {
+      if (!forkAvailable) return;
       const config: BotConfig = {
         network: { rpcUrl: FORK_RPC, chainId: 42161 },
         pools: [],
@@ -191,7 +195,8 @@ describe("Live Execution Integration (Fork)", () => {
   });
 
   describe("Error Handling", () => {
-    it("should throw error if wallet is missing in shadow mode", () => {
+    it("should throw error if wallet is missing in shadow mode", async () => {
+      if (!forkAvailable) return;
       const config: BotConfig = {
         network: { rpcUrl: FORK_RPC, chainId: 42161 },
         pools: [],
