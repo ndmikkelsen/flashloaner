@@ -606,6 +606,11 @@ export class PriceMonitor extends EventEmitter {
       const deltaPercent =
         ((maxSnap.price - minSnap.price) / minSnap.price) * 100;
 
+      // Sanity check: spreads > 20% are almost certainly phantom (stale pool,
+      // misconfigured oracle, zero liquidity). Skip to prevent false execution.
+      const MAX_SANE_SPREAD = 20;
+      if (deltaPercent > MAX_SANE_SPREAD) continue;
+
       if (deltaPercent >= this.config.deltaThresholdPercent) {
         const delta: PriceDelta = {
           pair,

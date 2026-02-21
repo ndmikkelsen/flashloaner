@@ -331,18 +331,9 @@ export const ARBITRUM_MAINNET_POOLS: PoolDefinition[] = [
     feeTier: 15, // binStep in basis points (0.15%)
   },
 
-  {
-    label: "ARB/WETH Trader Joe LB (0.10%)",
-    dex: "traderjoe_lb",
-    // Verified via LBFactory.getLBPairInformation() 2026-02-21
-    // On-chain: tokenX=ARB (0x912CE...), tokenY=WETH (0x82aF...), activeId=8380154
-    // Hex-sorted here (token0 < token1); invertPrice compensates for reversed LB ordering
-    poolAddress: "0x0Be4aC7dA6cd4bAD60d96FbC6d091e1098aFA358",
-    token0: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH (tokenY on-chain)
-    token1: "0x912ce59144191c1204e64559fe8253a0e49e6548", // ARB (tokenX on-chain)
-    decimals0: 18,
-    decimals1: 18,
-    feeTier: 10, // binStep in basis points (0.10%)
-    invertPrice: true, // LB tokenX(ARB) > tokenY(WETH) in hex → invert
-  },
+  // ARB/WETH Trader Joe LB (0.10%) — REMOVED
+  // Pool 0x0Be4aC7dA6cd4bAD60d96FbC6d091e1098aFA358 has stale pricing:
+  // active bin stuck at ~4674 ARB/WETH while market is ~19950 ARB/WETH.
+  // Low liquidity means active bin doesn't move. Creates phantom 327% spread
+  // that would fail on execution. Re-add when liquidity improves.
 ];
