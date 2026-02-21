@@ -7,32 +7,59 @@ import type { PoolDefinition } from "../../types.js";
  * Addresses verified from Phase 1 research (ARBITRUM.md).
  */
 export const ARBITRUM_MAINNET_POOLS: PoolDefinition[] = [
-  // ──── WETH/USDC ────────────────────────────────────────────────
+  // ──── WETH/USDC.e (bridged) ────────────────────────────────────
 
   {
-    label: "WETH/USDC UniV3 (0.05%)",
+    label: "WETH/USDC.e UniV3 (0.05%)",
     dex: "uniswap_v3",
     poolAddress: "0xC31E54c7a869B9FcBEcc14363CF510d1c41fa443",
-    token0: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH (lower address = token0)
-    token1: "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8", // USDC.e
+    token0: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH
+    token1: "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8", // USDC.e (bridged)
     decimals0: 18,
     decimals1: 6,
     feeTier: 500,
   },
 
   {
-    label: "WETH/USDC UniV3 (0.3%)",
-    dex: "uniswap_v3",
-    poolAddress: "0xC6962004f452bE9203591991D15f6b388e09E8D0",
-    token0: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH (lower address = token0)
-    token1: "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8", // USDC.e
+    label: "WETH/USDC.e SushiV2",
+    dex: "sushiswap",
+    // 148.8 WETH + $295K USDC.e (verified 2026-02-21)
+    poolAddress: "0x905dfCD5649217c42684f23958568e533C711Aa3",
+    token0: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH
+    token1: "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8", // USDC.e (bridged)
     decimals0: 18,
     decimals1: 6,
-    feeTier: 3000,
   },
 
-  // Ramses V3 WETH/USDC: REMOVED — only native USDC pool exists (0xaF4CD193...)
-  // with zero in-range liquidity (verified 2026-02-21). Re-add if Ramses gets liquidity.
+  // ──── WETH/USDC (native) ─────────────────────────────────────
+  // Native USDC (Circle-issued) has replaced USDC.e as primary stablecoin on Arbitrum.
+  // These pools have 10x+ the liquidity of the USDC.e versions.
+
+  {
+    label: "WETH/USDC UniV3 (0.05%)",
+    dex: "uniswap_v3",
+    // 17,675 WETH + $10M USDC — largest WETH/USDC pool on Arbitrum
+    // NOTE: Was previously mislabeled as USDC.e 0.3%. Verified on-chain 2026-02-21.
+    poolAddress: "0xC6962004f452bE9203591991D15f6b388e09E8D0",
+    token0: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH
+    token1: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", // USDC (native)
+    decimals0: 18,
+    decimals1: 6,
+    feeTier: 500,
+  },
+
+  {
+    label: "WETH/USDC Camelot V3",
+    dex: "camelot_v3",
+    // 215 WETH + $77.8K USDC (verified 2026-02-21)
+    poolAddress: "0xB1026b8e7276e7AC75410F1fcbbe21796e8f7526",
+    token0: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH
+    token1: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", // USDC (native)
+    decimals0: 18,
+    decimals1: 6,
+  },
+
+  // WETH/USDC(native) TJ LB (0.15%) — NOT ADDED (~$33K TVL, too competitive for WETH/stablecoin arb)
 
   // ──── WETH/USDT ────────────────────────────────────────────────
 
@@ -106,6 +133,18 @@ export const ARBITRUM_MAINNET_POOLS: PoolDefinition[] = [
     decimals1: 18,
   },
 
+  {
+    label: "ARB/WETH Camelot V3",
+    dex: "camelot_v3",
+    // 2.6 WETH — dynamic fee creates arb windows vs fixed UniV3 tiers
+    // Pool verified on-chain 2026-02-21 via poolByPair()
+    poolAddress: "0xe51635ae8136aBAc44906A8f230C2D235E9c195F",
+    token0: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH
+    token1: "0x912ce59144191c1204e64559fe8253a0e49e6548", // ARB
+    decimals0: 18,
+    decimals1: 18,
+  },
+
   // ──── LINK/WETH ────────────────────────────────────────────────
 
   {
@@ -141,6 +180,18 @@ export const ARBITRUM_MAINNET_POOLS: PoolDefinition[] = [
     feeTier: 3000,
   },
 
+  {
+    label: "LINK/WETH Camelot V3",
+    dex: "camelot_v3",
+    // 20.3 WETH — best Camelot V3 liquidity of the mid-cap tokens
+    // Pool verified on-chain 2026-02-21 via poolByPair()
+    poolAddress: "0xe8795cF9c2309eCfe05Df028eB0F21D5D6e3a951",
+    token0: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH
+    token1: "0xf97f4df75117a78c1a5a0dbb814af92458539fb4", // LINK
+    decimals0: 18,
+    decimals1: 18,
+  },
+
   // ──── GMX/WETH ─────────────────────────────────────────────────
 
   {
@@ -165,6 +216,18 @@ export const ARBITRUM_MAINNET_POOLS: PoolDefinition[] = [
     feeTier: 10000,
   },
 
+  {
+    label: "GMX/WETH Camelot V3",
+    dex: "camelot_v3",
+    // 8.3 WETH — GMX community concentrates LPing on Camelot
+    // Pool verified on-chain 2026-02-21 via poolByPair()
+    poolAddress: "0xC99be44383BC8d82357F5A1D9ae9976EE9d75bee",
+    token0: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH
+    token1: "0xfc5a1a6eb076a2c7ad06ed22c90d7e710e35ad0a", // GMX
+    decimals0: 18,
+    decimals1: 18,
+  },
+
   // ──── MAGIC/WETH ───────────────────────────────────────────────
 
   {
@@ -182,6 +245,18 @@ export const ARBITRUM_MAINNET_POOLS: PoolDefinition[] = [
     label: "MAGIC/WETH SushiV2",
     dex: "sushiswap",
     poolAddress: "0xb7e50106a5bd3cf21af210a755f9c8740890a8c9",
+    token0: "0x539bde0d7dbd336b79148aa742883198bbf60342", // MAGIC
+    token1: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH
+    decimals0: 18,
+    decimals1: 18,
+  },
+
+  {
+    label: "MAGIC/WETH Camelot V3",
+    dex: "camelot_v3",
+    // 8.0 WETH — 3rd venue alongside UniV3 + SushiV2
+    // Pool verified on-chain 2026-02-21 via poolByPair()
+    poolAddress: "0x1106dB7165A8d4a8559B441eCdEe14a5d5070DbC",
     token0: "0x539bde0d7dbd336b79148aa742883198bbf60342", // MAGIC
     token1: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH
     decimals0: 18,
@@ -234,36 +309,11 @@ export const ARBITRUM_MAINNET_POOLS: PoolDefinition[] = [
     feeTier: 3000,
   },
 
-  // ──── PREMIA/WETH ────────────────────────────────────────────
+  // PREMIA/WETH — REMOVED (single-pool monitor, no cross-DEX arb possible)
+  // Camelot V3 0xc3e254E3... was only pool; UniV3 pool had zero in-range liquidity.
 
-  {
-    label: "PREMIA/WETH Camelot V3",
-    dex: "camelot_v3",
-    poolAddress: "0xc3e254E39c45c7886A12455cb8207c808486FAC3",
-    token0: "0x51fC0f6660482Ea73330E414eFd7808811a57Fa2", // PREMIA
-    token1: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH
-    decimals0: 18,
-    decimals1: 18,
-  },
-
-  // PREMIA/WETH UniV3 (0.3%) removed — pool 0x4d834a9b has zero in-range
-  // liquidity (stale sqrtPriceX96 produces phantom 42% spread vs Camelot V3).
-  // PREMIA Camelot V3 kept as single-pool monitor for future cross-DEX pairing.
-
-  // ──── JONES/WETH ─────────────────────────────────────────────
-
-  {
-    label: "JONES/WETH Camelot V2",
-    dex: "camelot_v2",
-    poolAddress: "0x460c2c075340EbC19Cf4af68E5d83C194E7D21D0",
-    token0: "0x10393c20975cF177a3513071bC110f7962CD67da", // JONES
-    token1: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH
-    decimals0: 18,
-    decimals1: 18,
-  },
-
-  // JONES/WETH SushiV2 removed — 3.4 WETH reserve ($9K), too thin for 5 ETH trades.
-  // JONES Camelot V2 kept as single-pool monitor (47.4 WETH, viable for future pairing).
+  // JONES/WETH — REMOVED (single-pool monitor, no cross-DEX arb possible)
+  // Camelot V2 0x460c2c07... was only viable pool; SushiV2 had 3.4 WETH (too thin).
 
   // ──── DPX/WETH ───────────────────────────────────────────────
 
@@ -287,32 +337,22 @@ export const ARBITRUM_MAINNET_POOLS: PoolDefinition[] = [
     decimals1: 18,
   },
 
-  // ──── SPELL/WETH ─────────────────────────────────────────────
+  // SPELL/WETH — REMOVED (single-pool monitor, no cross-DEX arb possible)
+  // SushiV2 0x8f93Eaae... was only viable pool; Camelot V2 had 0.285 WETH (too thin).
 
-  {
-    label: "SPELL/WETH SushiV2",
-    dex: "sushiswap",
-    poolAddress: "0x8f93Eaae544e8f5EB077A1e09C1554067d9e2CA8",
-    token0: "0x3E6648C5a70A150A88bCE65F4aD4d506Fe15d2AF", // SPELL
-    token1: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH
-    decimals0: 18,
-    decimals1: 18,
-  },
-
-  // SPELL/WETH Camelot V2 removed — 0.285 WETH reserve ($770 TVL). A 5 ETH trade
-  // drains 94% of the pool, causing catastrophic price impact. The 1.03% spread is
-  // real but unexecutable. SPELL SushiV2 kept for monitoring (37 WETH reserve).
+  // WBTC/WETH — NOT ADDED (too competitive, heavily arbed by MEV bots)
+  // wstETH/WETH — NOT ADDED (correlated asset pair, razor-thin margins, MEV dominated)
 
   // ──── Trader Joe Liquidity Book ────────────────────────────
 
   {
-    label: "WETH/USDC Trader Joe LB (0.15%)",
+    label: "WETH/USDC.e Trader Joe LB (0.15%)",
     dex: "traderjoe_lb",
     // Verified via LBFactory.getLBPairInformation() 2026-02-21
     // tokenX=WETH, tokenY=USDC.e, activeId=8375236
     poolAddress: "0x94d53BE52706a155d27440C4a2434BEa772a6f7C",
     token0: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH (tokenX)
-    token1: "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8", // USDC.e (tokenY)
+    token1: "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8", // USDC.e bridged (tokenY)
     decimals0: 18,
     decimals1: 6,
     feeTier: 15, // binStep in basis points (0.15%)

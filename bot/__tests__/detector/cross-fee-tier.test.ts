@@ -217,27 +217,27 @@ describe("Cross-Fee-Tier Routing", () => {
     // produce the same canonical pair key.
     // pairKey logic: [token0, token1].sort().join("/")
 
-    const wethUsdcLowFee = ARBITRUM_MAINNET_POOLS.find(
+    const wethUsdcUniV3 = ARBITRUM_MAINNET_POOLS.find(
       (p) => p.label === "WETH/USDC UniV3 (0.05%)",
     );
-    const wethUsdcHighFee = ARBITRUM_MAINNET_POOLS.find(
-      (p) => p.label === "WETH/USDC UniV3 (0.3%)",
+    const wethUsdcCamelot = ARBITRUM_MAINNET_POOLS.find(
+      (p) => p.label === "WETH/USDC Camelot V3",
     );
 
-    expect(wethUsdcLowFee).toBeDefined();
-    expect(wethUsdcHighFee).toBeDefined();
+    expect(wethUsdcUniV3).toBeDefined();
+    expect(wethUsdcCamelot).toBeDefined();
 
-    // Both should have the same token0/token1 (same pair, different fee)
-    expect(wethUsdcLowFee!.token0).toBe(wethUsdcHighFee!.token0);
-    expect(wethUsdcLowFee!.token1).toBe(wethUsdcHighFee!.token1);
+    // Both should have the same token0/token1 (same pair, different DEX)
+    expect(wethUsdcUniV3!.token0).toBe(wethUsdcCamelot!.token0);
+    expect(wethUsdcUniV3!.token1).toBe(wethUsdcCamelot!.token1);
 
     // pairKey function (same logic as PriceMonitor's private method)
     const pairKey = (token0: string, token1: string) => {
       return [token0.toLowerCase(), token1.toLowerCase()].sort().join("/");
     };
 
-    const key1 = pairKey(wethUsdcLowFee!.token0, wethUsdcLowFee!.token1);
-    const key2 = pairKey(wethUsdcHighFee!.token0, wethUsdcHighFee!.token1);
+    const key1 = pairKey(wethUsdcUniV3!.token0, wethUsdcUniV3!.token1);
+    const key2 = pairKey(wethUsdcCamelot!.token0, wethUsdcCamelot!.token1);
 
     expect(key1).toBe(key2);
   });
