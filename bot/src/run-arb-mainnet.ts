@@ -61,6 +61,12 @@ const stats: Stats = {
 };
 
 // ---------------------------------------------------------------------------
+// TJ LB stale-bin tracking: pool address → { activeId, count }
+// ---------------------------------------------------------------------------
+const lbBinTracker = new Map<string, { activeId: number; count: number }>();
+const STALE_BIN_THRESHOLD = 5;
+
+// ---------------------------------------------------------------------------
 // Logging helpers
 // ---------------------------------------------------------------------------
 function ts(): string {
@@ -201,28 +207,37 @@ async function main(): Promise<void> {
 
   // ---- Inject Arbitrum gas estimator ----
   // Uses NodeInterface precompile at 0xC8 for accurate L1+L2 cost breakdown.
-  // Falls back to zero/L2-only estimate if NodeInterface call fails (e.g., local fork).
+  // In dry-run mode (no executor deployed), use static estimates silently.
+  // In shadow/live mode, use NodeInterface with fallback on failure.
+  const executorAddr = process.env.EXECUTOR_ADDRESS;
+  const hasExecutor = executorAddr && executorAddr !== "0x0000000000000000000000000000000000000000";
+
   const arbGasEstimator = async (numSwaps: number): Promise<{ gasCost: number; l1DataFee?: number }> => {
+    // Static L1+L2 estimate based on typical Arbitrum conditions:
+    // L1 data ~90% of cost, L2 execution ~10%. Total ~0.0002 ETH per swap step.
+    const staticL2 = 0.00002 * numSwaps;
+    const staticL1 = 0.00018 * numSwaps;
+
+    if (!hasExecutor) {
+      // No executor deployed (dry-run) — skip NodeInterface, use static estimates
+      return { gasCost: staticL2, l1DataFee: staticL1 };
+    }
+
     // Build approximate calldata size for a swap transaction
     // Each swap step ~= 256 bytes calldata (conservative estimate)
     const estimatedCalldataSize = 4 + 32 * 8 * numSwaps; // function selector + args per swap
     const dummyData = "0x" + "00".repeat(estimatedCalldataSize);
-    const flashloanExecutor = chain.protocols.aaveV3Pool;
 
     try {
       const provider = new JsonRpcProvider(chain.rpcUrl);
-      const components = await estimateArbitrumGas(provider, flashloanExecutor, dummyData);
+      const components = await estimateArbitrumGas(provider, executorAddr, dummyData);
       const ethCosts = gasComponentsToEth(components);
       return { gasCost: ethCosts.l2CostEth, l1DataFee: ethCosts.l1CostEth };
     } catch (err) {
-      // Fallback: static L1+L2 estimate when NodeInterface fails (e.g., on local fork).
-      // Based on typical Arbitrum conditions: L1 data ~90% of cost, L2 execution ~10%.
-      // Total ~0.0002 ETH per swap step (conservative).
+      // Fallback: static estimate when NodeInterface fails (e.g., contract not yet verified)
       console.warn(
         `[GAS] NodeInterface call failed, using static estimate: ${err instanceof Error ? err.message : err}`,
       );
-      const staticL2 = 0.00002 * numSwaps;
-      const staticL1 = 0.00018 * numSwaps;
       return { gasCost: staticL2, l1DataFee: staticL1 };
     }
   };
@@ -234,13 +249,37 @@ async function main(): Promise<void> {
   // Price updates (dim — high volume, low priority)
   bot.monitor.on("priceUpdate", (snapshot: PriceSnapshot) => {
     stats.priceUpdates++;
+
+    // Include bin ID for TJ LB pools
+    const binSuffix = snapshot.activeId !== undefined
+      ? ` binId=${snapshot.activeId}`
+      : "";
+
     console.log(
       c.dim(
         `[${ts()}] [PRICE] ${snapshot.pool.label} ` +
           `price=${snapshot.price.toFixed(8)} ` +
-          `block=${snapshot.blockNumber}`,
+          `block=${snapshot.blockNumber}${binSuffix}`,
       ),
     );
+
+    // Track TJ LB bin staleness
+    if (snapshot.pool.dex === "traderjoe_lb" && snapshot.activeId !== undefined) {
+      const key = snapshot.pool.poolAddress.toLowerCase();
+      const prev = lbBinTracker.get(key);
+      if (prev && prev.activeId === snapshot.activeId) {
+        prev.count++;
+        if (prev.count === STALE_BIN_THRESHOLD) {
+          console.warn(
+            c.yellow(
+              `[${ts()}] [WARN] Stale bin: ${snapshot.pool.label} binId=${snapshot.activeId} unchanged for ${prev.count} cycles`,
+            ),
+          );
+        }
+      } else {
+        lbBinTracker.set(key, { activeId: snapshot.activeId, count: 1 });
+      }
+    }
   });
 
   // Opportunities found (green = would execute, yellow = unprofitable)

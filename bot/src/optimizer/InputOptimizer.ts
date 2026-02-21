@@ -24,17 +24,26 @@ export class InputOptimizer {
   /**
    * Compute optimal input amount for a swap path.
    * Uses ternary search to maximize net profit over the input amount space.
+   *
+   * @param path - The swap path to optimize
+   * @param profitFunction - Function that computes net profit for a given input amount
+   * @param maxAmountOverride - Optional cap on upper search bound (e.g., reserve-based limit)
    */
   optimize(
     path: SwapPath,
     profitFunction: (inputAmount: number) => number,
+    maxAmountOverride?: number,
   ): OptimizationResult {
     const startTime = Date.now();
 
     let left = this.config.minAmount;
-    let right = this.config.maxAmount;
+    let right = maxAmountOverride !== undefined
+      ? Math.min(this.config.maxAmount, maxAmountOverride)
+      : this.config.maxAmount;
     let iterations = 0;
-    let bestAmount = this.config.fallbackAmount;
+    // Clamp initial bestAmount to search range — fallbackAmount may be outside
+    // the range when maxAmountOverride restricts it (e.g., thin pool cap)
+    let bestAmount = Math.min(Math.max(this.config.fallbackAmount, left), right);
     let bestProfit = profitFunction(bestAmount);
     let convergedEarly = false;
 

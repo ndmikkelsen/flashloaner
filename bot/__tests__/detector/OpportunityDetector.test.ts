@@ -911,6 +911,66 @@ describe("OpportunityDetector", () => {
       expect(result!.inputAmount).toBeLessThan(100);
     });
 
+    it("should cap optimizer search range based on pool reserves (8.3 WETH pool)", () => {
+      detector = new OpportunityDetector({
+        minProfitThreshold: 0,
+        gasPriceGwei: 0,
+        maxSlippage: 0,
+        defaultInputAmount: 10,
+      });
+      detector.on("error", () => {});
+
+      const buyPool = makePool({ poolAddress: ADDR.POOL_V2 });
+      const sellPool = makePool({
+        label: "WETH/USDC Sushi",
+        dex: "sushiswap",
+        poolAddress: ADDR.POOL_SUSHI,
+      });
+
+      // Thin pool: 8.3 WETH — mimics the GMX/WETH Camelot V3 scenario
+      const buySnapshot: PriceSnapshot = {
+        pool: buyPool,
+        price: 2000,
+        inversePrice: 1 / 2000,
+        blockNumber: 19_000_000,
+        timestamp: Date.now(),
+        reserves: [
+          BigInt("8300000000000000000"),  // 8.3 WETH (token0, 18 dec)
+          BigInt("16600000000"),          // 16,600 USDC (token1, 6 dec)
+        ],
+      };
+
+      const sellSnapshot: PriceSnapshot = {
+        pool: sellPool,
+        price: 2040,
+        inversePrice: 1 / 2040,
+        blockNumber: 19_000_000,
+        timestamp: Date.now(),
+        reserves: [
+          BigInt("8300000000000000000"),  // 8.3 WETH
+          BigInt("16932000000"),          // 16,932 USDC
+        ],
+      };
+
+      const delta: PriceDelta = {
+        pair: `${buyPool.token0}/${buyPool.token1}`,
+        buyPool: buySnapshot,
+        sellPool: sellSnapshot,
+        deltaPercent: 2.0,
+        timestamp: Date.now(),
+      };
+
+      const result = detector.analyzeDelta(delta);
+
+      expect(result).not.toBeNull();
+      expect(result!.optimizationResult).toBeDefined();
+      // With 8.3 WETH reserve, the optimizer's buy step reserve is ~16,600 USDC
+      // and sell step reserve is ~8.3 WETH. Reserve cap = min(16600, 8.3) * 0.3 = 2.49
+      // The optimizer should NOT test 500 ETH — input should be capped around 2.5
+      expect(result!.inputAmount).toBeLessThanOrEqual(3);
+      expect(result!.inputAmount).toBeGreaterThan(0);
+    });
+
     it("should complete optimization within 100ms", () => {
       detector = new OpportunityDetector({
         minProfitThreshold: 0,

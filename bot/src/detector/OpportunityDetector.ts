@@ -180,7 +180,9 @@ export class OpportunityDetector extends EventEmitter {
 
     if (hasReserveData) {
       const profitFn = this.buildProfitFunction(path);
-      optimizationResult = this.optimizer.optimize(path, profitFn);
+      // Cap search range to 30% of buy pool depth to avoid testing absurd sizes
+      const reserveCap = this.computeReserveCap(path);
+      optimizationResult = this.optimizer.optimize(path, profitFn, reserveCap);
       inputAmount = optimizationResult.optimalAmount;
     } else {
       // No reserve data: fall back to fixed amount
@@ -288,7 +290,9 @@ export class OpportunityDetector extends EventEmitter {
 
     if (hasReserveData) {
       const profitFn = this.buildProfitFunction(path);
-      optimizationResult = this.optimizer.optimize(path, profitFn);
+      // Cap search range to 30% of buy pool depth to avoid testing absurd sizes
+      const reserveCap = this.computeReserveCap(path);
+      optimizationResult = this.optimizer.optimize(path, profitFn, reserveCap);
       inputAmount = optimizationResult.optimalAmount;
     } else {
       // No reserve data: fall back to fixed amount
@@ -562,6 +566,28 @@ export class OpportunityDetector extends EventEmitter {
 
     const slippageCost = spotOutput - amount;
     return Math.max(0, slippageCost);
+  }
+
+  /**
+   * Compute a reserve-based cap for the optimizer search range.
+   * Returns the minimum virtual reserve across all steps (scaled to 30% of depth),
+   * or undefined if no reserve data is available.
+   *
+   * Prevents the optimizer from testing absurd input sizes on thin pools
+   * (e.g., 500 ETH on a pool with only 8.3 WETH liquidity).
+   */
+  private computeReserveCap(path: SwapPath): number | undefined {
+    let minReserve: number | undefined;
+    for (const step of path.steps) {
+      if (step.virtualReserveIn !== undefined && step.virtualReserveIn > 0) {
+        if (minReserve === undefined || step.virtualReserveIn < minReserve) {
+          minReserve = step.virtualReserveIn;
+        }
+      }
+    }
+    if (minReserve === undefined) return undefined;
+    // Cap at 30% of the shallowest pool's depth
+    return minReserve * 0.3;
   }
 
   /** Check if a pool is marked as stale */

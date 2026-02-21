@@ -320,6 +320,52 @@ describe("InputOptimizer", () => {
     });
   });
 
+  describe("maxAmountOverride (reserve-based capping)", () => {
+    it("should cap search range when maxAmountOverride is provided", () => {
+      const optimizer = new InputOptimizer({ minAmount: 1, maxAmount: 1000 });
+      const path = makeSwapPath();
+
+      // Linear profit: optimal is at the upper bound. Without cap, optimal is 1000.
+      // With cap at 2.5, optimal should be at or near 2.5.
+      const profitFn = (x: number) => x * 0.01;
+
+      const resultCapped = optimizer.optimize(path, profitFn, 2.5);
+      const resultUncapped = optimizer.optimize(path, profitFn);
+
+      expect(resultCapped.converged).toBe(true);
+      expect(resultCapped.optimalAmount).toBeLessThanOrEqual(2.5);
+      expect(resultCapped.optimalAmount).toBeGreaterThanOrEqual(1);
+      // Uncapped should find much larger amount
+      expect(resultUncapped.optimalAmount).toBeGreaterThan(100);
+    });
+
+    it("should use config maxAmount when override is larger", () => {
+      const optimizer = new InputOptimizer({ minAmount: 1, maxAmount: 100 });
+      const path = makeSwapPath();
+
+      // Override is larger than config: config wins (min of the two)
+      const profitFn = (x: number) => -Math.pow(x - 50, 2) + 100;
+
+      const result = optimizer.optimize(path, profitFn, 500);
+
+      expect(result.converged).toBe(true);
+      // Should find the peak at 50, constrained by config maxAmount=100
+      expect(result.optimalAmount).toBeCloseTo(50, 0);
+    });
+
+    it("should ignore override when undefined", () => {
+      const optimizer = new InputOptimizer({ minAmount: 1, maxAmount: 1000 });
+      const path = makeSwapPath();
+
+      const profitFn = (x: number) => -Math.pow(x - 500, 2) + 100;
+
+      const result = optimizer.optimize(path, profitFn, undefined);
+
+      expect(result.converged).toBe(true);
+      expect(result.optimalAmount).toBeCloseTo(500, 0);
+    });
+  });
+
   describe("realistic profit function with slippage", () => {
     it("should find optimal with slippage-based profit function", () => {
       const optimizer = new InputOptimizer({ minAmount: 1, maxAmount: 200 });
