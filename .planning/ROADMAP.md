@@ -29,7 +29,7 @@ See: `.planning/milestones/v1.0-ROADMAP.md` for full details.
 - [x] **Phase 8: P&L Dashboard + Operations** - Persist trade outcomes, display session stats, and run bot unattended via pm2 (completed 2026-02-20)
 - [ ] **Phase 9: Ramses V2 Adapter** - Add Ramses V3 CL pool monitoring and on-chain swap routing with fee manipulation safeguards
 - [x] **Phase 10: Trader Joe V2.1 LB Adapter** - Add Trader Joe Liquidity Book price reading and on-chain swap routing with variable fee buffers (completed 2026-02-20)
-- [ ] **Phase 11: Dry-Run Signal Quality Fixes** - Fix TJ LB slippage underestimation, GMX/WETH V3 reserve cap failure, and TJ LB fee display bug found in 6.5-hour dry-run
+- [x] **Phase 11: Dry-Run Signal Quality Fixes** - Fix TJ LB slippage underestimation, GMX/WETH V3 reserve cap failure, and TJ LB fee display bug found in 6.5-hour dry-run (completed 2026-02-22)
 - [ ] **Phase 12: Contract Deployment & Live Validation** - Deploy FlashloanExecutor + adapters to Arbitrum mainnet, validate with shadow mode, go live with small capital
 
 ## Phase Details
@@ -142,8 +142,8 @@ Plans:
 | 8. P&L Dashboard + Operations | v1.1 | 3/3 | Complete | 2026-02-20 |
 | 9. Ramses V2 Adapter | v1.1 | 2/2 | Complete | 2026-02-20 |
 | 10. Trader Joe V2.1 LB Adapter | v1.1 | 3/3 | Complete | 2026-02-20 |
-| 11. Dry-Run Signal Quality Fixes | v1.1 | 0/2 | Planned | - |
-| 12. Contract Deployment & Live Validation | v1.1 | 0/? | Not started | - |
+| 11. Dry-Run Signal Quality Fixes | 2/2 | Complete   | 2026-02-22 | - |
+| 12. Contract Deployment & Live Validation | v1.1 | 0/3 | Not started | - |
 
 ### Phase 11: Dry-Run Signal Quality Fixes
 **Goal**: Fix three critical signal quality issues found during 6.5-hour dry-run: (1) TJ LB slippage dangerously underestimated (500 ETH with 0.004 ETH slippage), (2) GMX/WETH V3 virtual reserves not passed to optimizer, (3) TJ LB fee display shows 0.00% instead of 0.15%
@@ -168,8 +168,10 @@ Plans:
   1. FlashloanExecutor and all adapters deployed to Arbitrum mainnet with verified addresses
   2. Shadow mode validates estimated vs simulated profits match within 10% for at least 100 opportunities
   3. Bot executes at least one profitable live trade on mainnet
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 12 to break down)
+- [ ] 12-01-PLAN.md -- Deploy FlashloanExecutor + adapters to Arbitrum mainnet
+- [ ] 12-02-PLAN.md -- Shadow mode validation (100+ opportunities, 10% accuracy)
+- [ ] 12-03-PLAN.md -- Go live with small capital, execute first profitable trade
 
