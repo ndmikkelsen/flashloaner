@@ -3,7 +3,7 @@
 ## Milestones
 
 - v1.0 **Multi-Chain Expansion** -- Phases 1-4 (shipped 2026-02-19)
-- v1.1 **Mainnet Profitability** -- Phases 5-10 (in progress)
+- v1.1 **Mainnet Profitability** -- Phases 5-12 (in progress)
 
 ## Phases
 
@@ -29,6 +29,8 @@ See: `.planning/milestones/v1.0-ROADMAP.md` for full details.
 - [x] **Phase 8: P&L Dashboard + Operations** - Persist trade outcomes, display session stats, and run bot unattended via pm2 (completed 2026-02-20)
 - [ ] **Phase 9: Ramses V2 Adapter** - Add Ramses V3 CL pool monitoring and on-chain swap routing with fee manipulation safeguards
 - [x] **Phase 10: Trader Joe V2.1 LB Adapter** - Add Trader Joe Liquidity Book price reading and on-chain swap routing with variable fee buffers (completed 2026-02-20)
+- [ ] **Phase 11: Dry-Run Signal Quality Fixes** - Fix TJ LB slippage underestimation, GMX/WETH V3 reserve cap failure, and TJ LB fee display bug found in 6.5-hour dry-run
+- [ ] **Phase 12: Contract Deployment & Live Validation** - Deploy FlashloanExecutor + adapters to Arbitrum mainnet, validate with shadow mode, go live with small capital
 
 ## Phase Details
 
@@ -126,7 +128,7 @@ Plans:
 
 ## Progress
 
-**Execution Order:** Phases execute in numeric order: 5 -> 6 -> 7 -> 8 -> 9 -> 10
+**Execution Order:** Phases execute in numeric order: 5 -> 6 -> 7 -> 8 -> 9 -> 10 -> 11 -> 12
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -136,7 +138,38 @@ Plans:
 | 4. Testnet Validation | v1.0 | 2/2 | Complete | 2026-02-18 |
 | 5. Cross-Fee-Tier Routing | v1.1 | 2/2 | Complete | 2026-02-20 |
 | 6. Optimal Input Sizing | v1.1 | 3/3 | Complete | 2026-02-20 |
-| 7. Live Execution + Safety | v1.1 | Complete    | 2026-02-20 | - |
-| 8. P&L Dashboard + Operations | v1.1 | Complete    | 2026-02-20 | - |
-| 9. Ramses V2 Adapter | v1.1 | 0/? | Not started | - |
-| 10. Trader Joe V2.1 LB Adapter | 2/3 | Complete    | 2026-02-20 | - |
+| 7. Live Execution + Safety | v1.1 | 3/3 | Complete | 2026-02-20 |
+| 8. P&L Dashboard + Operations | v1.1 | 3/3 | Complete | 2026-02-20 |
+| 9. Ramses V2 Adapter | v1.1 | 2/2 | Complete | 2026-02-20 |
+| 10. Trader Joe V2.1 LB Adapter | v1.1 | 3/3 | Complete | 2026-02-20 |
+| 11. Dry-Run Signal Quality Fixes | v1.1 | 0/2 | Planned | - |
+| 12. Contract Deployment & Live Validation | v1.1 | 0/? | Not started | - |
+
+### Phase 11: Dry-Run Signal Quality Fixes
+**Goal**: Fix three critical signal quality issues found during 6.5-hour dry-run: (1) TJ LB slippage dangerously underestimated (500 ETH with 0.004 ETH slippage), (2) GMX/WETH V3 virtual reserves not passed to optimizer, (3) TJ LB fee display shows 0.00% instead of 0.15%
+**Depends on**: Phase 10 (dry-run analysis of Phase 10 pools revealed these issues)
+**Requirements**: SIZE-02, SIZE-03, DEX-06
+**Success Criteria** (what must be TRUE):
+  1. TJ LB opportunities show realistic slippage proportional to input size, with inputs capped to available bin liquidity depth
+  2. GMX/WETH optimizer uses V3 virtual reserves for range capping, showing inputs proportional to 8.3 WETH depth (not 500+ ETH)
+  3. TJ LB fee display shows correct percentage (0.15%, not 0.00%)
+  4. All 554+ TS tests and 342 Solidity tests pass
+**Plans**: 2 plans
+
+Plans:
+- [ ] 11-01-PLAN.md -- Fix TJ LB input cap + V3 reserve cap propagation
+- [ ] 11-02-PLAN.md -- Fix TJ LB fee display + cost floor formatting
+
+### Phase 12: Contract Deployment & Live Validation
+**Goal**: Deploy FlashloanExecutor and all DEX adapters to Arbitrum mainnet, validate signal quality in shadow mode (eth_call simulation), and go live with small capital
+**Depends on**: Phase 11 (signal quality must be accurate before spending real gas)
+**Requirements**: EXEC-01, EXEC-02
+**Success Criteria** (what must be TRUE):
+  1. FlashloanExecutor and all adapters deployed to Arbitrum mainnet with verified addresses
+  2. Shadow mode validates estimated vs simulated profits match within 10% for at least 100 opportunities
+  3. Bot executes at least one profitable live trade on mainnet
+**Plans**: TBD
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 12 to break down)
+
