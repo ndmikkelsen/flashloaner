@@ -306,13 +306,14 @@ export class FlashloanBot {
           nonce: 0,
         });
 
+        const ts = new Date().toISOString();
         if (simResult.success) {
-          this.log("info", `[SHADOW] ✓ Simulation succeeded for ${opp.id}`);
-          this.log("info", `[SHADOW] Estimated profit: ${opp.netProfit.toFixed(8)} ETH`);
-          this.log("info", `[SHADOW] Would broadcast in live mode`);
+          console.log(`\x1b[32m[${ts}] [SHADOW] ✓ Simulation succeeded for ${opp.id}\x1b[0m`);
+          console.log(`\x1b[32m[${ts}] [SHADOW]   Estimated profit: ${opp.netProfit.toFixed(8)} ETH\x1b[0m`);
+          console.log(`\x1b[32m[${ts}] [SHADOW]   Would broadcast in live mode\x1b[0m`);
         } else {
-          this.log("warn", `[SHADOW] ✗ Simulation failed: ${simResult.reason}`);
-          this.log("warn", `[SHADOW] Estimated profit was ${opp.netProfit.toFixed(8)} ETH, but would revert on-chain`);
+          console.log(`\x1b[33m[${ts}] [SHADOW] ✗ Simulation failed: ${simResult.reason}\x1b[0m`);
+          console.log(`\x1b[33m[${ts}] [SHADOW]   Estimated profit was ${opp.netProfit.toFixed(8)} ETH, but would revert on-chain\x1b[0m`);
 
           // Record simulation revert in trade store
           this.tradeStore?.append({

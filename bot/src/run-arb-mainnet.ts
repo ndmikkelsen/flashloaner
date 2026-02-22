@@ -37,6 +37,7 @@ const c = {
   red: (s: string) => `\x1b[31m${s}\x1b[0m`,
   yellow: (s: string) => `\x1b[33m${s}\x1b[0m`,
   cyan: (s: string) => `\x1b[36m${s}\x1b[0m`,
+  magenta: (s: string) => `\x1b[35m${s}\x1b[0m`,
   dim: (s: string) => `\x1b[2m${s}\x1b[0m`,
   bold: (s: string) => `\x1b[1m${s}\x1b[0m`,
 };
@@ -212,6 +213,8 @@ async function main(): Promise<void> {
   const executorAddr = process.env.EXECUTOR_ADDRESS;
   const hasExecutor = executorAddr && executorAddr !== "0x0000000000000000000000000000000000000000";
 
+  let nodeInterfaceWarned = false;
+
   const arbGasEstimator = async (numSwaps: number): Promise<{ gasCost: number; l1DataFee?: number }> => {
     // Static L1+L2 estimate based on typical Arbitrum conditions:
     // L1 data ~90% of cost, L2 execution ~10%. Total ~0.0002 ETH per swap step.
@@ -235,9 +238,13 @@ async function main(): Promise<void> {
       return { gasCost: ethCosts.l2CostEth, l1DataFee: ethCosts.l1CostEth };
     } catch (err) {
       // Fallback: static estimate when NodeInterface fails (e.g., contract not yet verified)
-      console.warn(
-        `[GAS] NodeInterface call failed, using static estimate: ${err instanceof Error ? err.message : err}`,
-      );
+      // Only warn once — subsequent failures use static estimates silently
+      if (!nodeInterfaceWarned) {
+        console.warn(
+          c.yellow(`[${ts()}] [GAS] NodeInterface call failed, using static estimates (this warning won't repeat)`),
+        );
+        nodeInterfaceWarned = true;
+      }
       return { gasCost: staticL2, l1DataFee: staticL1 };
     }
   };
@@ -340,11 +347,11 @@ async function main(): Promise<void> {
     console.log(col(`================================================`));
   });
 
-  // Opportunities rejected (dim — noise)
+  // Opportunities rejected (red — clearly not profitable)
   bot.detector.on("opportunityRejected", (reason: string, delta: PriceDelta) => {
     stats.opportunitiesRejected++;
     console.log(
-      c.dim(
+      c.red(
         `[${ts()}] [REJECTED] ${reason} | pair=${delta.pair} delta=${delta.deltaPercent.toFixed(4)}%`,
       ),
     );
