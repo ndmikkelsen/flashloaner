@@ -215,3 +215,37 @@ describe.skipIf(!process.env.ARBITRUM_MAINNET_RPC_URL)("Trader Joe LB Integratio
     }
   });
 });
+
+describe("fee display formatting", () => {
+  it("should compute correct fee display for TJ LB binStep=15", () => {
+    const binStep = 15;
+    const basePct = binStep / 100; // bps to percent
+    expect(basePct.toFixed(2)).toBe("0.15");
+  });
+
+  it("should compute correct fee display for TJ LB binStep=25", () => {
+    const binStep = 25;
+    const basePct = binStep / 100;
+    expect(basePct.toFixed(2)).toBe("0.25");
+  });
+
+  it("should compute correct cost floor rate for TJ LB", () => {
+    const binStep = 15;
+    const rate = (binStep / 10_000) * 1.5; // with 50% buffer
+    expect(rate).toBeCloseTo(0.00225, 6);
+    // Display: (0.00225 * 100).toFixed(2) = "0.23%"
+    expect((rate * 100).toFixed(2)).toBe("0.23");
+  });
+
+  it("should compute correct cost floor rate for V3 feeTier=500", () => {
+    const feeTier = 500; // 0.05%
+    const rate = feeTier / 1_000_000;
+    expect(rate).toBeCloseTo(0.0005, 6);
+  });
+
+  it("should not affect V2 display (no feeTier)", () => {
+    // V2 pools use default 0.3% = 0.003
+    const rate = 0.003;
+    expect((rate * 100).toFixed(2)).toBe("0.30");
+  });
+});

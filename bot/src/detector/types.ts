@@ -102,6 +102,10 @@ export interface OpportunityDetectorConfig {
    *  Returns the total gas cost in ETH including L1 data fees (for L2 chains like Arbitrum).
    *  The function receives the number of swaps and should return { gasCost: number; l1DataFee?: number } */
   gasEstimatorFn?: (numSwaps: number) => Promise<{ gasCost: number; l1DataFee?: number }>;
+  /** Per-DEX maximum input amount overrides. Used to cap pools that lack reserve data
+   *  (e.g., Trader Joe LB uses bin-based liquidity with no reserve/depth info).
+   *  Key: DEXProtocol string, Value: max input in base token units. */
+  maxInputByDex?: Partial<Record<DEXProtocol, number>>;
 }
 
 /** Events emitted by OpportunityDetector */

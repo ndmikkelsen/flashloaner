@@ -293,14 +293,34 @@ async function main(): Promise<void> {
     // Show individual step fee breakdown for cross-tier visibility
     for (let i = 0; i < opp.path.steps.length; i++) {
       const step = opp.path.steps[i];
-      const feeRate = step.feeTier !== undefined
-        ? `${(step.feeTier / 10000).toFixed(2)}%`
-        : "0.30% (V2)";
+      let feeRate: string;
+      if (step.dex === "traderjoe_lb") {
+        // LB: feeTier is binStep in basis points (15 = 0.15%)
+        // Show with 50% buffer indicator matching getSwapFeeRate() logic
+        const basePct = (step.feeTier ?? 0) / 100; // bps to percent
+        feeRate = `${basePct.toFixed(2)}% (LB, +50% buffer)`;
+      } else if (step.feeTier !== undefined) {
+        // V3: feeTier in hundredths of a bip (500 = 0.05%, 3000 = 0.3%)
+        feeRate = `${(step.feeTier / 10000).toFixed(2)}%`;
+      } else {
+        // V2: standard 0.3%
+        feeRate = "0.30% (V2)";
+      }
       const direction = i === 0 ? "Buy" : "Sell";
       console.log(col(`  ${direction} fee:   ${feeRate} on ${step.dex}`));
     }
     const combinedFee = opp.path.steps.reduce((sum, s) => {
-      const rate = s.feeTier !== undefined ? s.feeTier / 1_000_000 : 0.003;
+      let rate: number;
+      if (s.dex === "traderjoe_lb") {
+        // LB: feeTier is binStep in bps, with 50% buffer
+        rate = ((s.feeTier ?? 0) / 10_000) * 1.5;
+      } else if (s.feeTier !== undefined) {
+        // V3: feeTier in hundredths of a bip
+        rate = s.feeTier / 1_000_000;
+      } else {
+        // V2: standard 0.3%
+        rate = 0.003;
+      }
       return sum + rate;
     }, 0);
     console.log(col(`  Cost floor: ~${(combinedFee * 100).toFixed(2)}% (trading fees only)`));

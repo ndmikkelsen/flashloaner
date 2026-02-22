@@ -1084,4 +1084,313 @@ describe("OpportunityDetector", () => {
       expect(result!.optimizationResult!.converged).toBeDefined();
     });
   });
+
+  // ---- Signal quality: per-DEX input cap ----
+
+  describe("signal quality: per-DEX input cap", () => {
+    const ADDR_TJ_LB = "0x0000000000000000000000000000000000000010";
+
+    it("should cap TJ LB opportunities at maxInputByDex.traderjoe_lb (default 5)", () => {
+      detector = new OpportunityDetector({
+        minProfitThreshold: 0,
+        gasPriceGwei: 0,
+        maxSlippage: 0,
+        defaultInputAmount: 100, // Would normally use 100
+      });
+      detector.on("error", () => {});
+
+      // TJ LB buy pool (no reserves, no liquidity -- just activeId)
+      const tjPool = makePool({
+        label: "WETH/USDC TJ LB",
+        dex: "traderjoe_lb",
+        poolAddress: ADDR_TJ_LB,
+        feeTier: 15, // binStep=15 bps
+      });
+
+      // UniV2 sell pool (no reserves either for simplicity)
+      const v2Pool = makePool({
+        label: "WETH/USDC UniV2",
+        dex: "uniswap_v2",
+        poolAddress: ADDR.POOL_V2,
+      });
+
+      // Build delta: buy on TJ LB (cheap), sell on V2 (expensive)
+      const buySnapshot: PriceSnapshot = {
+        pool: tjPool,
+        price: 2000,
+        inversePrice: 1 / 2000,
+        blockNumber: 19_000_000,
+        timestamp: Date.now(),
+        activeId: 8388608, // TJ LB activeId, no reserves/liquidity
+      };
+
+      const sellSnapshot: PriceSnapshot = {
+        pool: v2Pool,
+        price: 2100,
+        inversePrice: 1 / 2100,
+        blockNumber: 19_000_000,
+        timestamp: Date.now(),
+      };
+
+      const delta: PriceDelta = {
+        pair: `${tjPool.token0}/${tjPool.token1}`,
+        buyPool: buySnapshot,
+        sellPool: sellSnapshot,
+        deltaPercent: 5.0,
+        timestamp: Date.now(),
+      };
+
+      const result = detector.analyzeDelta(delta);
+
+      expect(result).not.toBeNull();
+      // Without fix: inputAmount = 100 (defaultInputAmount)
+      // With fix: inputAmount capped at 5 (TJ LB default cap)
+      expect(result!.inputAmount).toBeLessThanOrEqual(5);
+      expect(result!.inputAmount).toBe(5);
+    });
+
+    it("should NOT cap non-LB pools when they have reserve data", () => {
+      detector = new OpportunityDetector({
+        minProfitThreshold: 0,
+        gasPriceGwei: 0,
+        maxSlippage: 0,
+        defaultInputAmount: 10,
+      });
+      detector.on("error", () => {});
+
+      // Both V2 pools with deep reserves
+      const buyPool = makePool({ poolAddress: ADDR.POOL_V2 });
+      const sellPool = makePool({
+        label: "WETH/USDC Sushi",
+        dex: "sushiswap",
+        poolAddress: ADDR.POOL_SUSHI,
+      });
+
+      const buySnapshot: PriceSnapshot = {
+        pool: buyPool,
+        price: 2000,
+        inversePrice: 1 / 2000,
+        blockNumber: 19_000_000,
+        timestamp: Date.now(),
+        reserves: [
+          BigInt("10000000000000000000000"),  // 10,000 WETH
+          BigInt("20000000000000"),            // 20,000,000 USDC
+        ],
+      };
+
+      const sellSnapshot: PriceSnapshot = {
+        pool: sellPool,
+        price: 2100,
+        inversePrice: 1 / 2100,
+        blockNumber: 19_000_000,
+        timestamp: Date.now(),
+        reserves: [
+          BigInt("10000000000000000000000"),  // 10,000 WETH
+          BigInt("21000000000000"),            // 21,000,000 USDC
+        ],
+      };
+
+      const delta: PriceDelta = {
+        pair: `${buyPool.token0}/${buyPool.token1}`,
+        buyPool: buySnapshot,
+        sellPool: sellSnapshot,
+        deltaPercent: 5.0,
+        timestamp: Date.now(),
+      };
+
+      const result = detector.analyzeDelta(delta);
+
+      expect(result).not.toBeNull();
+      // No TJ LB cap should apply; optimizer can size > 5
+      expect(result!.inputAmount).toBeGreaterThan(5);
+    });
+
+    it("should use custom maxInputByDex override", () => {
+      detector = new OpportunityDetector({
+        minProfitThreshold: 0,
+        gasPriceGwei: 0,
+        maxSlippage: 0,
+        defaultInputAmount: 100,
+        maxInputByDex: { traderjoe_lb: 2 },
+      });
+      detector.on("error", () => {});
+
+      const tjPool = makePool({
+        label: "WETH/USDC TJ LB",
+        dex: "traderjoe_lb",
+        poolAddress: ADDR_TJ_LB,
+        feeTier: 15,
+      });
+
+      const v2Pool = makePool({
+        label: "WETH/USDC UniV2",
+        dex: "uniswap_v2",
+        poolAddress: ADDR.POOL_V2,
+      });
+
+      const buySnapshot: PriceSnapshot = {
+        pool: tjPool,
+        price: 2000,
+        inversePrice: 1 / 2000,
+        blockNumber: 19_000_000,
+        timestamp: Date.now(),
+        activeId: 8388608,
+      };
+
+      const sellSnapshot: PriceSnapshot = {
+        pool: v2Pool,
+        price: 2100,
+        inversePrice: 1 / 2100,
+        blockNumber: 19_000_000,
+        timestamp: Date.now(),
+      };
+
+      const delta: PriceDelta = {
+        pair: `${tjPool.token0}/${tjPool.token1}`,
+        buyPool: buySnapshot,
+        sellPool: sellSnapshot,
+        deltaPercent: 5.0,
+        timestamp: Date.now(),
+      };
+
+      const result = detector.analyzeDelta(delta);
+
+      expect(result).not.toBeNull();
+      // Custom cap of 2 ETH
+      expect(result!.inputAmount).toBeLessThanOrEqual(2);
+      expect(result!.inputAmount).toBe(2);
+    });
+  });
+
+  // ---- Signal quality: computeReserveCap with unknown steps ----
+
+  describe("signal quality: computeReserveCap with unknown steps", () => {
+    const ADDR_TJ_LB = "0x0000000000000000000000000000000000000010";
+
+    it("should apply conservative cap when path has one known and one unknown step (TJ LB)", () => {
+      detector = new OpportunityDetector({
+        minProfitThreshold: 0,
+        gasPriceGwei: 0,
+        maxSlippage: 0,
+        defaultInputAmount: 10,
+      });
+      detector.on("error", () => {});
+
+      // Buy step: UniV3 with deep reserves (10,000 WETH virtual reserve)
+      const v3Pool = makePool({
+        label: "WETH/USDC UniV3",
+        dex: "uniswap_v3",
+        poolAddress: ADDR.POOL_V3,
+        feeTier: 500,
+      });
+
+      // Sell step: TJ LB with NO reserves (bin-based, no reserve data)
+      const tjPool = makePool({
+        label: "WETH/USDC TJ LB",
+        dex: "traderjoe_lb",
+        poolAddress: ADDR_TJ_LB,
+        feeTier: 15,
+      });
+
+      // V3 buy snapshot with liquidity (deep pool)
+      const buySnapshot: PriceSnapshot = {
+        pool: v3Pool,
+        price: 2000,
+        inversePrice: 1 / 2000,
+        blockNumber: 19_000_000,
+        timestamp: Date.now(),
+        // V3: liquidity and sqrtPriceX96 that produce ~10,000 WETH virtual reserve
+        // sqrtPriceX96 = sqrt(2000) * 2^96, L chosen to give ~10000 WETH in token0 terms
+        liquidity: BigInt("1000000000000000000000"),  // Large L
+        sqrtPriceX96: BigInt("3543191142285914205922034323214"), // ~sqrt(2000) * 2^96
+      };
+
+      // TJ LB sell snapshot: no reserves, no liquidity, just activeId
+      const sellSnapshot: PriceSnapshot = {
+        pool: tjPool,
+        price: 2100,
+        inversePrice: 1 / 2100,
+        blockNumber: 19_000_000,
+        timestamp: Date.now(),
+        activeId: 8388608,
+      };
+
+      const delta: PriceDelta = {
+        pair: `${v3Pool.token0}/${v3Pool.token1}`,
+        buyPool: buySnapshot,
+        sellPool: sellSnapshot,
+        deltaPercent: 5.0,
+        timestamp: Date.now(),
+      };
+
+      const result = detector.analyzeDelta(delta);
+
+      expect(result).not.toBeNull();
+      // Without fix: reserveCap = 30% of deep V3 reserve (potentially hundreds of ETH)
+      // With fix: capped at 5 ETH (TJ LB per-DEX cap) since sell step has no reserve data
+      expect(result!.inputAmount).toBeLessThanOrEqual(5);
+    });
+
+    it("should preserve 30% reserve cap when both steps have reserve data", () => {
+      detector = new OpportunityDetector({
+        minProfitThreshold: 0,
+        gasPriceGwei: 0,
+        maxSlippage: 0,
+        defaultInputAmount: 10,
+      });
+      detector.on("error", () => {});
+
+      // Both V2 pools with reserves
+      const buyPool = makePool({ poolAddress: ADDR.POOL_V2 });
+      const sellPool = makePool({
+        label: "WETH/USDC Sushi",
+        dex: "sushiswap",
+        poolAddress: ADDR.POOL_SUSHI,
+      });
+
+      // Buy: 500 WETH + 1M USDC -> buyStep (tokenIn=USDC): reserveIn = 1,000,000
+      // Sell: 200 WETH + 404,000 USDC -> sellStep (tokenIn=WETH): reserveIn = 200
+      const buySnapshot: PriceSnapshot = {
+        pool: buyPool,
+        price: 2000,
+        inversePrice: 1 / 2000,
+        blockNumber: 19_000_000,
+        timestamp: Date.now(),
+        reserves: [
+          BigInt("500000000000000000000"),   // 500 WETH (token0)
+          BigInt("1000000000000"),            // 1,000,000 USDC (token1)
+        ],
+      };
+
+      const sellSnapshot: PriceSnapshot = {
+        pool: sellPool,
+        price: 2020,
+        inversePrice: 1 / 2020,
+        blockNumber: 19_000_000,
+        timestamp: Date.now(),
+        reserves: [
+          BigInt("200000000000000000000"),   // 200 WETH (token0)
+          BigInt("404000000000"),             // 404,000 USDC (token1)
+        ],
+      };
+
+      const delta: PriceDelta = {
+        pair: `${buyPool.token0}/${buyPool.token1}`,
+        buyPool: buySnapshot,
+        sellPool: sellSnapshot,
+        deltaPercent: 1.0,
+        timestamp: Date.now(),
+      };
+
+      const result = detector.analyzeDelta(delta);
+
+      expect(result).not.toBeNull();
+      expect(result!.optimizationResult).toBeDefined();
+      // Min reserve is 200 WETH (sell step). Reserve cap = 200 * 0.3 = 60
+      // Optimizer should find an amount within that range (no per-DEX cap applies)
+      // and it should be able to exceed 5 (the TJ LB default) since no TJ LB is involved
+      expect(result!.inputAmount).toBeLessThanOrEqual(60);
+      expect(result!.inputAmount).toBeGreaterThan(0);
+    });
+  });
 });

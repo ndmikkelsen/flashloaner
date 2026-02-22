@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-19)
 
 **Core value:** The bot must never lose funds beyond gas costs -- the 4-layer safety system (off-chain estimate, eth_call simulation, on-chain ProfitValidator, MEV protection) ensures every transaction either profits or reverts.
-**Current focus:** Phase 8 -- P&L Dashboard Operations
+**Current focus:** Phase 11 -- Dry-Run Signal Quality Fixes
 
 ## Current Position
 
-Phase: 10 of 10 (Trader Joe LB Adapter)
-Plan: 3 of 3 in current phase
-Status: Phase 10 COMPLETE (3/3 plans complete)
-Last activity: 2026-02-20 -- Completed 10-03-PLAN.md (Trader Joe LB Pool Integration & Fee Buffer)
+Phase: 11 of 12 (Dry-Run Signal Quality Fixes)
+Plan: 0 of ? in current phase
+Status: Phase 11 NOT PLANNED
+Last activity: 2026-02-21 -- Added Phases 11 and 12 to roadmap after 6.5-hour dry-run analysis
 
-Progress: [======================] 100% (24/24 plans -- v1.0: 11 complete, v1.1: 13 complete)
+Progress: [======================..] 92% (24/26+ plans -- v1.0: 11 complete, v1.1: 13 complete, 2 phases pending)
 
 ## Performance Metrics
 
@@ -107,17 +107,23 @@ New for v1.1:
 - [Phase 10-03]: LB pool addresses use placeholders pending LBFactory verification via cast
 - [Phase 10-03]: Integration tests skip gracefully when ARBITRUM_MAINNET_RPC_URL not set (follows Phase 09 pattern)
 
+### Roadmap Evolution
+
+- Phase 11 added: Dry-Run Signal Quality Fixes (TJ LB slippage, V3 reserve cap, fee display)
+- Phase 12 added: Contract Deployment & Live Validation (deploy, shadow mode, go live)
+
 ### Pending Todos
 
 None.
 
 ### Blockers/Concerns
 
-- Ramses fee manipulation risk may make Phase 9 non-viable (monitor during Phase 8)
-- Trader Joe LB complexity is HIGH -- decision gate at 5 days, defer to v1.2 if exceeded
+- TJ LB slippage dangerously underestimated: 500 ETH input with 0.004 ETH slippage (no reserve data)
+- GMX/WETH V3 virtual reserves not reaching optimizer (Camelot V3 computeVirtualReserve not used)
+- TJ LB fee display bug: binStep=15 shows 0.00% instead of 0.15%
 
 ## Session Continuity
 
-Last session: 2026-02-20
-Stopped at: Completed 10-03-PLAN.md (Trader Joe LB Pool Integration & Fee Buffer) -- Phase 10 COMPLETE (3/3 plans)
-Resume file: Phase 10 complete. ALL v1.1 PHASES COMPLETE (24/24 plans). Ready for milestone review and v1.1 release.
+Last session: 2026-02-21
+Stopped at: Added Phases 11 and 12 to roadmap. Ready to plan and execute Phase 11.
+Resume file: Phase 11 needs planning. 6.5-hour dry-run analysis complete (see plan file).

@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 import { randomUUID } from "node:crypto";
-import type { PriceDelta, PriceSnapshot } from "../monitor/types.js";
+import type { DEXProtocol, PriceDelta, PriceSnapshot } from "../monitor/types.js";
 import type { PriceMonitor } from "../monitor/PriceMonitor.js";
 import type {
   ArbitrageOpportunity,
@@ -34,9 +34,10 @@ const DEFAULT_FLASH_LOAN_FEES: FlashLoanFees = {
  * gas costs, and slippage.
  */
 export class OpportunityDetector extends EventEmitter {
-  private readonly config: Required<Omit<OpportunityDetectorConfig, "flashLoanFees" | "gasEstimatorFn">> & {
+  private readonly config: Required<Omit<OpportunityDetectorConfig, "flashLoanFees" | "gasEstimatorFn" | "maxInputByDex">> & {
     flashLoanFees: FlashLoanFees;
   };
+  private readonly maxInputByDex: Partial<Record<DEXProtocol, number>>;
   private gasEstimatorFn: ((numSwaps: number) => Promise<{ gasCost: number; l1DataFee?: number }>) | undefined;
   private monitor: PriceMonitor | null = null;
   private stalePools = new Set<string>();
@@ -56,6 +57,10 @@ export class OpportunityDetector extends EventEmitter {
       },
     };
     this.gasEstimatorFn = config.gasEstimatorFn;
+    this.maxInputByDex = {
+      traderjoe_lb: 5, // Conservative: LB bins typically hold 2-20 ETH depth
+      ...config.maxInputByDex,
+    };
 
     // Initialize optimizer with conservative defaults
     this.optimizer = new InputOptimizer({
@@ -189,6 +194,12 @@ export class OpportunityDetector extends EventEmitter {
       inputAmount = this.config.defaultInputAmount;
     }
 
+    // Apply per-DEX max input cap (for pools without reserve data like TJ LB)
+    const dexCap = this.getDexInputCap(path);
+    if (dexCap !== undefined && inputAmount > dexCap) {
+      inputAmount = dexCap;
+    }
+
     const grossProfit = this.calculateGrossProfit(path, inputAmount);
     const costs = this.estimateCosts(path, inputAmount);
     const netProfit = grossProfit - costs.totalCost;
@@ -297,6 +308,12 @@ export class OpportunityDetector extends EventEmitter {
     } else {
       // No reserve data: fall back to fixed amount
       inputAmount = this.config.defaultInputAmount;
+    }
+
+    // Apply per-DEX max input cap (for pools without reserve data like TJ LB)
+    const dexCap = this.getDexInputCap(path);
+    if (dexCap !== undefined && inputAmount > dexCap) {
+      inputAmount = dexCap;
     }
 
     const grossProfit = this.calculateGrossProfit(path, inputAmount);
@@ -569,6 +586,23 @@ export class OpportunityDetector extends EventEmitter {
   }
 
   /**
+   * Get the minimum per-DEX input cap across all steps in a path.
+   * Returns undefined if no step's DEX has a cap configured.
+   */
+  private getDexInputCap(path: SwapPath): number | undefined {
+    let minCap: number | undefined;
+    for (const step of path.steps) {
+      const cap = this.maxInputByDex[step.dex];
+      if (cap !== undefined) {
+        if (minCap === undefined || cap < minCap) {
+          minCap = cap;
+        }
+      }
+    }
+    return minCap;
+  }
+
+  /**
    * Compute a reserve-based cap for the optimizer search range.
    * Returns the minimum virtual reserve across all steps (scaled to 30% of depth),
    * or undefined if no reserve data is available.
@@ -578,16 +612,32 @@ export class OpportunityDetector extends EventEmitter {
    */
   private computeReserveCap(path: SwapPath): number | undefined {
     let minReserve: number | undefined;
+    let hasUnknownStep = false;
+
     for (const step of path.steps) {
       if (step.virtualReserveIn !== undefined && step.virtualReserveIn > 0) {
         if (minReserve === undefined || step.virtualReserveIn < minReserve) {
           minReserve = step.virtualReserveIn;
         }
+      } else {
+        hasUnknownStep = true;
       }
     }
-    if (minReserve === undefined) return undefined;
+
+    // If any step lacks reserve data, apply per-DEX cap as conservative bound
+    if (hasUnknownStep) {
+      const dexCap = this.getDexInputCap(path);
+      if (dexCap !== undefined) {
+        if (minReserve === undefined || dexCap < minReserve * 0.3) {
+          return dexCap;
+        }
+      }
+      // If no per-DEX cap and no reserve data at all, return undefined (fallback to default)
+      if (minReserve === undefined) return undefined;
+    }
+
     // Cap at 30% of the shallowest pool's depth
-    return minReserve * 0.3;
+    return minReserve! * 0.3;
   }
 
   /** Check if a pool is marked as stale */
