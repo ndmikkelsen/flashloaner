@@ -1,0 +1,23 @@
+{
+  "chainId": 42161,
+  "network": "arbitrum",
+  "deployedAt": "1771777659",
+  "blockNumber": 24513600,
+  "contracts": {
+    "FlashloanExecutor": "0x06409bFF450b9feFD6045f4d014DC887cF898a77",
+    "CircuitBreaker": "0x349F680744AD406a42F25381EFce3e8BE52f5598",
+    "ProfitValidator": "0x5c0Ecf6DBB806a636121f0a3f670E4f7aC13A667",
+    "UniswapV2Adapter": "0x0000000000000000000000000000000000000000",
+    "UniswapV3Adapter": "0xEeB5C0d81A27bb92C25Af1D50b4A6470500404d1",
+    "SushiSwapV2Adapter": "0x33F5fa68839c39af84B622D997e15B5f1F671403",
+    "SushiSwapV3Adapter": "0x660c8222CDdD07189F6176fFE77B1fEd45AfDac8",
+    "TraderJoeLBAdapter": "0x47ad3b7F3048633fE67173861a8e5c07d93B0306"
+  },
+  "configuration": {
+    "aavePool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
+    "balancerVault": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+    "uniswapV2Router": "0x0000000000000000000000000000000000000000",
+    "uniswapV3Router": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+    "uniswapV3Quoter": "0x61fFE014bA17989E743c5F6cB21bF9697530B21e"
+  }
+}

@@ -8,7 +8,7 @@
  *
  * Environment Variables:
  * - RPC_URL: Arbitrum One RPC endpoint (required)
- * - PRIVATE_KEY: Wallet private key for signing transactions (required for shadow/live modes)
+ * - BOT_PRIVATE_KEY: Bot wallet private key for signing transactions (required for shadow/live modes)
  * - EXECUTOR_ADDRESS: FlashloanExecutor contract address (required for shadow/live modes)
  * - ADAPTER_UNISWAP_V2: UniswapV2Adapter contract address
  * - ADAPTER_UNISWAP_V3: UniswapV3Adapter contract address
@@ -149,10 +149,10 @@ async function main(): Promise<void> {
   // Load wallet in shadow/live modes
   let wallet: Wallet | undefined;
   if (shadowMode || liveMode) {
-    const privateKey = process.env.PRIVATE_KEY;
+    const privateKey = process.env.BOT_PRIVATE_KEY ?? process.env.PRIVATE_KEY;
     if (!privateKey) {
-      console.error(`[ERROR] PRIVATE_KEY environment variable is required for ${mode} mode.`);
-      console.error(`[ERROR] Set PRIVATE_KEY to your wallet's private key (0x...)`);
+      console.error(`[ERROR] BOT_PRIVATE_KEY environment variable is required for ${mode} mode.`);
+      console.error(`[ERROR] Set BOT_PRIVATE_KEY to the bot wallet's private key (0xdC9d...)`);
       process.exit(1);
     }
 

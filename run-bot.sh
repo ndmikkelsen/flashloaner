@@ -1,34 +1,78 @@
 #!/usr/bin/env bash
-# run-bot.sh — Start the flashloan bot with logging and summary on exit
+# run-bot.sh — Start the flashloan bot in any execution mode
+#
+# Usage:
+#   ./run-bot.sh                   # dry-run (default, safe)
+#   ./run-bot.sh shadow            # shadow mode (simulates via eth_call, free)
+#   ./run-bot.sh live              # live mode (broadcasts transactions, costs gas)
+#   ./run-bot.sh dry               # explicit dry-run
+#   ./run-bot.sh shadow arb-sepolia # shadow mode on testnet
 set -euo pipefail
 
-# ── Defaults ──
-CHAIN="${1:-arb-mainnet}"
+# ── Parse args ──
+MODE="${1:-dry}"
+CHAIN="${2:-arb-mainnet}"
 LOGDIR="/tmp"
-LOGFILE="${LOGDIR}/flashbot-${CHAIN}-$(date +%Y%m%d-%H%M%S).log"
+LOGFILE="${LOGDIR}/flashbot-${CHAIN}-${MODE}-$(date +%Y%m%d-%H%M%S).log"
 
-# ── Resolve env file and script ──
+# ── Resolve env file ──
 case "$CHAIN" in
   arb-mainnet)  ENV_FILE=".env.arbitrum-mainnet" ;;
   arb-sepolia)  ENV_FILE=".env.arbitrum-sepolia" ;;
   *)
     echo "Unknown chain: $CHAIN"
-    echo "Usage: ./run-bot.sh [arb-mainnet|arb-sepolia]"
+    echo "Usage: ./run-bot.sh [dry|shadow|live] [arb-mainnet|arb-sepolia]"
     exit 1
     ;;
 esac
 
-SCRIPT="bot:${CHAIN}"
-
 if [[ ! -f "$ENV_FILE" ]]; then
-  echo "Error: $ENV_FILE not found. Copy from .env.example.${CHAIN} and fill in your keys."
+  echo "Error: $ENV_FILE not found."
   exit 1
 fi
+
+# ── Set execution mode env vars ──
+case "$MODE" in
+  dry|dry-run|dryrun)
+    export DRY_RUN=true
+    unset SHADOW_MODE 2>/dev/null || true
+    MODE_LABEL="DRY-RUN (detect only, no transactions)"
+    ;;
+  shadow)
+    export DRY_RUN=false
+    export SHADOW_MODE=true
+    MODE_LABEL="SHADOW (simulate via eth_call, zero gas cost)"
+    ;;
+  live)
+    export DRY_RUN=false
+    unset SHADOW_MODE 2>/dev/null || true
+    MODE_LABEL="LIVE (broadcasting transactions, spending gas)"
+    ;;
+  *)
+    echo "Unknown mode: $MODE"
+    echo ""
+    echo "Usage: ./run-bot.sh [dry|shadow|live] [arb-mainnet|arb-sepolia]"
+    echo ""
+    echo "  dry     Detect opportunities, log them, do nothing (default)"
+    echo "  shadow  Build real transactions, simulate via eth_call (free)"
+    echo "  live    Broadcast transactions on-chain (costs gas)"
+    exit 1
+    ;;
+esac
 
 # ── Source env ──
 set -a && source "$ENV_FILE" && set +a
 
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# ── Safety gate for live mode ──
+if [[ "$MODE" == "live" ]]; then
+  echo ""
+  echo "  ⚠️  LIVE MODE — transactions will be broadcast and gas will be spent."
+  echo "  Press Enter to continue, or Ctrl+C to abort."
+  read -r
+fi
+
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  Mode:    $MODE_LABEL"
 echo "  Chain:   $CHAIN"
 echo "  Env:     $ENV_FILE"
 echo "  Log:     $LOGFILE"
@@ -37,13 +81,13 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 # ── Run bot (tee to log) ──
-pnpm "$SCRIPT" 2>&1 | tee "$LOGFILE"
+node --import tsx bot/src/run-arb-mainnet.ts 2>&1 | tee "$LOGFILE"
 EXIT_CODE=${PIPESTATUS[0]}
 
 # ── Summary ──
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  SESSION SUMMARY"
+echo "  SESSION SUMMARY ($MODE)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 # Strip ANSI codes for parsing
