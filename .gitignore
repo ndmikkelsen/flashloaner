@@ -69,6 +69,8 @@ STICKYNOTE.md
 
 # ── Kamal secrets (DO NOT COMMIT) ──
 .kamal/secrets
+.kamal/secrets-common
+.kamal/secrets.*
 
 # ── Cognee local data ──
 cognee_data/
