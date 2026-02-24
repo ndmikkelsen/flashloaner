@@ -3,6 +3,11 @@
 .env.local
 .env.*.local
 .env.server-backup
+.env.arbitrum-sepolia
+.env.arbitrum
+.env.arbitrum-mainnet
+.env.base-sepolia
+.env.base
 
 # ── Foundry ──
 out/
@@ -27,6 +32,12 @@ __pycache__/
 
 # ── Logs ──
 *.log
+
+# ── Data directory (JSONL persistence, pm2 logs) ──
+.data/*
+!.data/logs/
+.data/logs/*
+!.data/logs/.gitkeep
 
 # ── IDE ──
 .vscode/
@@ -55,6 +66,11 @@ STICKYNOTE.md
 .beads/README.md
 .beads/interactions.jsonl
 .beads/metadata.json
+
+# ── Kamal secrets (DO NOT COMMIT) ──
+.kamal/secrets
+.kamal/secrets-common
+.kamal/secrets.*
 
 # ── Cognee local data ──
 cognee_data/

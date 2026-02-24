@@ -182,30 +182,30 @@ Use `/deploy` command for the full gated deployment protocol. See `.rules/patter
 
 ## Cognee Integration
 
-Cognee provides semantic search over documentation and knowledge:
+Cognee runs on the compute server, deployed via Kamal. Provides semantic search over documentation and knowledge.
 
 ```bash
-# Start Cognee stack
-./.claude/scripts/cognee-local.sh up
-
 # Check health
-./.claude/scripts/cognee-local.sh health
+curl -sk https://flashloaner-cognee.apps.compute.lan/health
 
 # Sync project knowledge
 ./.claude/scripts/sync-to-cognee.sh
 
 # Search for information (or use /query command)
-curl -X POST http://localhost:8002/api/v1/search \
+curl -sk -X POST https://flashloaner-cognee.apps.compute.lan/api/v1/search \
   -H "Content-Type: application/json" \
   -d '{"query": "How does the flashloan executor work?"}'
+
+# Deploy/redeploy Cognee
+kamal deploy
 ```
 
 ### Datasets
 
-- `flashloaner-architecture` - System design, contract architecture
-- `flashloaner-troubleshooting` - Problem solutions
-- `flashloaner-references` - How-to guides, protocol docs
-- `flashloaner-constitution` - Constitution framework
+- `flashloaner-skills` - BDD pipeline, planning, TDD skills
+- `flashloaner-rules` - Architecture, patterns, workflows
+- `flashloaner-project` - Constitution, vision, project config
+- `flashloaner-solidity` - Contract docs, audits, feature specs
 
 ## Agent Team
 

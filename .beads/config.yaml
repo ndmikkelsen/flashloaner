@@ -1,5 +1,4 @@
 issue_prefix: flashloaner
-no_db: true
 
 auto_sync:
   export_to_jsonl: true
@@ -11,3 +10,10 @@ auto_import:
 
 daemon:
   auto_start: true
+
+dolt:
+  host: 10.10.20.138
+  port: 3306
+  database: beads
+  user: beads
+  auto-commit: "on"

@@ -303,9 +303,9 @@ describe("Full Pipeline: Monitor → Detector → Builder → Engine", () => {
         deltaThresholdPercent: 0.5,
       });
       detector = new OpportunityDetector({
-        minProfitThreshold: 0.5,
-        gasPriceGwei: 200, // Extremely high gas
-        maxSlippage: 0.02,
+        minProfitThreshold: 10.0,  // Very high threshold to force rejection
+        gasPriceGwei: 500,         // Extremely high gas
+        maxSlippage: 0.05,         // High slippage
       });
       detector.attach(monitor);
       monitor.on("error", () => {});

@@ -192,21 +192,21 @@ Semantic search over project knowledge, architecture docs, and protocol research
 ### Quick Start
 
 ```bash
-# Start Cognee stack
-./.claude/scripts/cognee-local.sh up
-
 # Check health
-./.claude/scripts/cognee-local.sh health
+curl -sk https://flashloaner-cognee.apps.compute.lan/health
 
 # Sync project knowledge
 ./.claude/scripts/sync-to-cognee.sh
+
+# Deploy/redeploy
+kamal deploy
 ```
 
 ### Search Knowledge
 
 ```bash
 # Use /query command or:
-curl -X POST http://localhost:8002/api/v1/search \
+curl -sk -X POST https://flashloaner-cognee.apps.compute.lan/api/v1/search \
   -H "Content-Type: application/json" \
   -d '{"query": "How does the flashloan executor handle multi-hop swaps?"}'
 ```

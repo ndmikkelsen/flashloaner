@@ -13,6 +13,7 @@ gas_reports = ["*"]
 ffi = false
 ast = true
 build_info = true
+fs_permissions = [{ access = "read-write", path = "deployments/" }]
 
 # Fuzz testing
 [profile.default.fuzz]
@@ -29,7 +30,15 @@ depth = 15
 mainnet = "${MAINNET_RPC_URL}"
 sepolia = "${SEPOLIA_RPC_URL}"
 arbitrum = "${ARBITRUM_RPC_URL}"
+arbitrum-sepolia = "${ARBITRUM_SEPOLIA_RPC_URL}"
 base = "${BASE_RPC_URL}"
+
+# Etherscan API keys for contract verification
+[etherscan]
+mainnet = { key = "${ETHERSCAN_API_KEY}" }
+sepolia = { key = "${ETHERSCAN_API_KEY}" }
+arbitrum = { key = "${ARBISCAN_API_KEY}" }
+arbitrum-sepolia = { key = "${ARBISCAN_API_KEY}" }
 
 # CI profile: higher fuzz runs for pre-merge security
 [profile.ci]

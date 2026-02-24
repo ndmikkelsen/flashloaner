@@ -1,7 +1,7 @@
 import type { Provider } from "ethers";
 
 /** Supported DEX protocols */
-export type DEXProtocol = "uniswap_v2" | "uniswap_v3" | "sushiswap";
+export type DEXProtocol = "uniswap_v2" | "uniswap_v3" | "sushiswap" | "sushiswap_v3" | "camelot_v2" | "camelot_v3" | "ramses_v3" | "traderjoe_lb";
 
 /** A token pair on a specific DEX */
 export interface PoolConfig {
@@ -21,6 +21,9 @@ export interface PoolConfig {
   decimals1: number;
   /** Uniswap V3 fee tier (bps) — only for uniswap_v3 */
   feeTier?: number;
+  /** Invert the raw on-chain price. Used when Trader Joe LB tokenX/tokenY ordering
+   *  doesn't match the hex-sorted token0/token1 convention. */
+  invertPrice?: boolean;
 }
 
 /** A snapshot of a pool's price at a point in time */
@@ -34,6 +37,14 @@ export interface PriceSnapshot {
   blockNumber: number;
   /** Timestamp (ms) when this snapshot was taken */
   timestamp: number;
+  /** V2: Raw reserves [reserve0, reserve1] for price impact estimation */
+  reserves?: [bigint, bigint];
+  /** V3: In-range liquidity (L) for virtual reserve computation */
+  liquidity?: bigint;
+  /** V3: sqrtPriceX96 for virtual reserve computation */
+  sqrtPriceX96?: bigint;
+  /** Trader Joe LB: Active bin ID */
+  activeId?: number;
 }
 
 /** Emitted when a price delta exceeds the configured threshold */
@@ -62,6 +73,12 @@ export interface PriceMonitorConfig {
   pollIntervalMs?: number;
   /** Maximum retries per pool fetch before marking stale. Default: 3 */
   maxRetries?: number;
+  /** Use Multicall3 to batch all pool reads into a single RPC call. Default: true */
+  useMulticall?: boolean;
+  /** Minimum WETH reserve (in ETH) for V2 pools to be considered viable. Default: 5.0 */
+  minReserveWeth?: number;
+  /** WETH address for liquidity checks. Required when minReserveWeth is set. */
+  wethAddress?: string;
 }
 
 /** Events emitted by PriceMonitor */

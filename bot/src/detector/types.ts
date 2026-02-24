@@ -1,4 +1,5 @@
 import type { DEXProtocol, PriceDelta } from "../monitor/types.js";
+import type { OptimizationResult } from "../optimizer/types.js";
 
 /** A single swap step in an arbitrage path */
 export interface SwapStep {
@@ -18,6 +19,9 @@ export interface SwapStep {
   expectedPrice: number;
   /** Uniswap V3 fee tier (bps) — only for uniswap_v3 */
   feeTier?: number;
+  /** Virtual reserve of tokenIn for slippage estimation (human-readable units).
+   *  V2: actual reserve. V3: computed from L and sqrtPriceX96. */
+  virtualReserveIn?: number;
 }
 
 /** A complete arbitrage path (sequence of swaps) */
@@ -34,11 +38,13 @@ export interface SwapPath {
 export interface CostEstimate {
   /** Flash loan fee in base token units (e.g. 0.05% of borrow) */
   flashLoanFee: number;
-  /** Estimated gas cost in base token units (ETH) */
+  /** Estimated gas cost in base token units (ETH) — L2 execution cost only */
   gasCost: number;
+  /** Arbitrum L1 data posting cost in base token units (ETH). Only present on L2 chains. */
+  l1DataFee?: number;
   /** Expected slippage loss in base token units */
   slippageCost: number;
-  /** Total costs */
+  /** Total costs (includes l1DataFee when present) */
   totalCost: number;
 }
 
@@ -50,6 +56,8 @@ export interface ArbitrageOpportunity {
   path: SwapPath;
   /** Input amount in base token (human-readable, e.g. 10.5 ETH) */
   inputAmount: number;
+  /** Optimization result for input amount sizing. Undefined when using fixed defaultInputAmount. */
+  optimizationResult?: OptimizationResult;
   /** Expected gross revenue (before costs) in base token */
   grossProfit: number;
   /** Cost breakdown */
@@ -90,6 +98,14 @@ export interface OpportunityDetectorConfig {
   gasPerSwap?: number;
   /** Flash loan fee config. Defaults to Aave V3 rates */
   flashLoanFees?: Partial<FlashLoanFees>;
+  /** Optional async gas estimator. When provided, overrides the simple gasPriceGwei formula.
+   *  Returns the total gas cost in ETH including L1 data fees (for L2 chains like Arbitrum).
+   *  The function receives the number of swaps and should return { gasCost: number; l1DataFee?: number } */
+  gasEstimatorFn?: (numSwaps: number) => Promise<{ gasCost: number; l1DataFee?: number }>;
+  /** Per-DEX maximum input amount overrides. Used to cap pools that lack reserve data
+   *  (e.g., Trader Joe LB uses bin-based liquidity with no reserve/depth info).
+   *  Key: DEXProtocol string, Value: max input in base token units. */
+  maxInputByDex?: Partial<Record<DEXProtocol, number>>;
 }
 
 /** Events emitted by OpportunityDetector */

@@ -37,6 +37,9 @@ abstract contract FlashloanReceiver is IFlashloanReceiver, Ownable, ReentrancyGu
     /// @notice ETH transfer failed.
     error ETHTransferFailed();
 
+    /// @notice A flash loan callback was invoked outside of an active flash loan.
+    error NoActiveFlashLoan();
+
     // ──────────────────────────────────────────────
     // Events
     // ──────────────────────────────────────────────
@@ -59,6 +62,10 @@ abstract contract FlashloanReceiver is IFlashloanReceiver, Ownable, ReentrancyGu
 
     /// @notice The Balancer Vault address authorized to call receiveFlashLoan.
     address public immutable balancerVault;
+
+    /// @dev Flag set to true only while a flash loan is actively being processed.
+    ///      Used to guard callbacks that cannot validate msg.sender against a known address.
+    bool private _flashLoanActive;
 
     // ──────────────────────────────────────────────
     // Constructor
@@ -124,8 +131,8 @@ abstract contract FlashloanReceiver is IFlashloanReceiver, Ownable, ReentrancyGu
 
     /// @inheritdoc IFlashloanReceiver
     function uniswapV3FlashCallback(uint256, uint256, bytes calldata data) external nonReentrant {
-        // Uniswap V3 flash: the pool address is encoded in data by the caller.
-        // For security, the child contract must validate msg.sender against a known pool.
+        // Guard: only callable during an active flash loan initiated by this contract.
+        if (!_flashLoanActive) revert NoActiveFlashLoan();
         _executeArbitrage(data);
     }
 
@@ -136,8 +143,8 @@ abstract contract FlashloanReceiver is IFlashloanReceiver, Ownable, ReentrancyGu
         uint256,
         bytes calldata data
     ) external nonReentrant {
-        // dYdX flash: the SoloMargin address should be validated by the child contract.
-        // dYdX charges no fee; the exact borrowed amount must be repaid.
+        // Guard: only callable during an active flash loan initiated by this contract.
+        if (!_flashLoanActive) revert NoActiveFlashLoan();
         _executeArbitrage(data);
     }
 
@@ -149,6 +156,12 @@ abstract contract FlashloanReceiver is IFlashloanReceiver, Ownable, ReentrancyGu
     /// @param params Encoded swap parameters
     function _executeArbitrage(bytes calldata params) internal virtual;
 
+    /// @dev Set the flash loan active flag. Call before initiating a flash loan
+    ///      to allow callbacks that cannot validate msg.sender (Uniswap V3, dYdX).
+    function _setFlashLoanActive(bool active) internal {
+        _flashLoanActive = active;
+    }
+
     // ──────────────────────────────────────────────
     // Emergency Withdrawal
     // ──────────────────────────────────────────────
@@ -157,7 +170,7 @@ abstract contract FlashloanReceiver is IFlashloanReceiver, Ownable, ReentrancyGu
     /// @param token The token address
     /// @param to The recipient address
     /// @param amount The amount to withdraw
-    function emergencyWithdrawToken(address token, address to, uint256 amount) external onlyOwner {
+    function emergencyWithdrawToken(address token, address to, uint256 amount) external onlyOwner nonReentrant {
         if (token == address(0)) revert ZeroAddress();
         if (to == address(0)) revert ZeroAddress();
         if (amount == 0) revert ZeroAmount();
@@ -172,7 +185,7 @@ abstract contract FlashloanReceiver is IFlashloanReceiver, Ownable, ReentrancyGu
     /// @notice Withdraw ETH stuck in the contract (owner only).
     /// @param to The recipient address
     /// @param amount The amount to withdraw (in wei)
-    function emergencyWithdrawETH(address to, uint256 amount) external onlyOwner {
+    function emergencyWithdrawETH(address to, uint256 amount) external onlyOwner nonReentrant {
         if (to == address(0)) revert ZeroAddress();
         if (amount == 0) revert ZeroAmount();
         if (amount > address(this).balance) revert InsufficientBalance(amount, address(this).balance);

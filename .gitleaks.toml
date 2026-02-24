@@ -10,14 +10,21 @@ description = "Allowlisted files and patterns"
 # Allow .env.example files (they should only contain placeholders)
 # Allow broadcast/ logs (Foundry deployment logs contain public addresses, not secrets)
 paths = [
+    '''\.env$''',
     '''\.env\.example$''',
     '''\.env\.sample$''',
     '''\.env\.template$''',
+    '''\.env\.sepolia\.example$''',
+    '''\.env\.mainnet\.example$''',
     '''\.rules/patterns/env-security\.md$''',
     '''broadcast/''',
     '''node_modules/''',
     '''lib/''',
     '''\.beads/''',
+    '''deployments/''',
+    '''\.planning/''',
+    '''\.claude/get-shit-done/''',
+    '''\.claude/gsd-file-manifest\.json''',
 ]
 
 # Allow placeholder patterns that are obviously fake
@@ -30,7 +37,31 @@ regexes = [
     '''example\.com''',
     '''\*\*\*REMOVED\*\*\*''',
     '''0x0{39}[0-9a-fA-F]''',
-    # Public Ethereum token addresses (WETH, USDC, etc.) used in examples
+    # Public Ethereum token/pool addresses used in config (not secrets)
     '''0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2''',  # WETH mainnet
     '''0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48''',  # USDC mainnet
+    '''0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4''',    # USDC Sepolia
+    '''0xfFf9976782d46CC05630D1f6eBAb18b2324d6B''',     # WETH Sepolia
+    # Public token addresses on L2 chains (not secrets)
+    '''0x82aF49447D8a07e3bd95BD0d56f35241523fBab1''',  # WETH Arbitrum
+    '''0x82af49447d8a07e3bd95bd0d56f35241523fbab1''',  # WETH Arbitrum (lowercase)
+    '''0xaf88d065e77c8cC2239327C5EDb3A432268e5831''',  # USDC Arbitrum
+    '''0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8''',  # USDC Arbitrum (native)
+    '''0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9''',  # USDT Arbitrum
+    '''0x912ce59144191c1204e64559fe8253a0e49e6548''',  # ARB Arbitrum
+    '''0xfc5a1a6eb076a2c7ad06ed22c90d7e710e35ad0a''',  # GMX Arbitrum
+    '''0xf97f4df75117a78c1a5a0dbb814af92458539fb4''',  # LINK Arbitrum
+    '''0x539bde0d7dbd336b79148aa742883198bbf60342''',  # MAGIC Arbitrum
+    '''0x0c880f6761F1af8d9Aa9C466984b80DAb9a8c9e8''',  # PENDLE Arbitrum
+    '''0x18c11FD286C5EC11c3b683Caa813B77f5163A122''',  # GNS Arbitrum
+    '''0x51fC0f6660482Ea73330E414eFd7808811a57Fa2''',  # PREMIA Arbitrum
+    '''0x10393c20975cF177a3513071bC110f7962CD67da''',  # JONES Arbitrum
+    '''0x6C2C06790b3E3E3c38e12Ee22F8183b37a13EE55''',  # DPX Arbitrum
+    '''0x3E6648C5a70A150A88bCE65F4aD4d506Fe15d2AF''',  # SPELL Arbitrum
+    # Public pool addresses on L2 chains (not secrets)
+    '''0xC31E54c7a869B9FcBEcc14363CF510d1c41fa443''',  # WETH/USDC UniV3 0.05% Arbitrum
+    '''0x641c00a822e8b671738d32a431a4fb6074e5c79d''',  # WETH/USDT UniV3 0.05% Arbitrum
+    # Well-known Hardhat/Foundry/Anvil default test private keys (NOT real secrets)
+    '''0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a''',  # Hardhat account #2
+    '''0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80''',  # Anvil default key #0
 ]

@@ -40,11 +40,17 @@ export interface ExecutionSigner {
     chainId: number;
   }): Promise<{ hash: string; wait(confirmations?: number): Promise<TransactionReceipt | null> }>;
   getNonce(blockTag?: string): Promise<number>;
+  /**
+   * Simulate a transaction via eth_call (free, no gas cost).
+   * Returns the call result data on success, throws on revert.
+   * In ethers.js v6: signer.call(tx) or provider.call(tx)
+   */
+  call?(tx: { to: string; data: string; value?: bigint }): Promise<string>;
 }
 
 /** Minimal transaction receipt interface */
 export interface TransactionReceipt {
-  status: number;
+  status: number | null; // null for pending transactions
   blockNumber: number;
   gasUsed: bigint;
   gasPrice?: bigint;
@@ -107,9 +113,37 @@ export class ExecutionEngine extends EventEmitter {
   }
 
   /**
+   * Simulate a transaction via eth_call before submitting.
+   * This is free (no gas cost) and reveals if the tx would revert.
+   *
+   * Returns true if simulation succeeds, false if it would revert.
+   * Emits "simulationFailed" with the revert reason on failure.
+   */
+  async simulateTransaction(tx: PreparedTransaction): Promise<{ success: boolean; reason?: string }> {
+    if (!this.signer.call) {
+      // Signer doesn't support simulation — skip (backwards compatible)
+      return { success: true };
+    }
+
+    try {
+      await this.signer.call({
+        to: tx.to,
+        data: tx.data,
+        value: tx.value,
+      });
+      return { success: true };
+    } catch (err) {
+      const reason = this.parseRevertReason(err) ?? (err instanceof Error ? err.message : String(err));
+      this.emit("simulationFailed", reason, tx);
+      return { success: false, reason };
+    }
+  }
+
+  /**
    * Execute a prepared arbitrage transaction.
    *
-   * Submits the transaction, waits for confirmation, parses the result,
+   * Pre-flight: simulates via eth_call (free) to catch reverts before spending gas.
+   * Then submits the transaction, waits for confirmation, parses the result,
    * and tracks profit/loss.
    */
   async executeTransaction(tx: PreparedTransaction): Promise<ExecutionResult> {
@@ -127,6 +161,17 @@ export class ExecutionEngine extends EventEmitter {
         gasUsed: tx.gas.gasLimit,
       });
       this.emit("confirmed", result);
+      return result;
+    }
+
+    // Pre-flight simulation via eth_call (free — no gas cost)
+    const sim = await this.simulateTransaction(tx);
+    if (!sim.success) {
+      const result = this.makeResult("failed", {
+        error: `Simulation reverted: ${sim.reason}`,
+        revertReason: sim.reason,
+      });
+      this.emit("simulationFailed", sim.reason, tx);
       return result;
     }
 
@@ -211,7 +256,7 @@ export class ExecutionEngine extends EventEmitter {
         this.parseProfitFromReceipt(txHash, receipt);
 
         return result;
-      } else {
+      } else if (receipt.status === 0) {
         // Reverted
         this.recordFailure();
         const result = this.makeResult("reverted", {
@@ -225,6 +270,15 @@ export class ExecutionEngine extends EventEmitter {
 
         this.updateTracked(txHash, "reverted");
         this.emit("reverted", result);
+        return result;
+      } else {
+        // Null status (shouldn't happen after wait() resolves)
+        this.recordFailure();
+        const result = this.makeResult("failed", {
+          txHash,
+          error: "Transaction status is null after confirmation",
+        });
+        this.emit("failed", result);
         return result;
       }
     } catch (err) {
