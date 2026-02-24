@@ -1,12 +1,14 @@
-# Kamal 2 deployment config for Cognee (semantic search + knowledge layer)
+# Kamal 2 deployment config for flashloaner infrastructure
 #
-# Deploy:   kamal setup -d cognee     (first time)
-#           kamal deploy -d cognee    (subsequent)
-# Logs:     kamal app logs -d cognee
-# Status:   kamal details -d cognee
+# Deploy:   kamal setup    (first time)
+#           kamal deploy   (subsequent)
+# Logs:     kamal app logs
+# Status:   kamal details
 #
-# This is a per-project Cognee instance (flashloaner).
-# Slimmed down: API + PostgreSQL/pgvector only (no Neo4j, no Redis).
+# Services:
+#   - Cognee API (semantic search + knowledge layer)
+#   - PostgreSQL/pgvector (Cognee database)
+#   - Dolt SQL server (Beads issue tracking backend)
 
 service: flashloaner-cognee
 
@@ -82,3 +84,18 @@ accessories:
         - POSTGRES_PASSWORD
     directories:
       - /mnt/nfs/databases/flashloaner/cognee:/var/lib/postgresql/data
+  dolt:
+    image: dolthub/dolt-sql-server:latest
+    host: 10.10.20.138
+    port: "3306:3306"
+    env:
+      clear:
+        DOLT_ROOT_HOST: "%"
+        DOLT_DATABASE: beads
+        DOLT_USER: beads
+        DOLT_USER_HOST: "%"
+      secret:
+        - DOLT_ROOT_PASSWORD
+        - DOLT_PASSWORD
+    directories:
+      - /mnt/nfs/databases/flashloaner/dolt:/var/lib/dolt
