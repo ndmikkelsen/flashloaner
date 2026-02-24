@@ -14,6 +14,6 @@ daemon:
 dolt:
   host: 10.10.20.138
   port: 3306
-  database: beads
+  database: beads_flashloaner
   user: beads
   auto-commit: "on"
