@@ -81,4 +81,4 @@ accessories:
       secret:
         - POSTGRES_PASSWORD
     directories:
-      - /mnt/nfs/databases/flashloaner-cognee:/var/lib/postgresql/data
+      - /mnt/nfs/databases/flashloaner/cognee:/var/lib/postgresql/data
