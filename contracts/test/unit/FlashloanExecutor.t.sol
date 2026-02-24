@@ -136,6 +136,39 @@ contract MockAavePool {
 }
 
 // ---------------------------------------------------------------
+// Mock Balancer Vault
+// ---------------------------------------------------------------
+
+/// @dev Simulates Balancer Vault.flashLoan: sends tokens, calls
+///      receiveFlashLoan on the receiver, then expects tokens to be returned.
+///      Balancer V2 charges 0% fee on flash loans.
+contract MockBalancerVault {
+    function flashLoan(
+        address recipient,
+        address[] calldata tokens,
+        uint256[] calldata amounts,
+        bytes calldata userData
+    ) external {
+        // Send the loan amount to the recipient
+        MockToken(tokens[0]).transfer(recipient, amounts[0]);
+
+        // Prepare fee amounts (Balancer = 0%)
+        uint256[] memory feeAmounts = new uint256[](tokens.length);
+        for (uint256 i = 0; i < tokens.length; i++) {
+            feeAmounts[i] = 0;
+        }
+
+        // Call receiveFlashLoan on the recipient
+        FlashloanExecutor(payable(recipient)).receiveFlashLoan(
+            tokens, amounts, feeAmounts, userData
+        );
+
+        // Verify tokens were returned (Balancer pulls via transfer in the callback)
+        // The receiver's receiveFlashLoan already does safeTransfer back to vault
+    }
+}
+
+// ---------------------------------------------------------------
 // FlashloanExecutorTest
 // ---------------------------------------------------------------
 
@@ -146,8 +179,7 @@ contract FlashloanExecutorTest is Test {
     MockAdapter internal adapter1;
     MockAdapter internal adapter2;
     MockAavePool internal aavePool;
-
-    address internal balancerVault = makeAddr("balancerVault");
+    MockBalancerVault internal balancerVault;
     address internal owner = makeAddr("owner");
     address internal botWallet = makeAddr("botWallet");
     address internal attacker = makeAddr("attacker");
@@ -161,13 +193,14 @@ contract FlashloanExecutorTest is Test {
         token = new MockToken();
         tokenB = new MockToken();
         aavePool = new MockAavePool();
+        balancerVault = new MockBalancerVault();
         adapter1 = new MockAdapter();
         adapter2 = new MockAdapter();
 
         // Deploy executor
         executor = new FlashloanExecutor(
             address(aavePool),
-            balancerVault,
+            address(balancerVault),
             owner,
             botWallet,
             MIN_PROFIT
@@ -187,21 +220,21 @@ contract FlashloanExecutorTest is Test {
         assertEq(executor.botWallet(), botWallet);
         assertEq(executor.minProfit(), MIN_PROFIT);
         assertEq(executor.aavePool(), address(aavePool));
-        assertEq(executor.balancerVault(), balancerVault);
+        assertEq(executor.balancerVault(), address(balancerVault));
         assertFalse(executor.paused());
     }
 
     function test_revertWhen_constructorZeroBotWallet() public {
         vm.expectRevert(FlashloanReceiver.ZeroAddress.selector);
         new FlashloanExecutor(
-            address(aavePool), balancerVault, owner, address(0), MIN_PROFIT
+            address(aavePool), address(balancerVault), owner, address(0), MIN_PROFIT
         );
     }
 
     function test_revertWhen_constructorZeroAavePool() public {
         vm.expectRevert(FlashloanReceiver.ZeroAddress.selector);
         new FlashloanExecutor(
-            address(0), balancerVault, owner, botWallet, MIN_PROFIT
+            address(0), address(balancerVault), owner, botWallet, MIN_PROFIT
         );
     }
 
@@ -214,7 +247,7 @@ contract FlashloanExecutorTest is Test {
 
     function test_constructorAllowsZeroMinProfit() public {
         FlashloanExecutor ex = new FlashloanExecutor(
-            address(aavePool), balancerVault, owner, botWallet, 0
+            address(aavePool), address(balancerVault), owner, botWallet, 0
         );
         assertEq(ex.minProfit(), 0);
     }
@@ -444,6 +477,104 @@ contract FlashloanExecutorTest is Test {
         vm.prank(owner);
         vm.expectRevert(); // InsufficientProfit
         executor.executeArbitrage(address(aavePool), address(token), LOAN_AMOUNT, steps);
+    }
+
+    // ---------------------------------------------------------------
+    // Balancer Flash Loan Provider Tests
+    // ---------------------------------------------------------------
+
+    function test_executeArbitrage_balancerProvider() public {
+        // Set up a profitable swap via Balancer (0% fee)
+        _setupProfitableBalancerSwap(adapter1, LOAN_AMOUNT);
+
+        IFlashloanExecutor.SwapStep[] memory steps = _singleSwapStep(adapter1);
+
+        vm.prank(owner);
+        executor.executeArbitrage(address(balancerVault), address(token), LOAN_AMOUNT, steps);
+
+        // Executor should hold the profit (no Balancer premium)
+        uint256 executorBalance = token.balanceOf(address(executor));
+        assertGt(executorBalance, 0, "Executor should have profit from Balancer flash loan");
+    }
+
+    function test_executeArbitrage_balancerZeroFee() public {
+        // Balancer charges 0% fee, so profit should be higher than with Aave's 0.05%
+        _setupProfitableBalancerSwap(adapter1, LOAN_AMOUNT);
+
+        IFlashloanExecutor.SwapStep[] memory steps = _singleSwapStep(adapter1);
+
+        vm.prank(owner);
+        executor.executeArbitrage(address(balancerVault), address(token), LOAN_AMOUNT, steps);
+
+        uint256 balancerProfit = token.balanceOf(address(executor));
+
+        // Compare: Aave would have taken a 0.05% premium from the same setup
+        // Balancer profit should be at least minProfit
+        assertGe(balancerProfit, MIN_PROFIT, "Balancer profit should meet minimum threshold");
+    }
+
+    function test_executeArbitrage_balancerEmitsArbitrageExecuted() public {
+        _setupProfitableBalancerSwap(adapter1, LOAN_AMOUNT);
+
+        IFlashloanExecutor.SwapStep[] memory steps = _singleSwapStep(adapter1);
+
+        vm.expectEmit(true, false, false, false);
+        emit IFlashloanExecutor.ArbitrageExecuted(address(token), 0, 0);
+
+        vm.prank(owner);
+        executor.executeArbitrage(address(balancerVault), address(token), LOAN_AMOUNT, steps);
+    }
+
+    function test_revertWhen_unsupportedFlashLoanProvider() public {
+        IFlashloanExecutor.SwapStep[] memory steps = _singleSwapStep(adapter1);
+
+        address unsupported = makeAddr("unsupportedProvider");
+
+        vm.prank(owner);
+        vm.expectRevert(
+            abi.encodeWithSelector(FlashloanExecutor.UnsupportedFlashLoanProvider.selector, unsupported)
+        );
+        executor.executeArbitrage(unsupported, address(token), LOAN_AMOUNT, steps);
+    }
+
+    function test_executeArbitrage_balancerMultiHop() public {
+        // Register adapter2
+        vm.prank(owner);
+        executor.registerAdapter(address(adapter2));
+
+        // Set up: token -> tokenB -> token
+        adapter1.setMultiplier(110, 100);
+        adapter2.setMultiplier(100, 100);
+
+        // Fund adapters and Balancer vault
+        tokenB.mint(address(adapter1), 200 ether);
+        token.mint(address(adapter2), 200 ether);
+        token.mint(address(balancerVault), LOAN_AMOUNT);
+
+        IFlashloanExecutor.SwapStep[] memory steps = new IFlashloanExecutor.SwapStep[](2);
+        steps[0] = IFlashloanExecutor.SwapStep({
+            adapter: address(adapter1),
+            tokenIn: address(token),
+            tokenOut: address(tokenB),
+            amountIn: LOAN_AMOUNT,
+            extraData: ""
+        });
+        steps[1] = IFlashloanExecutor.SwapStep({
+            adapter: address(adapter2),
+            tokenIn: address(tokenB),
+            tokenOut: address(token),
+            amountIn: 0, // use full balance
+            extraData: ""
+        });
+
+        vm.prank(owner);
+        executor.executeArbitrage(address(balancerVault), address(token), LOAN_AMOUNT, steps);
+
+        // 100 * 1.1 = 110 tokenB, 110 * 1.0 = 110 token
+        // Repay: 100 + 0 (Balancer 0% fee) = 100
+        // Profit: 110 - 100 = 10 ether (more than Aave's ~9.95 due to no fee)
+        uint256 executorBalance = token.balanceOf(address(executor));
+        assertGt(executorBalance, 9 ether, "Should have ~10 ether profit with Balancer");
     }
 
     // ---------------------------------------------------------------
@@ -838,6 +969,20 @@ contract FlashloanExecutorTest is Test {
 
         // Fund Aave pool with enough token for the loan
         token.mint(address(aavePool), amount);
+    }
+
+    /// @dev Set up a profitable single-hop swap funded via Balancer (0% fee).
+    function _setupProfitableBalancerSwap(MockAdapter adapter, uint256 amount) internal {
+        // Balancer charges 0% fee, so no premium needed
+        uint256 returnAmount = amount + MIN_PROFIT + 0.01 ether; // guarantee profit
+
+        adapter.setMultiplier(returnAmount, amount);
+
+        // Fund adapter with enough token to pay out
+        token.mint(address(adapter), returnAmount);
+
+        // Fund Balancer vault with enough token for the loan
+        token.mint(address(balancerVault), amount);
     }
 
     /// @dev Create a single swap step: token -> token through the given adapter

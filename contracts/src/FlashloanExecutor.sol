@@ -54,6 +54,9 @@ contract FlashloanExecutor is FlashloanReceiver, IFlashloanExecutor {
     /// @notice The contract is paused.
     error ContractPaused();
 
+    /// @notice The flash loan provider is not supported.
+    error UnsupportedFlashLoanProvider(address provider);
+
     // ──────────────────────────────────────────────
     // Additional Events
     // ──────────────────────────────────────────────
@@ -138,10 +141,15 @@ contract FlashloanExecutor is FlashloanReceiver, IFlashloanExecutor {
         // Set flash loan active flag (guards uniswapV3FlashCallback / callFunction)
         _setFlashLoanActive(true);
 
-        // Request flash loan from Aave V3
-        // Aave will call executeOperation() on this contract
+        // Route to the appropriate flash loan provider
         bytes memory params = ""; // Steps are stored in contract storage
-        _requestAaveFlashLoan(flashLoanProvider, flashLoanToken, flashLoanAmount, params);
+        if (flashLoanProvider == balancerVault) {
+            _requestBalancerFlashLoan(flashLoanProvider, flashLoanToken, flashLoanAmount, params);
+        } else if (flashLoanProvider == aavePool) {
+            _requestAaveFlashLoan(flashLoanProvider, flashLoanToken, flashLoanAmount, params);
+        } else {
+            revert UnsupportedFlashLoanProvider(flashLoanProvider);
+        }
 
         // Clear flash loan active flag after completion
         _setFlashLoanActive(false);
@@ -164,6 +172,40 @@ contract FlashloanExecutor is FlashloanReceiver, IFlashloanExecutor {
                 amount,
                 params,
                 uint16(0) // no referral
+            )
+        );
+        if (!success) {
+            // Bubble up the revert reason
+            if (returnData.length > 0) {
+                assembly {
+                    revert(add(returnData, 32), mload(returnData))
+                }
+            }
+            revert("FlashLoan request failed");
+        }
+    }
+
+    /// @dev Request a flash loan from Balancer Vault.
+    function _requestBalancerFlashLoan(
+        address vault,
+        address asset,
+        uint256 amount,
+        bytes memory /* params */
+    ) internal {
+        address[] memory tokens = new address[](1);
+        tokens[0] = asset;
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = amount;
+
+        // Balancer Vault.flashLoan(recipient, tokens, amounts, userData)
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returnData) = vault.call(
+            abi.encodeWithSignature(
+                "flashLoan(address,address[],uint256[],bytes)",
+                address(this),
+                tokens,
+                amounts,
+                "" // empty bytes — steps are in contract storage
             )
         );
         if (!success) {

@@ -228,6 +228,21 @@ export class FlashloanBot {
     // 2. Start price monitoring
     this.monitor.start();
 
+    // 2b. Start WebSocket block subscriptions if wsUrl is configured
+    if (this.config.network.wsUrl) {
+      this.log("info", `WebSocket URL configured — enabling real-time block subscriptions`);
+      this.monitor.on("ws:connected", () => {
+        this.log("info", "WebSocket connected — polling driven by new blocks");
+      });
+      this.monitor.on("ws:disconnected", () => {
+        this.log("warn", "WebSocket disconnected — falling back to HTTP polling");
+      });
+      this.monitor.on("ws:reconnecting", () => {
+        this.log("info", "WebSocket reconnecting...");
+      });
+      this.monitor.startWebSocket(this.config.network.wsUrl);
+    }
+
     // 3. Register graceful shutdown
     this.registerShutdownHandlers();
 
@@ -305,7 +320,7 @@ export class FlashloanBot {
         }
 
         // Build the transaction
-        const tx = this.builder.buildArbitrageTransaction(opp, "aave_v3");
+        const tx = this.builder.buildArbitrageTransaction(opp, "balancer");
 
         // Simulate via eth_call (free, no gas cost)
         const simResult = await this.engine.simulateTransaction({
@@ -382,7 +397,7 @@ export class FlashloanBot {
           }
 
           // Build transaction
-          const tx = this.builder.buildArbitrageTransaction(opp, "aave_v3");
+          const tx = this.builder.buildArbitrageTransaction(opp, "balancer");
 
           // Get current gas parameters from provider
           const provider = new JsonRpcProvider(this.config.network.rpcUrl);
