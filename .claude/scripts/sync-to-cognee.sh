@@ -1,17 +1,18 @@
 #!/bin/bash
 set -euo pipefail
 
-# Sync knowledge to Cognee
+# Sync knowledge to Cognee (compute server deployment)
 # Usage: ./sync-to-cognee.sh [--clear] [dataset]
-#   --clear: Delete datasets AND clear Neo4j graph before syncing (fresh upload)
+#   --clear: Delete all datasets before syncing (fresh upload)
 #   dataset: specific dataset to sync (optional)
 #   If no dataset specified, syncs all datasets
 #
-# Note: --clear also purges the Neo4j knowledge graph to prevent stale entity accumulation
+# Default target: https://flashloaner-cognee.apps.compute.lan
+# Override: COGNEE_URL=http://localhost:8003 ./sync-to-cognee.sh
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-COGNEE_API="http://localhost:8003/api/v1"
+COGNEE_API="${COGNEE_URL:-https://flashloaner-cognee.apps.compute.lan}/api/v1"
 
 # Colors for output
 RED='\033[0;31m'
@@ -25,17 +26,19 @@ log_error() { echo -e "${RED}[ERROR]${NC} $*"; }
 
 # Check if Cognee is running
 check_cognee() {
-    if ! curl -s -f "http://localhost:8003/health" > /dev/null 2>&1; then
-        log_error "Cognee is not running. Start it with: .claude/scripts/cognee-local.sh up"
+    local base_url="${COGNEE_URL:-https://flashloaner-cognee.apps.compute.lan}"
+    if ! curl -sk -f "${base_url}/health" > /dev/null 2>&1; then
+        log_error "Cognee is not reachable at ${base_url}"
+        log_error "Set COGNEE_URL env var or check the deployment"
         exit 1
     fi
-    log_info "Cognee is running"
+    log_info "Cognee is running at ${base_url}"
 }
 
 # Get dataset ID by name
 get_dataset_id() {
     local dataset_name="$1"
-    curl -s "$COGNEE_API/datasets" | \
+    curl -sk "$COGNEE_API/datasets" | \
         python3 -c "import sys, json; datasets = json.load(sys.stdin); match = next((d for d in datasets if d['name'] == '$dataset_name'), None); print(match['id'] if match else '')"
 }
 
@@ -51,30 +54,27 @@ delete_dataset() {
     fi
 
     log_info "Deleting dataset: $dataset_name (ID: $dataset_id)"
-    curl -s -X DELETE "$COGNEE_API/datasets/$dataset_id" > /dev/null
+    curl -sk -X DELETE "$COGNEE_API/datasets/$dataset_id" > /dev/null
     log_info "Deleted: $dataset_name"
 }
 
-# Clear Neo4j knowledge graph (prevents stale entity accumulation)
-clear_neo4j_graph() {
-    log_info "Clearing Neo4j knowledge graph..."
-
-    # Get Neo4j password from .env file or use default
-    local neo4j_password="neo4j_password"
-    local env_file="$REPO_ROOT/.claude/docker/.env"
-    if [ -f "$env_file" ]; then
-        local env_password
-        env_password=$(grep -E "^COGNEE_NEO4J_PASSWORD=" "$env_file" 2>/dev/null | cut -d'=' -f2)
-        if [ -n "$env_password" ]; then
-            neo4j_password="$env_password"
-        fi
-    fi
-
-    # Clear all nodes and relationships from Neo4j
-    if docker exec flashloaner-cognee-neo4j cypher-shell -u neo4j -p "$neo4j_password" "MATCH (n) DETACH DELETE n" > /dev/null 2>&1; then
-        log_info "Neo4j graph cleared"
+# Clear knowledge graph (deletes all datasets, Cognee rebuilds on next cognify)
+clear_graph() {
+    log_info "Clearing knowledge graph via API..."
+    # Delete all datasets — Cognee will rebuild the graph on next cognify
+    local datasets
+    datasets=$(curl -sk "$COGNEE_API/datasets" 2>/dev/null)
+    if [ -n "$datasets" ] && [ "$datasets" != "[]" ]; then
+        echo "$datasets" | python3 -c "
+import sys, json
+for d in json.load(sys.stdin):
+    print(d['id'])
+" 2>/dev/null | while read -r did; do
+            curl -sk -X DELETE "$COGNEE_API/datasets/$did" > /dev/null 2>&1
+        done
+        log_info "All datasets cleared"
     else
-        log_warn "Could not clear Neo4j graph (container may not be running or wrong password)"
+        log_info "No datasets to clear"
     fi
 }
 
@@ -106,14 +106,14 @@ upload_files() {
         log_info "  -> $filename"
 
         # Upload file to Cognee
-        curl -s -X POST "$COGNEE_API/add" \
+        curl -sk -X POST "$COGNEE_API/add" \
             -F "data=@$file" \
             -F "datasetName=$dataset_name" > /dev/null
     done
 
     log_info "Processing dataset: $dataset_name"
     # Cognify using dataset name
-    curl -s -X POST "$COGNEE_API/cognify" \
+    curl -sk -X POST "$COGNEE_API/cognify" \
         -H "Content-Type: application/json" \
         -d "{\"datasets\": [\"$dataset_name\"]}" > /dev/null
 
@@ -211,9 +211,9 @@ main() {
     done
     export CLEAR_DATASETS
 
-    # Clear Neo4j graph if --clear flag is set
+    # Clear all datasets if --clear flag is set
     if [ "$CLEAR_DATASETS" = "true" ]; then
-        clear_neo4j_graph
+        clear_graph
     fi
 
     if [ $# -eq 0 ]; then

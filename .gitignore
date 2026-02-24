@@ -67,5 +67,8 @@ STICKYNOTE.md
 .beads/interactions.jsonl
 .beads/metadata.json
 
+# ── Kamal secrets (DO NOT COMMIT) ──
+.kamal/secrets
+
 # ── Cognee local data ──
 cognee_data/

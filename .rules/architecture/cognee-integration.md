@@ -1,165 +1,122 @@
 ---
-description: Cognee AI memory layer integration for flashloan arbitrage bot knowledge system
-tags: [cognee, architecture, knowledge-graph, semantic-search]
-last_updated: 2026-02-13
+description: Cognee AI memory layer — deployed to compute server via Kamal
+tags: [cognee, architecture, knowledge-graph, semantic-search, kamal]
+last_updated: 2026-02-24
 ---
 
 # Cognee Integration Architecture
 
 Cognee provides semantic search, knowledge graphs, and AI-powered insights over the flashloan bot documentation, BDD specs, trading patterns, and contract documentation.
 
-## Overview
+## Deployment
+
+Cognee runs on the compute server (`10.10.20.138`) deployed via **Kamal**. Each project gets its own isolated Cognee instance.
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Knowledge Sources                         │
-│  (.claude/ + .rules/ + contracts/docs/ + Session History)   │
-└────────────────┬────────────────────────────────────────────┘
-                 │
-                 │ /land (auto-sync) or sync-to-cognee.sh
-                 ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    Cognee Stack                              │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │  PostgreSQL  │  │    Redis     │  │    Neo4j     │      │
-│  │  + pgvector  │  │   (Cache)    │  │   (Graph)    │      │
-│  └──────────────┘  └──────────────┘  └──────────────┘      │
-│         │                  │                 │              │
-│         └──────────────────┴─────────────────┘              │
-│                           │                                 │
-│                  ┌────────▼────────┐                        │
-│                  │  Cognee API     │                        │
-│                  │  (FastAPI)      │                        │
-│                  └────────┬────────┘                        │
-└───────────────────────────┼─────────────────────────────────┘
-                            │
-                            │ HTTP API
-                            ▼
-┌─────────────────────────────────────────────────────────────┐
-│                      Consumers                               │
-│  - /query command (semantic search)                         │
-│  - /land command (session capture)                          │
-│  - Claude agents (context retrieval)                        │
-│  - Neo4j Browser (graph visualization)                      │
-└─────────────────────────────────────────────────────────────┘
+Client (curl, /query, sync-to-cognee.sh)
+    │
+    │ HTTPS
+    ▼
+Traefik (*.apps.compute.lan wildcard TLS)
+    │
+    ▼
+kamal-proxy
+    │
+    ├─► flashloaner-cognee-web  (Cognee API, port 8000)
+    │       │  Graph: Kuzu (embedded)
+    │       │  Vectors: pgvector
+    │       │  Relational: PostgreSQL
+    │       │
+    └─► flashloaner-cognee-db   (pgvector/pgvector:pg17)
+            │  NFS: /mnt/nfs/databases/flashloaner-cognee
 ```
 
-## Unique Deployment (Isolated from Other Projects)
+### Stack (Slim Deployment)
 
-This Cognee instance is **completely independent** from any other project's Cognee deployment (e.g., compute-stack). All container names, ports, volumes, and networks use the `flashloaner-cognee-*` prefix.
+| Component | Technology | Notes |
+|-----------|-----------|-------|
+| **API** | `cognee/cognee:latest` (v0.5.2) | FastAPI on port 8000 |
+| **Graph DB** | Kuzu (embedded) | File-based, no external server |
+| **Vector DB** | pgvector | PostgreSQL extension |
+| **Relational DB** | PostgreSQL 17 | pgvector image includes both |
+| **Secrets** | 1Password via `op read` | Fetched at deploy time |
 
-### Port Mappings
+No Neo4j, no Redis — minimal footprint.
 
-| Service | Container | Host | Purpose |
-|---------|-----------|------|---------|
-| PostgreSQL | 5432 | **5436** | Vector DB |
-| Redis | 6379 | **6383** | Cache |
-| Neo4j HTTP | 7474 | **7477** | Browser UI |
-| Neo4j Bolt | 7687 | **7690** | Protocol |
-| Cognee API | 8000 | **8003** | REST API |
+### Endpoints
 
-### Container Names
+| Service | URL |
+|---------|-----|
+| **Cognee API** | `https://flashloaner-cognee.apps.compute.lan` |
+| **Health** | `https://flashloaner-cognee.apps.compute.lan/health` |
+| **API Docs** | `https://flashloaner-cognee.apps.compute.lan/docs` |
 
-| Service | Container Name |
-|---------|---------------|
-| PostgreSQL | `flashloaner-cognee-postgres` |
-| Redis | `flashloaner-cognee-redis` |
-| Neo4j | `flashloaner-cognee-neo4j` |
-| Cognee API | `flashloaner-cognee-api` |
+### Deployment Commands
 
-### Docker Volumes
+```bash
+# Deploy (from repo root, requires kamal + op CLI)
+kamal deploy
 
-| Volume | Purpose |
-|--------|---------|
-| `flashloaner-cognee-pgdata` | PostgreSQL data + pgvector |
-| `flashloaner-cognee-redis` | Redis persistence |
-| `flashloaner-cognee-neo4j` | Neo4j graph data |
+# Check status
+kamal details
 
-### Docker Network
+# View logs
+kamal app logs
 
-| Network | Purpose |
-|---------|---------|
-| `flashloaner-cognee` | Internal communication between Cognee services |
+# Redeploy after config changes
+kamal deploy
+```
 
-## Components
+### Configuration Files
 
-### 1. Data Sources
+| File | Purpose |
+|------|---------|
+| `config/deploy.yml` | Kamal deployment config |
+| `.kamal/secrets` | 1Password secret references (gitignored) |
+| `.claude/docker/Dockerfile.cognee` | Thin wrapper (`FROM cognee/cognee:latest`) |
+
+## Data Sources
 
 **Claude Configuration** (`.claude/`)
-- Commands (workflow automation)
-- Skills (BDD pipeline, planning, TDD)
-- Agent definitions
-- Hook configurations
+- Commands, skills, agent definitions
 
 **Technical Documentation** (`.rules/`)
-- Architecture (system overview, contract architecture, this document)
-- Patterns (BDD workflow, beads integration, git workflow, deployment, security)
+- Architecture, patterns, workflows
 
-**Contract Documentation** (`contracts/docs/`)
-- Solidity NatSpec documentation
-- Interface specifications
-- Audit reports
+**Project Documentation** (root)
+- CONSTITUTION.md, VISION.md, CLAUDE.md
 
-**Session History**
-- Captured via `/land` command
-- Work completed, decisions made, challenges solved
-- BDD specs written, tests passed/failed
-- Trading pattern discoveries
-
-### 2. Cognee Stack
-
-**PostgreSQL + pgvector**
-- Document storage and metadata
-- Vector embeddings for semantic search
-- Full-text search capabilities
-
-**Redis**
-- Response caching
-- Async job queue
-- Session storage
-
-**Neo4j**
-- Knowledge graph database
-- Entity relationships (contracts, DEXes, tokens, patterns)
-- Dependency mapping between components
-
-**Cognee API**
-- REST API (FastAPI)
-- Document ingestion and processing
-- Semantic search
-- Knowledge graph queries
+**Contract Documentation** (`contracts/`, `docs/`)
+- Solidity docs, security audits, feature specs
 
 ## Datasets
 
 | Dataset | Source | Purpose |
 |---------|--------|---------|
-| `flashloaner-knowledge` | `.claude/` + `.rules/` files | Commands, skills, agents, architecture, patterns |
-| `flashloaner-patterns` | `.rules/patterns/` files | Trading patterns, workflow patterns, security patterns |
-| `flashloaner-sessions` | Session summaries | Work history, decisions, solutions |
-| `flashloaner-contracts` | Solidity docs/NatSpec | Contract interfaces, function docs, audit findings |
+| `flashloaner-skills` | `.claude/skills/` | BDD pipeline, planning, TDD skills |
+| `flashloaner-rules` | `.rules/` | Architecture, patterns, workflows |
+| `flashloaner-project` | Root `.md` files | Constitution, vision, project config |
+| `flashloaner-solidity` | `contracts/`, `docs/`, `features/` | Contract docs, audits, specs |
 
 ## Data Flow
 
 ### Ingestion (Knowledge -> Cognee)
 
 ```
-1. User runs: /land (auto-syncs when .claude/ or .rules/ changed)
+1. User runs: sync-to-cognee.sh (or /land auto-syncs)
    │
-2. sync-to-cognee.sh finds all .md and .sol files in .claude/, .rules/, contracts/
+2. Script finds .md and .feature files in .claude/, .rules/, contracts/, docs/
    │
 3. For each file:
    │  ├─ Upload to Cognee API (POST /api/v1/add)
-   │  ├─ Assign to dataset (flashloaner-knowledge, flashloaner-contracts, etc.)
-   │  └─ Store metadata (file path, last modified)
+   │  └─ Assign to dataset
    │
-4. Cognee processes files:
+4. Cognee processes (cognify):
    │  ├─ Chunk documents (semantic chunking)
-   │  ├─ Generate embeddings (OpenAI text-embedding-3-small)
+   │  ├─ Generate embeddings (text-embedding-3-small)
    │  ├─ Extract entities (LLM-based)
-   │  ├─ Build knowledge graph (Neo4j)
-   │  └─ Index for search (PostgreSQL + pgvector)
-   │
-5. Knowledge graph created and ready for queries
+   │  ├─ Build knowledge graph (Kuzu)
+   │  └─ Index for search (pgvector)
 ```
 
 ### Query (User -> Cognee -> Answer)
@@ -168,163 +125,61 @@ This Cognee instance is **completely independent** from any other project's Cogn
 1. User runs: /query "How does the FlashloanExecutor route swaps?"
    │
 2. Claude calls Cognee API:
-   │  POST /api/v1/search
+   │  POST https://flashloaner-cognee.apps.compute.lan/api/v1/search
    │  { "query": "How does the FlashloanExecutor route swaps?" }
    │
-3. Cognee processes query:
+3. Cognee processes:
    │  ├─ Generate query embedding
    │  ├─ Vector similarity search (pgvector)
-   │  ├─ Graph traversal (Neo4j) for related concepts
-   │  ├─ LLM-based answer generation
-   │  └─ Return answer + sources
+   │  ├─ Graph traversal (Kuzu)
+   │  └─ Return ranked results
    │
-4. Claude displays:
-   │  ├─ Answer to user's question
-   │  ├─ Source documents referenced
-   │  └─ Related contracts/patterns
-```
-
-### Session Capture (/land -> Cognee)
-
-```
-1. User runs: /land
-   │
-2. Create session summary:
-   │  ├─ Date, branch, commit
-   │  ├─ Work completed
-   │  ├─ Beads closed
-   │  ├─ Technical decisions
-   │  └─ Challenges/solutions
-   │
-3. Upload to Cognee:
-   │  ├─ POST /api/v1/add
-   │  ├─ Dataset: flashloaner-sessions
-   │  └─ Cognify to update graph
-   │
-4. Session indexed and searchable:
-   │  ├─ "What DEX adapters did we add last week?"
-   │  ├─ "How did we fix the reentrancy issue?"
-   │  └─ "What fork tests cover Curve pools?"
-```
-
-## API Endpoints
-
-### Health Check
-
-```bash
-curl http://localhost:8003/health
-```
-
-### Add Document
-
-```bash
-curl -X POST http://localhost:8003/api/v1/add \
-  -H "Content-Type: application/json" \
-  -d '{
-    "data": "FlashloanExecutor routes swaps through registered DEX adapters.",
-    "dataset_name": "flashloaner-knowledge"
-  }'
-```
-
-### Cognify (Build Knowledge Graph)
-
-```bash
-curl -X POST http://localhost:8003/api/v1/cognify \
-  -H "Content-Type: application/json" \
-  -d '{
-    "datasets": ["flashloaner-knowledge", "flashloaner-patterns", "flashloaner-contracts"]
-  }'
-```
-
-### Search
-
-```bash
-curl -X POST http://localhost:8003/api/v1/search \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "How does the safety module validate profit?",
-    "dataset_name": "flashloaner-knowledge"
-  }'
-```
-
-## Configuration
-
-### Environment Variables
-
-See `.claude/docker/.env`:
-
-```env
-# Database
-COGNEE_DB_PASSWORD=<secure-password>
-COGNEE_NEO4J_PASSWORD=<secure-password>
-
-# OpenAI (required)
-OPENAI_API_KEY=sk-your-key-here
-COGNEE_LLM_MODEL=gpt-4
-COGNEE_EMBEDDING_MODEL=text-embedding-3-small
-
-# Authentication (disabled for local dev)
-COGNEE_REQUIRE_AUTH=false
+4. Claude displays answer + sources
 ```
 
 ## Workflows
 
-### Initial Setup
+### Syncing Knowledge
 
 ```bash
-# 1. Start Cognee stack
-.claude/scripts/cognee-local.sh up
-
-# 2. Wait for health checks
-.claude/scripts/cognee-local.sh health
-
-# 3. Initial sync
+# Sync all datasets to Cognee
 .claude/scripts/sync-to-cognee.sh
 
-# 4. Verify in Neo4j Browser
-open http://localhost:7477
+# Sync specific dataset
+.claude/scripts/sync-to-cognee.sh rules
+
+# Clear everything and re-sync from scratch
+.claude/scripts/sync-to-cognee.sh --clear
+
+# Available datasets: skills, rules, project, solidity
 ```
 
-### Daily Use
+### Querying
 
 ```bash
-# Query knowledge
+# Via /query command
 /query How does the FlashloanExecutor handle Aave callbacks?
 
-# At end of session
-/land  # Auto-syncs to Cognee, captures session
+# Via curl
+curl -sk -X POST https://flashloaner-cognee.apps.compute.lan/api/v1/search \
+  -H "Content-Type: application/json" \
+  -d '{"query": "How does the FlashloanExecutor route swaps?"}'
 ```
 
-### Maintenance
+### Health Check
 
 ```bash
-# View logs
-.claude/scripts/cognee-local.sh logs-api
-
-# Check health
-.claude/scripts/cognee-local.sh health
-
-# Backup data
-.claude/scripts/cognee-local.sh backup
-
-# Reset everything
-.claude/scripts/cognee-local.sh clean
-.claude/scripts/cognee-local.sh up
+curl -sk https://flashloaner-cognee.apps.compute.lan/health
+# {"status":"ready","health":"healthy","version":"0.5.2-local"}
 ```
 
-## Limitations
+## Environment Override
 
-### Local Development
+The sync script defaults to the compute server. Override with `COGNEE_URL` for local dev:
 
-- Requires Docker and 4GB+ RAM (8GB recommended)
-- OpenAI API key required (costs money)
-- Network connectivity for embeddings
-
-### Performance
-
-- Initial sync can take minutes for large documentation sets
-- Search latency ~1-2 seconds
-- Neo4j requires warm-up time after restart
+```bash
+COGNEE_URL=http://localhost:8003 .claude/scripts/sync-to-cognee.sh
+```
 
 ## Related Documentation
 

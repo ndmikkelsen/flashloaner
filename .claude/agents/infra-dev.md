@@ -39,7 +39,7 @@ Before writing ANY configuration, read the relevant documentation:
 
 ### Docker
 - **Container Management**: Docker Compose, multi-stage builds
-- **Cognee Stack**: flashloaner-cognee-* containers (PG 5436, Redis 6383, Neo4j 7477/7690, API 8003)
+- **Cognee Stack**: Deployed to compute server via Kamal (flashloaner-cognee.apps.compute.lan)
 
 ## Project Structure
 
@@ -120,11 +120,10 @@ init.flashloan-scaffolding/
 #### Cognee Stack
 
 ```yaml
-# flashloaner-cognee containers:
-# - PostgreSQL (port 5436)
-# - Redis (port 6383)
-# - Neo4j (ports 7477 HTTP, 7690 Bolt)
-# - Cognee API (port 8003)
+# Deployed to compute server via Kamal
+# URL: https://flashloaner-cognee.apps.compute.lan
+# Config: config/deploy.yml
+# Components: Cognee API + PostgreSQL/pgvector + Kuzu (embedded graph)
 ```
 
 ### Monitoring Setup

@@ -81,7 +81,7 @@ export const ARBITRUM_CONFIG: ChainConfig = {
   // Detector configuration (Arbitrum thresholds — tuned from v1 dry-run analysis)
   // Fee deduction is now handled in OpportunityDetector.calculateGrossProfit()
   detector: {
-    minProfitThreshold: 0.005, // Lowered from 0.01 — catches marginal SPELL/WETH opps (~0.016 ETH net)
+    minProfitThreshold: 0.015, // Raised from 0.005 — must exceed worst-case revert gas cost (~0.0098 ETH)
     maxSlippage: 0.001, // 0.1% — tighter than 0.5% default; V2 pools handle moderate sizes well
     defaultInputAmount: 5, // 5 ETH flash loan (minimum viable for SPELL/WETH profitability)
     gasPriceGwei: 0.1, // Arbitrum typical gas price (L2 only; L1 via gasEstimatorFn)

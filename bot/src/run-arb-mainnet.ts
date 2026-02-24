@@ -342,7 +342,9 @@ async function main(): Promise<void> {
     console.log(col(`  Total cost: ${opp.costs.totalCost.toFixed(8)} ETH`));
     console.log(col(`  Net profit: ${opp.netProfit.toFixed(8)} ETH (${opp.netProfitPercent.toFixed(4)}%)`));
     console.log(col(`  Block:      ${opp.blockNumber}`));
-    const decision = profitable ? "WOULD EXECUTE (dry-run)" : "SKIP (costs exceed profit)";
+    const decision = profitable
+      ? (liveMode ? "EXECUTE (live)" : shadowMode ? "SIMULATE (shadow)" : "WOULD EXECUTE (dry-run)")
+      : "SKIP (costs exceed profit)";
     console.log(col(`  [${decision}]`));
     console.log(col(`================================================`));
   });

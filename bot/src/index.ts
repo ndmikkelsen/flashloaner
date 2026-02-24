@@ -52,6 +52,14 @@ export class FlashloanBot {
   private _status: BotStatus = "idle";
   private shutdownHandlers: Array<() => void> = [];
 
+  // Fix #3: Per-pair submission cooldown — prevents rapid-fire gas burn on the same spread
+  private _pairCooldowns: Map<string, number> = new Map();
+  private readonly SUBMISSION_COOLDOWN_MS = 10_000; // 10 seconds
+
+  // Fix #4: Revert tracking — skip recently reverted pairs for N seconds
+  private _revertedPairs: Map<string, { timestamp: number; blockNumber: number }> = new Map();
+  private readonly REVERT_COOLDOWN_MS = 10_000; // 10 seconds (~40 blocks on Arbitrum)
+
   constructor(
     config: BotConfig,
     dryRun = true,
@@ -333,11 +341,28 @@ export class FlashloanBot {
         return;
       }
 
-      // LIVE mode: check staleness and execute
+      // LIVE mode: check staleness, cooldowns, and execute
       if (this.mode === "live") {
         const staleness = this.detector.checkStaleness(opp);
         if (!staleness.fresh) {
           this.log("warn", `[STALE] Opportunity ${opp.id} is too stale (${staleness.latencyMs}ms > 200ms). Aborting.`);
+          return;
+        }
+
+        // Fix #3: Check per-pair submission cooldown
+        const pairKey = opp.priceDelta.pair;
+        const lastSubmission = this._pairCooldowns.get(pairKey);
+        if (lastSubmission && Date.now() - lastSubmission < this.SUBMISSION_COOLDOWN_MS) {
+          const remaining = Math.ceil((this.SUBMISSION_COOLDOWN_MS - (Date.now() - lastSubmission)) / 1000);
+          this.log("warn", `[COOLDOWN] Skipping ${pairKey} — submitted ${remaining}s ago, waiting for cooldown`);
+          return;
+        }
+
+        // Fix #4: Check if this pair recently reverted
+        const revertInfo = this._revertedPairs.get(pairKey);
+        if (revertInfo && Date.now() - revertInfo.timestamp < this.REVERT_COOLDOWN_MS) {
+          const remaining = Math.ceil((this.REVERT_COOLDOWN_MS - (Date.now() - revertInfo.timestamp)) / 1000);
+          this.log("warn", `[REVERT-SKIP] Skipping ${pairKey} — reverted at block ${revertInfo.blockNumber}, cooldown ${remaining}s remaining`);
           return;
         }
 
@@ -375,8 +400,9 @@ export class FlashloanBot {
           // Prepare transaction with gas and nonce
           const preparedTx = this.builder.prepareTransaction(tx, gasSettings, nonceResult.nonce);
 
-          // Submit transaction
+          // Submit transaction — record cooldown immediately
           this.log("info", `[LIVE] Submitting transaction for ${opp.id}...`);
+          this._pairCooldowns.set(pairKey, Date.now());
           const result = await this.engine.executeTransaction(preparedTx);
 
           if (result.status === "confirmed") {
@@ -403,6 +429,9 @@ export class FlashloanBot {
             this.log("warn", `[LIVE] ✗ Transaction reverted: ${result.txHash}`);
             this.log("warn", `[LIVE] Revert reason: ${result.revertReason ?? "unknown"}`);
             this.nonceManager.markConfirmed(result.txHash!); // Still increment nonce
+
+            // Fix #4: Track reverted pair for cooldown
+            this._revertedPairs.set(pairKey, { timestamp: Date.now(), blockNumber: opp.blockNumber });
 
             // Record reverted trade (gas burned)
             const revertGasEth = result.gasUsed ? Number(result.gasUsed) * Number(feeData.gasPrice ?? 0n) / 1e18 : opp.costs.gasCost;

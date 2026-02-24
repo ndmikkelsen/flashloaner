@@ -164,20 +164,21 @@ Related Patterns:
 EOF
 
 # Upload to Cognee (set COGNEE_RUNNING for Step 7b)
+COGNEE_URL="${COGNEE_URL:-https://flashloaner-cognee.apps.compute.lan}"
 COGNEE_RUNNING=false
-if curl -s http://localhost:8003/health > /dev/null 2>&1; then
-  curl -X POST http://localhost:8003/api/v1/add \
+if curl -sk "${COGNEE_URL}/health" > /dev/null 2>&1; then
+  curl -sk -X POST "${COGNEE_URL}/api/v1/add" \
     -F "data=@${SESSION_FILE}" \
     -F "datasetName=flashloaner-sessions"
 
   # Cognify to create knowledge graph
-  curl -X POST http://localhost:8003/api/v1/cognify \
+  curl -sk -X POST "${COGNEE_URL}/api/v1/cognify" \
     -H "Content-Type: application/json" \
     -d '{"datasets": ["flashloaner-sessions"]}'
 
   COGNEE_RUNNING=true
 else
-  echo "Cognee not running -- skipping session capture"
+  echo "Cognee not reachable at ${COGNEE_URL} -- skipping session capture"
 fi
 ```
 
@@ -194,26 +195,26 @@ GARDEN_CHANGED=$(git diff --name-only origin/main...HEAD | grep '^\(.claude/\|.r
 if [ -n "$GARDEN_CHANGED" ] && [ "$COGNEE_RUNNING" = true ]; then
   echo "Syncing knowledge garden to Cognee..."
 
-  # Upload .claude/ files to flashloaner-knowledge dataset
+  # Upload .claude/ files to flashloaner-skills dataset
   for file in $(find .claude -type f -name "*.md" | sort); do
-    curl -s -X POST http://localhost:8003/api/v1/add \
+    curl -sk -X POST "${COGNEE_URL}/api/v1/add" \
       -F "data=@${file}" \
-      -F "datasetName=flashloaner-knowledge" > /dev/null
+      -F "datasetName=flashloaner-skills" > /dev/null
   done
 
-  # Upload .rules/ files to flashloaner-patterns dataset
+  # Upload .rules/ files to flashloaner-rules dataset
   if [ -d .rules ]; then
     for file in $(find .rules -type f -name "*.md" | sort); do
-      curl -s -X POST http://localhost:8003/api/v1/add \
+      curl -sk -X POST "${COGNEE_URL}/api/v1/add" \
         -F "data=@${file}" \
-        -F "datasetName=flashloaner-patterns" > /dev/null
+        -F "datasetName=flashloaner-rules" > /dev/null
     done
   fi
 
   # Cognify both datasets
-  curl -s -X POST http://localhost:8003/api/v1/cognify \
+  curl -sk -X POST "${COGNEE_URL}/api/v1/cognify" \
     -H "Content-Type: application/json" \
-    -d '{"datasets": ["flashloaner-knowledge", "flashloaner-patterns"]}' > /dev/null
+    -d '{"datasets": ["flashloaner-skills", "flashloaner-rules"]}' > /dev/null
 
   echo "Knowledge garden synced to Cognee"
 elif [ -n "$GARDEN_CHANGED" ]; then
