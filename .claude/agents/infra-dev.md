@@ -50,13 +50,12 @@ init.flashloan-scaffolding/
 │       ├── test.yml            # Test pipeline (forge + vitest)
 │       ├── security.yml        # Security scanning (slither + gitleaks)
 │       └── deploy.yml          # Deployment pipeline (gated)
-├── docker/
-│   ├── bot/
-│   │   └── Dockerfile          # Bot container
-│   ├── cognee/
-│   │   └── docker-compose.yml  # Cognee stack
-│   └── monitoring/
-│       └── docker-compose.yml  # Monitoring stack
+├── .claude/docker/
+│   └── Dockerfile.dolt         # Dolt SQL server image
+├── config/
+│   ├── deploy.yml              # Kamal shared base config
+│   ├── deploy.cognee.yml       # Cognee Kamal destination
+│   └── deploy.dolt.yml         # Dolt Kamal destination
 ├── script/                     # Foundry deployment scripts
 │   └── Deploy.s.sol
 ├── foundry.toml                # Foundry configuration
@@ -186,12 +185,8 @@ DEPLOYER_PRIVATE_KEY=     # Deployer wallet (NEVER in git)
 ETHERSCAN_API_KEY=        # For contract verification
 BOT_PRIVATE_KEY=          # Bot execution wallet (NEVER in git)
 
-# Cognee stack
-COGNEE_PG_PORT=5436
-COGNEE_REDIS_PORT=6383
-COGNEE_NEO4J_HTTP_PORT=7477
-COGNEE_NEO4J_BOLT_PORT=7690
-COGNEE_API_PORT=8003
+# Beads Dolt SQL Server (remote — compute server)
+BEADS_DOLT_PASSWORD=          # From 1Password flashloaner-knowledge (NEVER in git)
 ```
 
 **CRITICAL**: Private keys and RPC URLs with API keys must NEVER be committed. Always use:
@@ -211,8 +206,8 @@ act push --dry-run                   # Dry run push workflow
 # Validate Docker builds
 docker build -f docker/bot/Dockerfile -t flashloan-bot:test .
 
-# Validate Cognee stack
-docker compose -f docker/cognee/docker-compose.yml config --quiet
+# Validate Cognee health (remote)
+curl -sk https://flashloaner-cognee.apps.compute.lan/health
 ```
 
 ### Deployment Tests

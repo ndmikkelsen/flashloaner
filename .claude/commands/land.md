@@ -52,9 +52,6 @@ bd close <id> --reason "Completed in this session"
 
 # Update in-progress issues
 bd update <id> --status backlog --comment "Pausing for next session"
-
-# Sync with git
-bd sync
 ```
 
 ## Step 4: Check for Uncommitted Files
@@ -163,9 +160,8 @@ Related Patterns:
 - [any .rules/ docs that are relevant]
 EOF
 
-# Upload to Cognee (set COGNEE_RUNNING for Step 7b)
+# Upload to Cognee (remote — always https://flashloaner-cognee.apps.compute.lan)
 COGNEE_URL="${COGNEE_URL:-https://flashloaner-cognee.apps.compute.lan}"
-COGNEE_RUNNING=false
 if curl -sk "${COGNEE_URL}/health" > /dev/null 2>&1; then
   curl -sk -X POST "${COGNEE_URL}/api/v1/add" \
     -F "data=@${SESSION_FILE}" \
@@ -176,7 +172,7 @@ if curl -sk "${COGNEE_URL}/health" > /dev/null 2>&1; then
     -H "Content-Type: application/json" \
     -d '{"datasets": ["flashloaner-sessions"]}'
 
-  COGNEE_RUNNING=true
+  echo "Session captured to Cognee"
 else
   echo "Cognee not reachable at ${COGNEE_URL} -- skipping session capture"
 fi
@@ -192,7 +188,7 @@ Sync `.claude/` and `.rules/` to Cognee if they changed this session:
 # Check if knowledge files changed in this session
 GARDEN_CHANGED=$(git diff --name-only origin/main...HEAD | grep '^\(.claude/\|.rules/\)' || echo "")
 
-if [ -n "$GARDEN_CHANGED" ] && [ "$COGNEE_RUNNING" = true ]; then
+if [ -n "$GARDEN_CHANGED" ] && curl -sk "${COGNEE_URL}/health" > /dev/null 2>&1; then
   echo "Syncing knowledge garden to Cognee..."
 
   # Upload .claude/ files to flashloaner-skills dataset
@@ -218,7 +214,7 @@ if [ -n "$GARDEN_CHANGED" ] && [ "$COGNEE_RUNNING" = true ]; then
 
   echo "Knowledge garden synced to Cognee"
 elif [ -n "$GARDEN_CHANGED" ]; then
-  echo "Knowledge garden changed but Cognee not running -- skipping sync"
+  echo "Knowledge garden changed but Cognee unreachable -- skipping sync"
 else
   echo "No knowledge garden changes, skipping sync"
 fi
