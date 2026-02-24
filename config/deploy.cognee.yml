@@ -1,0 +1,69 @@
+# Kamal 2 deployment config for Cognee (semantic search + knowledge layer)
+#
+# Deploy:   kamal setup -d cognee     (first time)
+#           kamal deploy -d cognee    (subsequent)
+# Logs:     kamal app logs -d cognee
+# Status:   kamal details -d cognee
+#
+# This is a per-project Cognee instance (flashloaner).
+# Slimmed down: API + PostgreSQL/pgvector only (no Neo4j, no Redis).
+
+service: flashloaner-cognee
+
+image: flashloaner/cognee
+
+proxy:
+  host: flashloaner-cognee.apps.compute.lan
+  app_port: 8000
+  ssl: false
+  forward_headers: true
+  healthcheck:
+    interval: 5
+    path: /health
+    timeout: 5
+
+builder:
+  dockerfile: .claude/docker/Dockerfile.cognee
+
+env:
+  clear:
+    # Relational Database (PostgreSQL)
+    DB_PROVIDER: postgres
+    DB_HOST: flashloaner-cognee-db
+    DB_PORT: 5432
+    DB_NAME: cognee
+    DB_USERNAME: cognee
+    # Vector Database (pgvector — same PostgreSQL instance)
+    VECTOR_DB_PROVIDER: pgvector
+    VECTOR_DB_HOST: flashloaner-cognee-db
+    VECTOR_DB_PORT: 5432
+    VECTOR_DB_NAME: cognee
+    VECTOR_DB_USERNAME: cognee
+    # Graph Database (embedded — no Neo4j server needed)
+    GRAPH_DATABASE_PROVIDER: kuzu
+    # Embeddings
+    EMBEDDING_MODEL: text-embedding-3-small
+    EMBEDDING_DIMENSIONS: "1536"
+    # Auth (disabled — internal network only)
+    REQUIRE_AUTHENTICATION: "false"
+    ENABLE_BACKEND_ACCESS_CONTROL: "false"
+  secret:
+    - DB_PASSWORD
+    - VECTOR_DB_PASSWORD
+    - RELATIONAL_DATABASE
+    - VECTOR_DB_URL
+    - LLM_API_KEY
+
+accessories:
+  db:
+    image: pgvector/pgvector:pg17
+    host: 10.10.20.138
+    port: "5432:5432"
+    env:
+      clear:
+        POSTGRES_USER: cognee
+        POSTGRES_DB: cognee
+      secret:
+        - POSTGRES_PASSWORD
+    directories:
+      - /mnt/nfs/databases/flashloaner/cognee:/var/lib/postgresql/data

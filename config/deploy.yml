@@ -1,28 +1,17 @@
-# Kamal 2 deployment config for Cognee (semantic search + knowledge layer)
+# Kamal 2 shared base config for flashloaner infrastructure
 #
-# Deploy:   kamal deploy             (update Cognee)
-# Logs:     kamal app logs
-# Status:   kamal details
+# Destinations:
+#   kamal deploy -d cognee    Cognee API + PostgreSQL/pgvector
+#   kamal deploy -d dolt      Dolt SQL server (Beads backend)
 #
-# This is a per-project Cognee instance (flashloaner).
-# Slimmed down: API + PostgreSQL/pgvector only (no Neo4j, no Redis).
+# This base config is not deployed directly — always use a destination.
 
-service: flashloaner-cognee
+service: flashloaner
 
-image: flashloaner/cognee
+image: flashloaner/base
 
 servers:
   - 10.10.20.138
-
-proxy:
-  host: flashloaner-cognee.apps.compute.lan
-  app_port: 8000
-  ssl: false
-  forward_headers: true
-  healthcheck:
-    interval: 5
-    path: /health
-    timeout: 5
 
 registry:
   server: harbor.compute.lan
@@ -37,47 +26,3 @@ ssh:
 
 builder:
   arch: amd64
-  dockerfile: .claude/docker/Dockerfile.cognee
-
-env:
-  clear:
-    # Relational Database (PostgreSQL)
-    DB_PROVIDER: postgres
-    DB_HOST: flashloaner-cognee-db
-    DB_PORT: 5432
-    DB_NAME: cognee
-    DB_USERNAME: cognee
-    # Vector Database (pgvector — same PostgreSQL instance)
-    VECTOR_DB_PROVIDER: pgvector
-    VECTOR_DB_HOST: flashloaner-cognee-db
-    VECTOR_DB_PORT: 5432
-    VECTOR_DB_NAME: cognee
-    VECTOR_DB_USERNAME: cognee
-    # Graph Database (embedded — no Neo4j server needed)
-    GRAPH_DATABASE_PROVIDER: kuzu
-    # Embeddings
-    EMBEDDING_MODEL: text-embedding-3-small
-    EMBEDDING_DIMENSIONS: "1536"
-    # Auth (disabled — internal network only)
-    REQUIRE_AUTHENTICATION: "false"
-    ENABLE_BACKEND_ACCESS_CONTROL: "false"
-  secret:
-    - DB_PASSWORD
-    - VECTOR_DB_PASSWORD
-    - RELATIONAL_DATABASE
-    - VECTOR_DB_URL
-    - LLM_API_KEY
-
-accessories:
-  db:
-    image: pgvector/pgvector:pg17
-    host: 10.10.20.138
-    port: "5432:5432"
-    env:
-      clear:
-        POSTGRES_USER: cognee
-        POSTGRES_DB: cognee
-      secret:
-        - POSTGRES_PASSWORD
-    directories:
-      - /mnt/nfs/databases/flashloaner/cognee:/var/lib/postgresql/data
