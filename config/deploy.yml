@@ -54,8 +54,8 @@ env:
     VECTOR_DB_PORT: 5432
     VECTOR_DB_NAME: cognee
     VECTOR_DB_USERNAME: cognee
-    # Graph Database (in-memory — no Neo4j needed)
-    GRAPH_DATABASE_PROVIDER: networkx
+    # Graph Database (embedded — no Neo4j server needed)
+    GRAPH_DATABASE_PROVIDER: kuzu
     # Embeddings
     EMBEDDING_MODEL: text-embedding-3-small
     EMBEDDING_DIMENSIONS: "1536"
