@@ -107,12 +107,14 @@ async function main(): Promise<void> {
   const mode = dryRun ? "DRY-RUN" : shadowMode ? "SHADOW" : "LIVE";
 
   const rpcStatus = chain.rpcUrl ? "configured" : "MISSING";
+  const wsStatus = process.env.WS_URL ? "configured" : "not set (HTTP polling only)";
 
   console.log(c.cyan(`\n========================================`));
   console.log(c.cyan(`  Flashloan Bot v${BOT_VERSION} — ARBITRUM ONE`));
   console.log(c.cyan(`  Mode:     ${mode}`));
   console.log(c.cyan(`  Chain:    ${chain.chainName} (chainId ${chain.chainId})`));
   console.log(c.cyan(`  RPC:      ${rpcStatus}`));
+  console.log(c.cyan(`  WS:       ${wsStatus}`));
   console.log(c.cyan(`  Pools:    ${chain.pools.length} configured`));
   console.log(c.cyan(`  WETH:     ${chain.tokens.WETH}`));
   console.log(c.cyan(`  Input:    ${chain.detector.defaultInputAmount} ETH`));
@@ -195,7 +197,7 @@ async function main(): Promise<void> {
   // This avoids the default config path that hardcodes Ethereum/Sepolia values.
   const bot = new FlashloanBot(
     {
-      network: { rpcUrl: chain.rpcUrl, chainId: chain.chainId },
+      network: { rpcUrl: chain.rpcUrl, chainId: chain.chainId, wsUrl: process.env.WS_URL },
       pools: chain.pools,
       monitor: chain.monitor,
       detector: chain.detector,

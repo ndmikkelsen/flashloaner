@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { Contract, Interface } from "ethers";
+import { Contract, Interface, WebSocketProvider } from "ethers";
 import type {
   PoolConfig,
   PriceDelta,
@@ -63,6 +63,14 @@ export class PriceMonitor extends EventEmitter {
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private running = false;
 
+  // ---- WebSocket state ----
+  private _wsProvider: WebSocketProvider | null = null;
+  private _wsUrl: string | null = null;
+  private _wsActive = false;
+  private _wsReconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private _wsReconnectDelay = 1_000; // Start at 1s, exponential backoff
+  private static readonly WS_MAX_RECONNECT_DELAY = 30_000; // Cap at 30s
+
   constructor(config: PriceMonitorConfig) {
     super();
     this.config = {
@@ -86,18 +94,161 @@ export class PriceMonitor extends EventEmitter {
     this.pollTimer = setInterval(() => void this.poll(), this.config.pollIntervalMs);
   }
 
-  /** Stop the polling loop */
+  /** Stop the polling loop and any WebSocket connection */
   stop(): void {
     this.running = false;
     if (this.pollTimer) {
       clearInterval(this.pollTimer);
       this.pollTimer = null;
     }
+    this.stopWebSocket();
   }
 
   /** Whether the monitor is currently running */
   get isRunning(): boolean {
     return this.running;
+  }
+
+  /** Whether the WebSocket connection is active */
+  get wsActive(): boolean {
+    return this._wsActive;
+  }
+
+  /**
+   * Start WebSocket-driven block subscriptions for real-time price monitoring.
+   *
+   * When active, new blocks trigger poll() immediately instead of waiting for
+   * the setInterval timer. The HTTP polling interval is disabled to avoid
+   * double-polling. If the WebSocket disconnects, falls back to interval
+   * polling and attempts reconnection with exponential backoff.
+   *
+   * @param wsUrl - WebSocket RPC endpoint (e.g., "wss://arb-mainnet.g.alchemy.com/v2/KEY")
+   */
+  startWebSocket(wsUrl: string): void {
+    if (this._wsActive) return;
+
+    this._wsUrl = wsUrl;
+    this._wsReconnectDelay = 1_000; // Reset backoff on fresh start
+    this._connectWebSocket();
+  }
+
+  /** Stop the WebSocket connection and clean up reconnection timers */
+  stopWebSocket(): void {
+    this._wsActive = false;
+    this._wsUrl = null;
+
+    if (this._wsReconnectTimer) {
+      clearTimeout(this._wsReconnectTimer);
+      this._wsReconnectTimer = null;
+    }
+
+    if (this._wsProvider) {
+      try {
+        this._wsProvider.removeAllListeners();
+        this._wsProvider.destroy();
+      } catch {
+        // Ignore errors during cleanup
+      }
+      this._wsProvider = null;
+    }
+  }
+
+  /**
+   * Internal: create a WebSocketProvider instance.
+   * Extracted as a method so tests can mock/spy on it.
+   */
+  protected _createWebSocketProvider(wsUrl: string): WebSocketProvider {
+    return new WebSocketProvider(wsUrl);
+  }
+
+  /** Internal: establish the WebSocket connection and wire up event handlers */
+  private _connectWebSocket(): void {
+    if (!this._wsUrl) return;
+
+    try {
+      this._wsProvider = this._createWebSocketProvider(this._wsUrl);
+    } catch (err) {
+      this.emit("ws:disconnected");
+      this._scheduleReconnect();
+      return;
+    }
+
+    this._wsActive = true;
+
+    // Disable the setInterval timer to avoid double-polling
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
+    }
+
+    // Subscribe to new blocks
+    this._wsProvider.on("block", (_blockNumber: number) => {
+      // Reset backoff on successful block receipt (connection is healthy)
+      this._wsReconnectDelay = 1_000;
+      void this.poll();
+    });
+
+    // Handle WebSocket-level disconnect
+    if (this._wsProvider.websocket) {
+      this._wsProvider.websocket.on("close", () => {
+        this._handleWsDisconnect();
+      });
+
+      this._wsProvider.websocket.on("error", () => {
+        this._handleWsDisconnect();
+      });
+    }
+
+    this.emit("ws:connected");
+  }
+
+  /** Internal: handle WebSocket disconnection — fall back to HTTP polling and schedule reconnect */
+  private _handleWsDisconnect(): void {
+    if (!this._wsActive && !this._wsUrl) return; // Already stopped intentionally
+
+    this._wsActive = false;
+
+    // Clean up old provider
+    if (this._wsProvider) {
+      try {
+        this._wsProvider.removeAllListeners();
+        this._wsProvider.destroy();
+      } catch {
+        // Ignore errors during cleanup
+      }
+      this._wsProvider = null;
+    }
+
+    this.emit("ws:disconnected");
+
+    // Reinstate HTTP polling fallback if monitor is still running
+    if (this.running && !this.pollTimer) {
+      this.pollTimer = setInterval(() => void this.poll(), this.config.pollIntervalMs);
+    }
+
+    // Schedule reconnection attempt
+    this._scheduleReconnect();
+  }
+
+  /** Internal: schedule a reconnection attempt with exponential backoff */
+  private _scheduleReconnect(): void {
+    if (!this._wsUrl) return; // stopWebSocket was called, don't reconnect
+
+    const delay = this._wsReconnectDelay;
+
+    this._wsReconnectTimer = setTimeout(() => {
+      this._wsReconnectTimer = null;
+      if (!this._wsUrl) return; // Cancelled during the wait
+
+      this.emit("ws:reconnecting");
+      this._connectWebSocket();
+    }, delay);
+
+    // Exponential backoff: 1s, 2s, 4s, 8s, 16s, 30s (capped)
+    this._wsReconnectDelay = Math.min(
+      this._wsReconnectDelay * 2,
+      PriceMonitor.WS_MAX_RECONNECT_DELAY,
+    );
   }
 
   /** Get the latest price snapshot for a pool */
