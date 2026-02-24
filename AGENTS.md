@@ -138,7 +138,7 @@ bd create "Title" -t task -p 1        # Create issue
 bd update <id> --status in_progress   # Claim work
 bd close <id> --reason "Done"         # Complete work
 bd dep add <blocked> <blocker>        # Add dependency
-bd sync                               # Sync with git
+# Note: bd sync is deprecated — Dolt backend auto-syncs via git hooks
 ```
 
 ### Issue Types
@@ -307,7 +307,6 @@ PLAN (what we're doing)
 4. **PUSH TO REMOTE** - This is MANDATORY:
    ```bash
    git pull --rebase
-   bd sync
    git push
    git status  # MUST show "up to date with origin"
    ```

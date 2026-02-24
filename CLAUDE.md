@@ -240,7 +240,7 @@ flashloaner/
 │   ├── agents/             # Agent definitions (5 agents)
 │   ├── skills/             # BDD pipeline skills
 │   ├── scripts/            # Cognee scripts
-│   └── docker/             # Cognee docker-compose
+│   └── docker/             # Kamal Dockerfiles (e.g. Dolt)
 ├── .beads/                 # Issue tracking
 ├── foundry.toml            # Foundry config
 ├── package.json            # pnpm/Node.js config
