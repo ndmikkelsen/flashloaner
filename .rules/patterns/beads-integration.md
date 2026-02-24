@@ -160,11 +160,11 @@ Implementation Plan:
 - Compare gas costs with Aave flash loans
 EOF
 
-curl -X POST http://localhost:8003/api/v1/add \
+curl -sk -X POST https://flashloaner-cognee.apps.compute.lan/api/v1/add \
   -F "data=@cognee-balancer-flash.txt" \
   -F "datasetName=flashloaner-knowledge"
 
-curl -X POST http://localhost:8003/api/v1/cognify \
+curl -sk -X POST https://flashloaner-cognee.apps.compute.lan/api/v1/cognify \
   -H "Content-Type: application/json" \
   -d '{"datasets": ["flashloaner-knowledge"]}'
 ```

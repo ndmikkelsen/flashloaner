@@ -12,6 +12,15 @@ import {IDEXAdapter} from "./interfaces/IDEXAdapter.sol";
 /// @dev Inherits FlashloanReceiver for flash loan callbacks, implements
 ///      IFlashloanExecutor for the full arbitrage interface. Supports multi-hop
 ///      swap routing through registered DEX adapters with profit validation.
+///
+/// Adapters to register via registerAdapter():
+/// - UniswapV2Adapter (Uniswap V2, SushiSwap V2)
+/// - UniswapV3Adapter (Uniswap V3, SushiSwap V3)
+/// - CamelotV2Adapter (Camelot V2)
+/// - CamelotV3Adapter (Camelot V3)
+/// - RamsesV3Adapter (Ramses V3)
+/// - TraderJoeLBAdapter (Trader Joe LB V2.1, Arbitrum only)
+///   Requires: LBRouter at 0xb4315e873dbcf96ffd0acd8ea43f689d8c20fb30
 contract FlashloanExecutor is FlashloanReceiver, IFlashloanExecutor {
     using SafeERC20 for IERC20;
 
@@ -44,6 +53,9 @@ contract FlashloanExecutor is FlashloanReceiver, IFlashloanExecutor {
 
     /// @notice The contract is paused.
     error ContractPaused();
+
+    /// @notice The flash loan provider is not supported.
+    error UnsupportedFlashLoanProvider(address provider);
 
     // ──────────────────────────────────────────────
     // Additional Events
@@ -126,10 +138,21 @@ contract FlashloanExecutor is FlashloanReceiver, IFlashloanExecutor {
         }
         _pendingToken = flashLoanToken;
 
-        // Request flash loan from Aave V3
-        // Aave will call executeOperation() on this contract
+        // Set flash loan active flag (guards uniswapV3FlashCallback / callFunction)
+        _setFlashLoanActive(true);
+
+        // Route to the appropriate flash loan provider
         bytes memory params = ""; // Steps are stored in contract storage
-        _requestAaveFlashLoan(flashLoanProvider, flashLoanToken, flashLoanAmount, params);
+        if (flashLoanProvider == balancerVault) {
+            _requestBalancerFlashLoan(flashLoanProvider, flashLoanToken, flashLoanAmount, params);
+        } else if (flashLoanProvider == aavePool) {
+            _requestAaveFlashLoan(flashLoanProvider, flashLoanToken, flashLoanAmount, params);
+        } else {
+            revert UnsupportedFlashLoanProvider(flashLoanProvider);
+        }
+
+        // Clear flash loan active flag after completion
+        _setFlashLoanActive(false);
     }
 
     /// @dev Request a flash loan from Aave V3 Pool.
@@ -149,6 +172,40 @@ contract FlashloanExecutor is FlashloanReceiver, IFlashloanExecutor {
                 amount,
                 params,
                 uint16(0) // no referral
+            )
+        );
+        if (!success) {
+            // Bubble up the revert reason
+            if (returnData.length > 0) {
+                assembly {
+                    revert(add(returnData, 32), mload(returnData))
+                }
+            }
+            revert("FlashLoan request failed");
+        }
+    }
+
+    /// @dev Request a flash loan from Balancer Vault.
+    function _requestBalancerFlashLoan(
+        address vault,
+        address asset,
+        uint256 amount,
+        bytes memory /* params */
+    ) internal {
+        address[] memory tokens = new address[](1);
+        tokens[0] = asset;
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = amount;
+
+        // Balancer Vault.flashLoan(recipient, tokens, amounts, userData)
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returnData) = vault.call(
+            abi.encodeWithSignature(
+                "flashLoan(address,address[],uint256[],bytes)",
+                address(this),
+                tokens,
+                amounts,
+                "" // empty bytes — steps are in contract storage
             )
         );
         if (!success) {
@@ -223,6 +280,13 @@ contract FlashloanExecutor is FlashloanReceiver, IFlashloanExecutor {
             0, // amountOutMin = 0; profit is validated at the end atomically
             step.extraData
         );
+
+        // Clear any residual allowance to prevent a compromised adapter from draining tokens.
+        // Only reset if there is a remaining allowance (avoids unnecessary SSTORE).
+        uint256 remaining = IERC20(step.tokenIn).allowance(address(this), step.adapter);
+        if (remaining > 0) {
+            IERC20(step.tokenIn).forceApprove(step.adapter, 0);
+        }
     }
 
     // ──────────────────────────────────────────────
@@ -271,7 +335,7 @@ contract FlashloanExecutor is FlashloanReceiver, IFlashloanExecutor {
     }
 
     /// @inheritdoc IFlashloanExecutor
-    function withdrawToken(address token, uint256 amount) external onlyOwner {
+    function withdrawToken(address token, uint256 amount) external onlyOwner nonReentrant {
         if (token == address(0)) revert ZeroAddress();
         if (amount == 0) revert ZeroAmount();
         IERC20(token).safeTransfer(msg.sender, amount);
@@ -279,7 +343,7 @@ contract FlashloanExecutor is FlashloanReceiver, IFlashloanExecutor {
     }
 
     /// @inheritdoc IFlashloanExecutor
-    function withdrawETH(uint256 amount) external onlyOwner {
+    function withdrawETH(uint256 amount) external onlyOwner nonReentrant {
         if (amount == 0) revert ZeroAmount();
         (bool success,) = msg.sender.call{value: amount}("");
         if (!success) revert ETHTransferFailed();

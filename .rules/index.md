@@ -78,7 +78,7 @@ These docs are indexed in Cognee datasets:
 Query Cognee for context:
 
 ```bash
-curl -X POST http://localhost:8003/api/v1/search \
+curl -sk -X POST https://flashloaner-cognee.apps.compute.lan/api/v1/search \
   -H "Content-Type: application/json" \
   -d '{"query": "How does the flashloan executor work?"}'
 ```

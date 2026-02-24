@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
+import { Interface } from "ethers";
 import { PriceMonitor } from "../../src/monitor/PriceMonitor.js";
 import type {
   PoolConfig,
@@ -17,6 +18,8 @@ const ADDR = {
   POOL_V2: "0x0000000000000000000000000000000000000001",
   POOL_V3: "0x0000000000000000000000000000000000000002",
   POOL_SUSHI: "0x0000000000000000000000000000000000000003",
+  POOL_CAMELOT_V2: "0x0000000000000000000000000000000000000004",
+  POOL_CAMELOT_V3: "0x0000000000000000000000000000000000000005",
 };
 
 function makePool(overrides: Partial<PoolConfig> = {}): PoolConfig {
@@ -40,6 +43,7 @@ function mockProvider(opts: {
   blockNumber?: number;
   getReservesReturn?: [bigint, bigint, number];
   slot0Return?: [bigint, number, number, number, number, number, boolean];
+  globalStateReturn?: [bigint, number, number, number, number, number, number];
 }) {
   const blockNum = opts.blockNumber ?? 19_000_000;
 
@@ -68,6 +72,16 @@ function mockProvider(opts: {
             0, 0, 0, 0, 0, true,
           ];
         return encodeSlot0(sqrtPrice, tick, obsIdx, obsCar, obsCarNext, feeProt, unlocked);
+      }
+
+      // globalState() selector = 0xe76c01e4
+      if (selector === "0xe76c01e4") {
+        const [sqrtPrice, tick, feeZto, feeOtz, tpIdx, cf0, cf1] =
+          opts.globalStateReturn ?? [
+            BigInt("3543191142285914000000000"),
+            0, 100, 100, 0, 0, 0,
+          ];
+        return encodeGlobalState(sqrtPrice, tick, feeZto, feeOtz, tpIdx, cf0, cf1);
       }
 
       throw new Error(`Unknown selector: ${selector}`);
@@ -116,6 +130,54 @@ function encodeSlot0(
     pad(feeProt) +
     pad(unlocked ? 1 : 0)
   );
+}
+
+/** ABI-encode globalState return value (Algebra V3 / Camelot V3) */
+function encodeGlobalState(
+  sqrtPriceX96: bigint,
+  tick: number,
+  feeZto: number,
+  feeOtz: number,
+  timepointIndex: number,
+  communityFeeToken0: number,
+  communityFeeToken1: number,
+): string {
+  const pad = (v: bigint | number) =>
+    BigInt(v).toString(16).padStart(64, "0");
+  const tickBig = tick >= 0 ? BigInt(tick) : (1n << 256n) + BigInt(tick);
+  return (
+    "0x" +
+    pad(sqrtPriceX96) +
+    tickBig.toString(16).padStart(64, "0") +
+    pad(feeZto) +
+    pad(feeOtz) +
+    pad(timepointIndex) +
+    pad(communityFeeToken0) +
+    pad(communityFeeToken1)
+  );
+}
+
+/**
+ * Build a mock WebSocketProvider with controllable websocket events.
+ * Mimics ethers.js v6 WebSocketProvider interface.
+ */
+function createMockWsProvider() {
+  const websocketListeners: Record<string, Array<(...args: any[]) => void>> = {};
+
+  return {
+    on: vi.fn(),
+    off: vi.fn(),
+    removeAllListeners: vi.fn(),
+    destroy: vi.fn(),
+    websocket: {
+      on: vi.fn().mockImplementation((event: string, handler: (...args: any[]) => void) => {
+        if (!websocketListeners[event]) websocketListeners[event] = [];
+        websocketListeners[event].push(handler);
+      }),
+      off: vi.fn(),
+      readyState: 1, // WebSocket.OPEN
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -316,6 +378,46 @@ describe("PriceMonitor", () => {
       const snapshot = await monitor.fetchPrice(sushiPool);
 
       expect(snapshot.price).toBeCloseTo(2010, 0);
+    });
+
+    it("should fetch Camelot V2 price using V2 interface", async () => {
+      const provider = mockProvider({
+        getReservesReturn: [
+          BigInt("500000000000000000000"),
+          BigInt("1005000000000"),
+          0,
+        ],
+      });
+      const camelotV2Pool = makePool({
+        label: "WETH/USDC CamelotV2",
+        dex: "camelot_v2",
+        poolAddress: ADDR.POOL_CAMELOT_V2,
+      });
+
+      monitor = new PriceMonitor({ provider, pools: [camelotV2Pool] });
+      const snapshot = await monitor.fetchPrice(camelotV2Pool);
+
+      expect(snapshot.price).toBeCloseTo(2010, 0);
+      expect(snapshot.pool.dex).toBe("camelot_v2");
+    });
+
+    it("should fetch Camelot V3 price using Algebra globalState()", async () => {
+      const sqrtPriceX96 = BigInt("3543191142285914000000000");
+      const provider = mockProvider({
+        globalStateReturn: [sqrtPriceX96, -200000, 100, 100, 0, 0, 0],
+      });
+
+      const camelotV3Pool = makePool({
+        label: "WETH/USDC CamelotV3",
+        dex: "camelot_v3",
+        poolAddress: ADDR.POOL_CAMELOT_V3,
+      });
+
+      monitor = new PriceMonitor({ provider, pools: [camelotV3Pool] });
+      const snapshot = await monitor.fetchPrice(camelotV3Pool);
+
+      expect(snapshot.price).toBeCloseTo(2000, 0);
+      expect(snapshot.pool.dex).toBe("camelot_v3");
     });
   });
 
@@ -579,6 +681,591 @@ describe("PriceMonitor", () => {
       expect(lower).toBeDefined();
       expect(upper).toBeDefined();
       expect(lower?.price).toBe(upper?.price);
+    });
+  });
+
+  // ---- Multicall batching ----
+
+  describe("multicall batching", () => {
+    const MULTICALL3_ADDRESS = "0xcA11bde05977b3631167028862bE2a173976CA11";
+    const mcABI = [
+      "function aggregate3(tuple(address target, bool allowFailure, bytes callData)[] calls) returns (tuple(bool success, bytes returnData)[])",
+    ];
+    const mcIface = new Interface(mcABI);
+
+    /** Process a single sub-call by its 4-byte selector, returning ABI-encoded result */
+    function processSingleCall(
+      selector: string,
+      opts: {
+        getReservesReturn?: [bigint, bigint, number];
+        slot0Return?: [bigint, number, number, number, number, number, boolean];
+        globalStateReturn?: [bigint, number, number, number, number, number, number];
+      },
+    ): string {
+      if (selector === "0x0902f1ac") {
+        const [r0, r1, ts] = opts.getReservesReturn ?? [
+          BigInt("1000000000000000000000"),
+          BigInt("2000000000000"),
+          0,
+        ];
+        return encodeGetReserves(r0, r1, ts);
+      }
+      if (selector === "0x3850c7bd") {
+        const [sqrtPrice, tick, obsIdx, obsCar, obsCarNext, feeProt, unlocked] =
+          opts.slot0Return ?? [
+            BigInt("3543191142285914000000000"),
+            0, 0, 0, 0, 0, true,
+          ];
+        return encodeSlot0(sqrtPrice, tick, obsIdx, obsCar, obsCarNext, feeProt, unlocked);
+      }
+      if (selector === "0xe76c01e4") {
+        const [sqrtPrice, tick, feeZto, feeOtz, tpIdx, cf0, cf1] =
+          opts.globalStateReturn ?? [
+            BigInt("3543191142285914000000000"),
+            0, 100, 100, 0, 0, 0,
+          ];
+        return encodeGlobalState(sqrtPrice, tick, feeZto, feeOtz, tpIdx, cf0, cf1);
+      }
+      throw new Error(`Unknown selector: ${selector}`);
+    }
+
+    /** Build a mock provider that handles Multicall3 aggregate3 calls */
+    function multicallMockProvider(opts: {
+      blockNumber?: number;
+      getReservesReturn?: [bigint, bigint, number];
+      slot0Return?: [bigint, number, number, number, number, number, boolean];
+      globalStateReturn?: [bigint, number, number, number, number, number, number];
+      failedPools?: Set<string>;
+    }) {
+      const blockNum = opts.blockNumber ?? 19_000_000;
+
+      return {
+        getBlockNumber: vi.fn().mockResolvedValue(blockNum),
+        call: vi.fn().mockImplementation(async (tx: { to?: string; data: string }) => {
+          // Handle Multicall3 aggregate3 calls
+          if (tx.to?.toLowerCase() === MULTICALL3_ADDRESS.toLowerCase()) {
+            const decoded = mcIface.decodeFunctionData("aggregate3", tx.data);
+            const calls = decoded[0];
+
+            const results: Array<[boolean, string]> = [];
+            for (const call of calls) {
+              const target = (call.target as string).toLowerCase();
+              if (opts.failedPools?.has(target)) {
+                results.push([false, "0x"]);
+              } else {
+                const selector = (call.callData as string).slice(0, 10);
+                try {
+                  const returnData = processSingleCall(selector, opts);
+                  results.push([true, returnData]);
+                } catch {
+                  results.push([false, "0x"]);
+                }
+              }
+            }
+
+            return mcIface.encodeFunctionResult("aggregate3", [results]);
+          }
+
+          // Handle individual calls (fallback path)
+          const selector = tx.data.slice(0, 10);
+          return processSingleCall(selector, opts);
+        }),
+      } as any;
+    }
+
+    it("should batch all pool reads into a single multicall", async () => {
+      const v2Pool = makePool({ poolAddress: ADDR.POOL_V2 });
+      const v3Pool = makePool({
+        label: "WETH/USDC UniV3",
+        dex: "uniswap_v3",
+        poolAddress: ADDR.POOL_V3,
+        feeTier: 3000,
+      });
+      const camelotPool = makePool({
+        label: "WETH/USDC CamelotV3",
+        dex: "camelot_v3",
+        poolAddress: ADDR.POOL_CAMELOT_V3,
+      });
+
+      const provider = multicallMockProvider({});
+      monitor = new PriceMonitor({
+        provider,
+        pools: [v2Pool, v3Pool, camelotPool],
+        useMulticall: true,
+      });
+
+      await monitor.poll();
+
+      // Should have exactly 2 provider.call invocations:
+      // 1 getBlockNumber + 1 multicall (NOT 1 per pool)
+      expect(provider.getBlockNumber).toHaveBeenCalledTimes(1);
+      expect(provider.call).toHaveBeenCalledTimes(1);
+
+      // All 3 snapshots should be populated
+      expect(monitor.getAllSnapshots()).toHaveLength(3);
+      expect(monitor.getSnapshot(ADDR.POOL_V2)?.price).toBeCloseTo(2000, 0);
+      expect(monitor.getSnapshot(ADDR.POOL_V3)?.price).toBeCloseTo(2000, 0);
+      expect(monitor.getSnapshot(ADDR.POOL_CAMELOT_V3)?.price).toBeCloseTo(2000, 0);
+    });
+
+    it("should send the multicall to the correct Multicall3 address", async () => {
+      const provider = multicallMockProvider({});
+      monitor = new PriceMonitor({
+        provider,
+        pools: [makePool()],
+        useMulticall: true,
+      });
+
+      await monitor.poll();
+
+      const callArg = provider.call.mock.calls[0][0];
+      expect(callArg.to).toBe(MULTICALL3_ADDRESS);
+    });
+
+    it("should handle individual pool failure gracefully in multicall batch", async () => {
+      const goodPool = makePool({ poolAddress: ADDR.POOL_V2 });
+      const badPool = makePool({
+        label: "BAD POOL",
+        dex: "sushiswap",
+        poolAddress: ADDR.POOL_SUSHI,
+      });
+
+      const provider = multicallMockProvider({
+        failedPools: new Set([ADDR.POOL_SUSHI.toLowerCase()]),
+      });
+
+      monitor = new PriceMonitor({
+        provider,
+        pools: [goodPool, badPool],
+        useMulticall: true,
+      });
+
+      const updates: PriceSnapshot[] = [];
+      const errors: Array<{ error: Error; pool: PoolConfig }> = [];
+      monitor.on("priceUpdate", (s) => updates.push(s));
+      monitor.on("error", (err, pool) => errors.push({ error: err, pool }));
+
+      await monitor.poll();
+
+      // Good pool should succeed
+      expect(updates).toHaveLength(1);
+      expect(updates[0].pool.poolAddress).toBe(ADDR.POOL_V2);
+
+      // Bad pool should emit error
+      expect(errors).toHaveLength(1);
+      expect(errors[0].error.message).toContain("Multicall failed for BAD POOL");
+    });
+
+    it("should fall back to individual calls when multicall fails entirely", async () => {
+      // Provider that rejects multicall but handles individual calls
+      const provider = {
+        getBlockNumber: vi.fn().mockResolvedValue(19_000_000),
+        call: vi.fn().mockImplementation(async (tx: { to?: string; data: string }) => {
+          if (tx.to?.toLowerCase() === MULTICALL3_ADDRESS.toLowerCase()) {
+            throw new Error("Multicall3 not available");
+          }
+          // Handle individual call
+          const selector = tx.data.slice(0, 10);
+          if (selector === "0x0902f1ac") {
+            return encodeGetReserves(
+              BigInt("1000000000000000000000"),
+              BigInt("2000000000000"),
+              0,
+            );
+          }
+          throw new Error(`Unknown selector: ${selector}`);
+        }),
+      } as any;
+
+      monitor = new PriceMonitor({
+        provider,
+        pools: [makePool()],
+        useMulticall: true,
+      });
+
+      await monitor.poll();
+
+      // Should still get the snapshot via fallback individual calls
+      expect(monitor.getSnapshot(ADDR.POOL_V2)).toBeDefined();
+      expect(monitor.getSnapshot(ADDR.POOL_V2)?.price).toBeCloseTo(2000, 0);
+
+      // provider.call called twice: 1 failed multicall + 1 individual call
+      // getBlockNumber called twice: 1 for multicall attempt + 1 for individual fetch
+      expect(provider.call).toHaveBeenCalledTimes(2);
+    });
+
+    it("should skip multicall when useMulticall is false", async () => {
+      const provider = multicallMockProvider({});
+      monitor = new PriceMonitor({
+        provider,
+        pools: [makePool()],
+        useMulticall: false,
+      });
+
+      await monitor.poll();
+
+      // Should use individual calls (getBlockNumber + getReserves for 1 pool)
+      expect(provider.getBlockNumber).toHaveBeenCalled();
+      expect(monitor.getSnapshot(ADDR.POOL_V2)).toBeDefined();
+
+      // The call to provider should NOT go to Multicall3
+      for (const callArgs of provider.call.mock.calls) {
+        expect(callArgs[0].to?.toLowerCase()).not.toBe(MULTICALL3_ADDRESS.toLowerCase());
+      }
+    });
+
+    it("should emit stale event for pool that fails repeatedly in multicall", async () => {
+      const pool = makePool({ poolAddress: ADDR.POOL_V2 });
+      const provider = multicallMockProvider({
+        failedPools: new Set([ADDR.POOL_V2.toLowerCase()]),
+      });
+
+      monitor = new PriceMonitor({
+        provider,
+        pools: [pool],
+        useMulticall: true,
+        maxRetries: 2,
+      });
+
+      const staleEvents: PoolConfig[] = [];
+      monitor.on("error", () => {});
+      monitor.on("stale", (p) => staleEvents.push(p));
+
+      // First poll: 1 error, not stale yet
+      await monitor.poll();
+      expect(staleEvents).toHaveLength(0);
+
+      // Second poll: 2 errors, now stale
+      await monitor.poll();
+      expect(staleEvents).toHaveLength(1);
+    });
+  });
+
+  // ---- WebSocket block subscription ----
+
+  describe("WebSocket block subscription", () => {
+    it("should expose startWebSocket and stopWebSocket methods", () => {
+      const provider = mockProvider({});
+      monitor = new PriceMonitor({ provider, pools: [makePool()] });
+      expect(typeof monitor.startWebSocket).toBe("function");
+      expect(typeof monitor.stopWebSocket).toBe("function");
+    });
+
+    it("should report wsActive as false when not using WebSocket", () => {
+      const provider = mockProvider({});
+      monitor = new PriceMonitor({ provider, pools: [makePool()] });
+      expect(monitor.wsActive).toBe(false);
+    });
+
+    it("should create a WebSocketProvider and subscribe to blocks", async () => {
+      const provider = mockProvider({});
+      monitor = new PriceMonitor({ provider, pools: [makePool()] });
+
+      // Mock the internal _createWebSocketProvider to return a controllable mock
+      const mockWsProvider = createMockWsProvider();
+      vi.spyOn(monitor as any, "_createWebSocketProvider").mockReturnValue(mockWsProvider);
+
+      monitor.startWebSocket("wss://arb-mainnet.example.com/ws");
+
+      expect(monitor.wsActive).toBe(true);
+      // Should have subscribed to "block" event
+      expect(mockWsProvider.on).toHaveBeenCalledWith("block", expect.any(Function));
+
+      monitor.stopWebSocket();
+    });
+
+    it("should call poll() on each new block from WebSocket", async () => {
+      const provider = mockProvider({});
+      monitor = new PriceMonitor({
+        provider,
+        pools: [makePool()],
+        pollIntervalMs: 60_000, // Long interval to ensure it's WS driving polls
+      });
+
+      const mockWsProvider = createMockWsProvider();
+      vi.spyOn(monitor as any, "_createWebSocketProvider").mockReturnValue(mockWsProvider);
+
+      const pollSpy = vi.spyOn(monitor, "poll").mockResolvedValue();
+
+      monitor.startWebSocket("wss://arb-mainnet.example.com/ws");
+
+      // Simulate a block event
+      const blockHandler = mockWsProvider.on.mock.calls.find(
+        (call: any[]) => call[0] === "block",
+      )![1] as (blockNumber: number) => void;
+
+      blockHandler(19_000_001);
+
+      // poll() should have been called
+      expect(pollSpy).toHaveBeenCalled();
+
+      monitor.stopWebSocket();
+    });
+
+    it("should disable setInterval polling when WebSocket is active", () => {
+      const provider = mockProvider({});
+      monitor = new PriceMonitor({
+        provider,
+        pools: [makePool()],
+        pollIntervalMs: 60_000,
+      });
+
+      const mockWsProvider = createMockWsProvider();
+      vi.spyOn(monitor as any, "_createWebSocketProvider").mockReturnValue(mockWsProvider);
+
+      // Start with HTTP polling first
+      monitor.start();
+      expect(monitor.isRunning).toBe(true);
+      // Internal timer should be set
+      expect((monitor as any).pollTimer).not.toBeNull();
+
+      // Now start WebSocket — should clear the interval
+      monitor.startWebSocket("wss://arb-mainnet.example.com/ws");
+      expect((monitor as any).pollTimer).toBeNull();
+
+      monitor.stopWebSocket();
+      monitor.stop();
+    });
+
+    it("should fall back to HTTP polling when WebSocket disconnects", async () => {
+      const provider = mockProvider({});
+      monitor = new PriceMonitor({
+        provider,
+        pools: [makePool()],
+        pollIntervalMs: 60_000,
+      });
+
+      const mockWsProvider = createMockWsProvider();
+      vi.spyOn(monitor as any, "_createWebSocketProvider").mockReturnValue(mockWsProvider);
+
+      monitor.start();
+      monitor.startWebSocket("wss://arb-mainnet.example.com/ws");
+
+      expect(monitor.wsActive).toBe(true);
+      expect((monitor as any).pollTimer).toBeNull();
+
+      // Simulate WebSocket close — trigger the "close" handler on the websocket
+      const wsCloseHandler = mockWsProvider.websocket.on.mock.calls.find(
+        (call: any[]) => call[0] === "close",
+      )![1] as () => void;
+
+      wsCloseHandler();
+
+      // Should fall back to interval polling
+      expect(monitor.wsActive).toBe(false);
+      // Fallback timer should be reinstated (if monitor is still running)
+      expect((monitor as any).pollTimer).not.toBeNull();
+
+      monitor.stop();
+    });
+
+    it("should emit ws:connected event when WebSocket connects", () => {
+      const provider = mockProvider({});
+      monitor = new PriceMonitor({ provider, pools: [makePool()] });
+
+      const mockWsProvider = createMockWsProvider();
+      vi.spyOn(monitor as any, "_createWebSocketProvider").mockReturnValue(mockWsProvider);
+
+      const events: string[] = [];
+      monitor.on("ws:connected", () => events.push("connected"));
+
+      monitor.startWebSocket("wss://arb-mainnet.example.com/ws");
+
+      expect(events).toContain("connected");
+
+      monitor.stopWebSocket();
+    });
+
+    it("should emit ws:disconnected event when WebSocket closes", () => {
+      const provider = mockProvider({});
+      monitor = new PriceMonitor({ provider, pools: [makePool()] });
+
+      const mockWsProvider = createMockWsProvider();
+      vi.spyOn(monitor as any, "_createWebSocketProvider").mockReturnValue(mockWsProvider);
+
+      const events: string[] = [];
+      monitor.on("ws:disconnected", () => events.push("disconnected"));
+
+      monitor.startWebSocket("wss://arb-mainnet.example.com/ws");
+
+      // Simulate close
+      const wsCloseHandler = mockWsProvider.websocket.on.mock.calls.find(
+        (call: any[]) => call[0] === "close",
+      )![1] as () => void;
+      wsCloseHandler();
+
+      expect(events).toContain("disconnected");
+
+      // Clean up reconnect timer
+      monitor.stopWebSocket();
+    });
+
+    it("should emit ws:reconnecting event when attempting reconnect", async () => {
+      vi.useFakeTimers();
+      const provider = mockProvider({});
+      monitor = new PriceMonitor({ provider, pools: [makePool()] });
+
+      const mockWsProvider = createMockWsProvider();
+      const mockWsProvider2 = createMockWsProvider();
+      const createSpy = vi.spyOn(monitor as any, "_createWebSocketProvider")
+        .mockReturnValueOnce(mockWsProvider)
+        .mockReturnValueOnce(mockWsProvider2);
+
+      const events: string[] = [];
+      monitor.on("ws:reconnecting", () => events.push("reconnecting"));
+      monitor.on("ws:connected", () => events.push("connected"));
+
+      monitor.startWebSocket("wss://arb-mainnet.example.com/ws");
+
+      // Simulate close
+      const wsCloseHandler = mockWsProvider.websocket.on.mock.calls.find(
+        (call: any[]) => call[0] === "close",
+      )![1] as () => void;
+      wsCloseHandler();
+
+      // Advance past the first reconnect delay (1 second)
+      await vi.advanceTimersByTimeAsync(1_100);
+
+      expect(events).toContain("reconnecting");
+      // Should have called _createWebSocketProvider again
+      expect(createSpy).toHaveBeenCalledTimes(2);
+
+      monitor.stopWebSocket();
+      vi.useRealTimers();
+    });
+
+    it("should use exponential backoff for reconnection (1s, 2s, 4s, 8s, max 30s)", async () => {
+      vi.useFakeTimers();
+      const provider = mockProvider({});
+      monitor = new PriceMonitor({ provider, pools: [makePool()] });
+
+      // Create providers that always close immediately
+      const providers: any[] = [];
+      const createSpy = vi.spyOn(monitor as any, "_createWebSocketProvider").mockImplementation(() => {
+        const p = createMockWsProvider();
+        providers.push(p);
+        return p;
+      });
+
+      monitor.startWebSocket("wss://arb-mainnet.example.com/ws");
+      expect(createSpy).toHaveBeenCalledTimes(1);
+
+      // Simulate close #1
+      const getCloseHandler = (p: any) =>
+        p.websocket.on.mock.calls.find((call: any[]) => call[0] === "close")![1] as () => void;
+
+      getCloseHandler(providers[0])();
+
+      // Should reconnect after 1s
+      await vi.advanceTimersByTimeAsync(500);
+      expect(createSpy).toHaveBeenCalledTimes(1); // Not yet
+      await vi.advanceTimersByTimeAsync(600);
+      expect(createSpy).toHaveBeenCalledTimes(2); // Now
+
+      // Simulate close #2
+      getCloseHandler(providers[1])();
+
+      // Should reconnect after 2s
+      await vi.advanceTimersByTimeAsync(1_500);
+      expect(createSpy).toHaveBeenCalledTimes(2); // Not yet
+      await vi.advanceTimersByTimeAsync(600);
+      expect(createSpy).toHaveBeenCalledTimes(3); // Now
+
+      // Simulate close #3
+      getCloseHandler(providers[2])();
+
+      // Should reconnect after 4s
+      await vi.advanceTimersByTimeAsync(3_500);
+      expect(createSpy).toHaveBeenCalledTimes(3); // Not yet
+      await vi.advanceTimersByTimeAsync(600);
+      expect(createSpy).toHaveBeenCalledTimes(4); // Now
+
+      monitor.stopWebSocket();
+      vi.useRealTimers();
+    });
+
+    it("should reset reconnect backoff after a successful connection period", async () => {
+      vi.useFakeTimers();
+      const provider = mockProvider({});
+      monitor = new PriceMonitor({ provider, pools: [makePool()] });
+
+      const providers: any[] = [];
+      vi.spyOn(monitor as any, "_createWebSocketProvider").mockImplementation(() => {
+        const p = createMockWsProvider();
+        providers.push(p);
+        return p;
+      });
+
+      monitor.startWebSocket("wss://arb-mainnet.example.com/ws");
+
+      const getCloseHandler = (p: any) =>
+        p.websocket.on.mock.calls.find((call: any[]) => call[0] === "close")![1] as () => void;
+
+      // Disconnect
+      getCloseHandler(providers[0])();
+      await vi.advanceTimersByTimeAsync(1_100); // 1s backoff
+
+      // Now connected again. Simulate a block arriving (proves connection is stable)
+      const blockHandler = providers[1].on.mock.calls.find(
+        (call: any[]) => call[0] === "block",
+      )![1] as (blockNumber: number) => void;
+      blockHandler(100);
+
+      // Disconnect again
+      getCloseHandler(providers[1])();
+
+      // Backoff should be reset to 1s (not 2s) because a block was received
+      await vi.advanceTimersByTimeAsync(1_100);
+      expect(providers.length).toBe(3);
+
+      monitor.stopWebSocket();
+      vi.useRealTimers();
+    });
+
+    it("should clean up WebSocket on stopWebSocket()", () => {
+      const provider = mockProvider({});
+      monitor = new PriceMonitor({ provider, pools: [makePool()] });
+
+      const mockWsProvider = createMockWsProvider();
+      vi.spyOn(monitor as any, "_createWebSocketProvider").mockReturnValue(mockWsProvider);
+
+      monitor.startWebSocket("wss://arb-mainnet.example.com/ws");
+      expect(monitor.wsActive).toBe(true);
+
+      monitor.stopWebSocket();
+      expect(monitor.wsActive).toBe(false);
+      expect(mockWsProvider.destroy).toHaveBeenCalled();
+    });
+
+    it("should clean up WebSocket when stop() is called", () => {
+      const provider = mockProvider({});
+      monitor = new PriceMonitor({ provider, pools: [makePool()] });
+
+      const mockWsProvider = createMockWsProvider();
+      vi.spyOn(monitor as any, "_createWebSocketProvider").mockReturnValue(mockWsProvider);
+
+      monitor.start();
+      monitor.startWebSocket("wss://arb-mainnet.example.com/ws");
+
+      monitor.stop();
+      expect(monitor.wsActive).toBe(false);
+      expect(mockWsProvider.destroy).toHaveBeenCalled();
+    });
+
+    it("should not start WebSocket if already active", () => {
+      const provider = mockProvider({});
+      monitor = new PriceMonitor({ provider, pools: [makePool()] });
+
+      const mockWsProvider = createMockWsProvider();
+      const createSpy = vi.spyOn(monitor as any, "_createWebSocketProvider").mockReturnValue(mockWsProvider);
+
+      monitor.startWebSocket("wss://arb-mainnet.example.com/ws");
+      monitor.startWebSocket("wss://arb-mainnet.example.com/ws");
+
+      // Should only create one provider
+      expect(createSpy).toHaveBeenCalledTimes(1);
+
+      monitor.stopWebSocket();
     });
   });
 });

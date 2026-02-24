@@ -81,7 +81,7 @@ contract Verify is Script {
     // ══════════════════════════════════════════════════════════════════════════════
 
     function verifyContractDeployment(DeployedAddresses memory addrs) internal view {
-        console2.log("\n━━━ Contract Deployment Checks ━━━");
+        console2.log(unicode"\n━━━ Contract Deployment Checks ━━━");
 
         checkContractCode(addrs.executor, "FlashloanExecutor");
         if (addrs.circuitBreaker != address(0)) {
@@ -103,7 +103,7 @@ contract Verify is Script {
         address expectedBotWallet,
         DeployedAddresses memory addrs
     ) internal view {
-        console2.log("\n━━━ FlashloanExecutor Configuration ━━━");
+        console2.log(unicode"\n━━━ FlashloanExecutor Configuration ━━━");
 
         FlashloanExecutor executor = FlashloanExecutor(payable(executorAddr));
 
@@ -141,7 +141,7 @@ contract Verify is Script {
     }
 
     function verifyAdapterConfiguration(DeployedAddresses memory addrs) internal view {
-        console2.log("\n━━━ DEX Adapter Registration ━━━");
+        console2.log(unicode"\n━━━ DEX Adapter Registration ━━━");
 
         FlashloanExecutor executor = FlashloanExecutor(payable(addrs.executor));
 
@@ -159,7 +159,7 @@ contract Verify is Script {
     function verifyCircuitBreakerConfiguration(address circuitBreakerAddr) internal view {
         if (circuitBreakerAddr == address(0)) return;
 
-        console2.log("\n━━━ CircuitBreaker Configuration ━━━");
+        console2.log(unicode"\n━━━ CircuitBreaker Configuration ━━━");
 
         CircuitBreaker cb = CircuitBreaker(circuitBreakerAddr);
 
@@ -224,9 +224,9 @@ contract Verify is Script {
     // ══════════════════════════════════════════════════════════════════════════════
 
     function printHeader() internal view {
-        console2.log("\n╔══════════════════════════════════════════════════════════════════════════════╗");
-        console2.log("║              POST-DEPLOYMENT VERIFICATION                                    ║");
-        console2.log("╚══════════════════════════════════════════════════════════════════════════════╝");
+        console2.log(unicode"\n╔══════════════════════════════════════════════════════════════════════════════╗");
+        console2.log(unicode"║              POST-DEPLOYMENT VERIFICATION                                    ║");
+        console2.log(unicode"╚══════════════════════════════════════════════════════════════════════════════╝");
         console2.log("");
         console2.log("Network:   ", getChainName(block.chainid));
         console2.log("Chain ID:  ", block.chainid);
@@ -235,9 +235,9 @@ contract Verify is Script {
     }
 
     function printSummary() internal view {
-        console2.log("\n╔══════════════════════════════════════════════════════════════════════════════╗");
-        console2.log("║                        VERIFICATION COMPLETE                                 ║");
-        console2.log("╚══════════════════════════════════════════════════════════════════════════════╝");
+        console2.log(unicode"\n╔══════════════════════════════════════════════════════════════════════════════╗");
+        console2.log(unicode"║                        VERIFICATION COMPLETE                                 ║");
+        console2.log(unicode"╚══════════════════════════════════════════════════════════════════════════════╝");
         console2.log("");
         console2.log("All critical checks passed. Deployment is ready for use.");
         console2.log("");

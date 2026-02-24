@@ -18,6 +18,11 @@ contract TestReceiver is FlashloanReceiver {
         arbitrageCalled = true;
         lastParams = params;
     }
+
+    /// @dev Expose _setFlashLoanActive for testing callback guards.
+    function setFlashLoanActive(bool active) external {
+        _setFlashLoanActive(active);
+    }
 }
 
 /// @dev Minimal ERC20 mock for testing.
@@ -212,26 +217,56 @@ contract FlashloanReceiverTest is Test {
     // Uniswap V3 Flash Callback Tests
     // ──────────────────────────────────────────────
 
-    function test_uniswapV3FlashCallback_callsArbitrage() public {
+    function test_uniswapV3FlashCallback_callsArbitrageWhenActive() public {
         bytes memory data = abi.encode("uni-v3-test");
-        // Any address can call (pool validation delegated to child)
+        // Set flash loan active flag (simulates being inside a flash loan flow)
+        receiver.setFlashLoanActive(true);
         receiver.uniswapV3FlashCallback(0, 0, data);
 
         assertTrue(receiver.arbitrageCalled());
         assertEq(receiver.lastParams(), data);
     }
 
+    function test_revertWhen_uniswapV3FlashCallbackNotActive() public {
+        bytes memory data = abi.encode("uni-v3-test");
+        // Flash loan not active -- should revert
+        vm.expectRevert(FlashloanReceiver.NoActiveFlashLoan.selector);
+        receiver.uniswapV3FlashCallback(0, 0, data);
+    }
+
+    function test_revertWhen_uniswapV3FlashCallbackByAttackerNotActive() public {
+        bytes memory data = abi.encode("attack");
+        vm.prank(attacker);
+        vm.expectRevert(FlashloanReceiver.NoActiveFlashLoan.selector);
+        receiver.uniswapV3FlashCallback(0, 0, data);
+    }
+
     // ──────────────────────────────────────────────
     // dYdX callFunction Tests
     // ──────────────────────────────────────────────
 
-    function test_callFunction_callsArbitrage() public {
+    function test_callFunction_callsArbitrageWhenActive() public {
         bytes memory data = abi.encode("dydx-test");
-        // Any address can call (SoloMargin validation delegated to child)
+        // Set flash loan active flag (simulates being inside a flash loan flow)
+        receiver.setFlashLoanActive(true);
         receiver.callFunction(address(this), address(this), 0, data);
 
         assertTrue(receiver.arbitrageCalled());
         assertEq(receiver.lastParams(), data);
+    }
+
+    function test_revertWhen_callFunctionNotActive() public {
+        bytes memory data = abi.encode("dydx-test");
+        // Flash loan not active -- should revert
+        vm.expectRevert(FlashloanReceiver.NoActiveFlashLoan.selector);
+        receiver.callFunction(address(this), address(this), 0, data);
+    }
+
+    function test_revertWhen_callFunctionByAttackerNotActive() public {
+        bytes memory data = abi.encode("attack");
+        vm.prank(attacker);
+        vm.expectRevert(FlashloanReceiver.NoActiveFlashLoan.selector);
+        receiver.callFunction(address(this), address(this), 0, data);
     }
 
     // ──────────────────────────────────────────────

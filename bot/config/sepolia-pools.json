@@ -1,0 +1,22 @@
+[
+  {
+    "label": "USDC/WETH UniV3 0.3%",
+    "dex": "uniswap_v3",
+    "poolAddress": "0x9799b5edc1aa7d3fad350309b08df3f64914e244",
+    "token0": "0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8",
+    "token1": "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14",
+    "decimals0": 6,
+    "decimals1": 18,
+    "feeTier": 3000
+  },
+  {
+    "label": "USDC/WETH UniV3 1%",
+    "dex": "uniswap_v3",
+    "poolAddress": "0xcdf1597a0c2dda04e80e135351831b7a6af1f86d",
+    "token0": "0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8",
+    "token1": "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14",
+    "decimals0": 6,
+    "decimals1": 18,
+    "feeTier": 10000
+  }
+]

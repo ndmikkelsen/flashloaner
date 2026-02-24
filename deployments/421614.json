@@ -1,0 +1,20 @@
+{
+  "chainId": 421614,
+  "network": "arbitrum-sepolia",
+  "deployedAt": "1771355032",
+  "blockNumber": 10280917,
+  "contracts": {
+    "FlashloanExecutor": "0x5c0Ecf6DBB806a636121f0a3f670E4f7aC13A667",
+    "CircuitBreaker": "0x9Bdb5c97795dc31FFbf7fBB28587D36524DCBf84",
+    "ProfitValidator": "0x349F680744AD406a42F25381EFce3e8BE52f5598",
+    "UniswapV2Adapter": "0x06409bFF450b9feFD6045f4d014DC887cF898a77",
+    "UniswapV3Adapter": "0xEeB5C0d81A27bb92C25Af1D50b4A6470500404d1"
+  },
+  "configuration": {
+    "aavePool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
+    "balancerVault": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+    "uniswapV2Router": "0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506",
+    "uniswapV3Router": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+    "uniswapV3Quoter": "0xEd1f6473345F45b75F8179591dd5bA1888cf2FB3"
+  }
+}

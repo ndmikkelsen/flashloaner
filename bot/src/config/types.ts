@@ -34,6 +34,8 @@ export interface PoolDefinition {
   decimals0: number;
   decimals1: number;
   feeTier?: number;
+  /** Invert raw on-chain price (for TJ LB pools where tokenX/tokenY != hex sort order) */
+  invertPrice?: boolean;
 }
 
 /** PriceMonitor configuration subset */
@@ -44,6 +46,10 @@ export interface MonitorConfig {
   pollIntervalMs: number;
   /** Max consecutive fetch failures before stale. Default: 3 */
   maxRetries: number;
+  /** Minimum WETH reserve for V2 pools to be viable (ETH). Default: 0 (disabled) */
+  minReserveWeth?: number;
+  /** WETH address for liquidity checks */
+  wethAddress?: string;
 }
 
 /** OpportunityDetector configuration subset */
