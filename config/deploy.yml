@@ -37,7 +37,7 @@ ssh:
     - ~/.ssh/z3r0Layer-main
 
 builder:
-  arch: arm64
+  arch: amd64
   dockerfile: .claude/docker/Dockerfile.cognee
 
 env:
