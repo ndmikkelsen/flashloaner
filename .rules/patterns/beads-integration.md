@@ -13,8 +13,9 @@ This project uses [Beads (bd)](https://github.com/steveyegge/beads) for ALL issu
 - **Track ALL work in bd** - Never use markdown TODOs or comment-based task lists
 - **Use `bd ready`** to find available work
 - **Use `bd create`** to track new issues/tasks/bugs
-- **Use `bd sync`** at end of session to sync with git remote
-- **Git hooks auto-sync** on commit/merge
+- **Git hooks auto-sync** on commit/merge — no manual sync needed
+- **Remote Dolt backend** — issues stored in `beads_flashloaner` DB on compute server
+- **Password required**: set `BEADS_DOLT_PASSWORD` env var (from 1Password `flashloaner-knowledge`)
 
 ## Quick Reference
 
@@ -25,7 +26,7 @@ bd create "Title" -t task -p 1        # Create new issue
 bd update <id> --status=in_progress   # Claim work
 bd close <id> --reason "Done"         # Mark complete
 bd dep add <issue> <depends-on>       # Add dependency
-bd sync                               # Sync with git remote
+# Note: bd sync is deprecated — Dolt backend auto-syncs via git hooks
 ```
 
 ## Workflow
@@ -34,7 +35,7 @@ bd sync                               # Sync with git remote
 2. **Claim an issue**: `bd update <id> --status=in_progress`
 3. **Do the work**: Implement, test, document
 4. **Mark complete**: `bd close <id> --reason "Completed"`
-5. **Sync**: `bd sync` (or let git hooks handle it)
+5. **Commit**: `git add .beads/issues.jsonl && git commit` (git hooks handle the rest)
 
 ## Issue Types
 
@@ -178,7 +179,7 @@ When working with Claude team agents:
 3. **Agents claim work**: `bd update <id> --status in_progress`
 4. **Agents complete work**: `bd close <id> --reason "Completed"`
 5. **Lead verifies**: Run quality gates and review changes
-6. **Sync at session end**: `bd sync --from-main`
+6. **Commit JSONL**: `git add .beads/issues.jsonl && git commit` (no manual sync needed)
 
 ## Common Patterns
 
