@@ -1,8 +1,0 @@
-{
-  "database": "dolt",
-  "jsonl_export": "issues.jsonl",
-  "dolt_server_host": "10.10.20.138",
-  "dolt_server_port": 3306,
-  "dolt_server_user": "beads",
-  "dolt_database": "beads_flashloaner"
-}
