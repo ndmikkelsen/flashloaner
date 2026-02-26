@@ -143,7 +143,7 @@ Plans:
 | 9. Ramses V2 Adapter | v1.1 | 2/2 | Complete | 2026-02-20 |
 | 10. Trader Joe V2.1 LB Adapter | v1.1 | 3/3 | Complete | 2026-02-20 |
 | 11. Dry-Run Signal Quality Fixes | 2/2 | Complete   | 2026-02-22 | - |
-| 12. Contract Deployment & Live Validation | v1.1 | 0/3 | Not started | - |
+| 12. Contract Deployment & Live Validation | v1.1 | 0/3 | In progress (plan 01 paused at deployment checkpoint) | - |
 
 ### Phase 11: Dry-Run Signal Quality Fixes
 **Goal**: Fix three critical signal quality issues found during 6.5-hour dry-run: (1) TJ LB slippage dangerously underestimated (500 ETH with 0.004 ETH slippage), (2) GMX/WETH V3 virtual reserves not passed to optimizer, (3) TJ LB fee display shows 0.00% instead of 0.15%
@@ -171,7 +171,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 12-01-PLAN.md -- Deploy FlashloanExecutor + adapters to Arbitrum mainnet
+- [~] 12-01-PLAN.md -- Deploy FlashloanExecutor + adapters to Arbitrum mainnet (Task 1 done: zero-address guard + EXECUTOR_ADDRESS validation; Tasks 2-3: awaiting human wallet funding + deployment)
 - [ ] 12-02-PLAN.md -- Shadow mode validation (100+ opportunities, 10% accuracy)
 - [ ] 12-03-PLAN.md -- Go live with small capital, execute first profitable trade
 
