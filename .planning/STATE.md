@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-19)
 
 **Core value:** The bot must never lose funds beyond gas costs -- the 4-layer safety system (off-chain estimate, eth_call simulation, on-chain ProfitValidator, MEV protection) ensures every transaction either profits or reverts.
-**Current focus:** Phase 11 -- Dry-Run Signal Quality Fixes
+**Current focus:** Phase 12 -- Contract Deployment & Live Validation
 
 ## Current Position
 
-Phase: 11 of 12 (Dry-Run Signal Quality Fixes)
-Plan: 0 of ? in current phase
-Status: Phase 11 NOT PLANNED
-Last activity: 2026-02-21 -- Added Phases 11 and 12 to roadmap after 6.5-hour dry-run analysis
+Phase: 12 of 12 (Contract Deployment & Live Validation)
+Plan: 1 of 3 in current phase (paused at Task 2 checkpoint)
+Status: Phase 12 Plan 01 IN PROGRESS — paused at checkpoint:human-action (Task 2: Fund deployer wallet + set env vars)
+Last activity: 2026-02-25 -- Executed Task 1 (zero-address adapter guard + EXECUTOR_ADDRESS validation), paused at deployment checkpoint
 
-Progress: [======================..] 92% (24/26+ plans -- v1.0: 11 complete, v1.1: 13 complete, 2 phases pending)
+Progress: [======================..] 92% (24/26+ plans -- v1.0: 11 complete, v1.1: 13 complete, Phase 12 in progress)
 
 ## Performance Metrics
 
@@ -106,6 +106,8 @@ New for v1.1:
 - [Phase 10-03]: 1.33x profit threshold for LB opportunities (0.8% if base is 0.6%) provides additional safety margin
 - [Phase 10-03]: LB pool addresses use placeholders pending LBFactory verification via cast
 - [Phase 10-03]: Integration tests skip gracefully when ARBITRUM_MAINNET_RPC_URL not set (follows Phase 09 pattern)
+- [Phase 12-contract-deployment-live-validation]: Throw on zero-address adapter in resolveAdapter() — caught by opportunityFound try/catch, opportunity silently skipped
+- [Phase 12-contract-deployment-live-validation]: EXECUTOR_ADDRESS guard placed after wallet balance check, before executionConfig construction — dry-run mode unaffected
 
 ### Roadmap Evolution
 
@@ -124,6 +126,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-21
-Stopped at: Added Phases 11 and 12 to roadmap. Ready to plan and execute Phase 11.
-Resume file: Phase 11 needs planning. 6.5-hour dry-run analysis complete (see plan file).
+Last session: 2026-02-25
+Stopped at: Paused at Task 2 checkpoint in 12-01-PLAN.md (checkpoint:human-action). Task 1 complete (commit dad8360).
+Resume: Fund deployer wallet with ETH on Arbitrum, set DEPLOYER_PRIVATE_KEY + ARBISCAN_API_KEY + all env vars, then run forge deploy dry-run and broadcast. See 12-01-PLAN.md Task 2 for exact commands.
