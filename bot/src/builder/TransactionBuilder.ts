@@ -25,6 +25,7 @@ const abiCoder = AbiCoder.defaultAbiCoder();
  * ABI-encoded calldata that can be submitted to the blockchain.
  */
 export class TransactionBuilder {
+  private static readonly ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
   readonly config: TransactionBuilderConfig;
   private readonly iface: Interface;
 
@@ -176,11 +177,20 @@ export class TransactionBuilder {
 
   /**
    * Resolve a DEX protocol identifier to its deployed adapter address.
+   *
+   * Throws if no adapter is configured for the DEX, or if the configured
+   * address is the zero address (adapter not yet deployed). This prevents
+   * silent failures where a transaction would revert on-chain with
+   * AdapterNotApproved(address(0)).
    */
   resolveAdapter(dex: DEXProtocol): string {
     const adapter = this.config.adapters[dex];
     if (!adapter) {
       throw new Error(`No adapter configured for DEX protocol: ${dex}`);
+    }
+    // Guard: zero address means adapter not deployed — skip this opportunity
+    if (adapter === TransactionBuilder.ZERO_ADDRESS) {
+      throw new Error(`Adapter for DEX protocol '${dex}' is zero address — adapter not deployed`);
     }
     return adapter;
   }

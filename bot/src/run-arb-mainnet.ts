@@ -172,12 +172,22 @@ async function main(): Promise<void> {
     if (balanceEth < 0.01) {
       console.warn(c.yellow(`[WARN] Low wallet balance (${balanceEth.toFixed(6)} ETH). Ensure you have enough ETH for gas.`));
     }
+
+    // Guard: EXECUTOR_ADDRESS must be set for shadow/live mode
+    const executorAddr = process.env.EXECUTOR_ADDRESS;
+    const ZERO = "0x0000000000000000000000000000000000000000";
+    if (!executorAddr || executorAddr === ZERO) {
+      console.error(`[ERROR] EXECUTOR_ADDRESS is not set or is the zero address.`);
+      console.error(`[ERROR] Set EXECUTOR_ADDRESS to the deployed FlashloanExecutor address from deployments/42161.json`);
+      console.error(`[ERROR] Cannot enter ${mode} mode without a valid executor contract.`);
+      process.exit(1);
+    }
   }
 
   // Execution config (adapters, executor address, flash loan providers)
   const executionConfig = (shadowMode || liveMode) && wallet ? {
     wallet,
-    executorAddress: process.env.EXECUTOR_ADDRESS ?? "0x0000000000000000000000000000000000000000", // TODO: Set in .env
+    executorAddress: process.env.EXECUTOR_ADDRESS ?? "0x0000000000000000000000000000000000000000", // validated above (non-zero in shadow/live)
     adapters: {
       uniswap_v2: process.env.ADAPTER_UNISWAP_V2 ?? "0x0000000000000000000000000000000000000000",
       uniswap_v3: process.env.ADAPTER_UNISWAP_V3 ?? "0x0000000000000000000000000000000000000000",
