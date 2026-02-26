@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 ## Current Position
 
 Phase: 12 of 12 (Contract Deployment & Live Validation)
-Plan: 1 of 3 in current phase (paused at Task 2 checkpoint)
-Status: Phase 12 Plan 01 IN PROGRESS — paused at checkpoint:human-action (Task 2: Fund deployer wallet + set env vars)
-Last activity: 2026-02-25 -- Executed Task 1 (zero-address adapter guard + EXECUTOR_ADDRESS validation), paused at deployment checkpoint
+Plan: 2 of 3 in current phase
+Status: Phase 12 Plan 01 COMPLETE — ready for Plan 02 (shadow mode validation)
+Last activity: 2026-02-25 -- Completed all 3 tasks: code patches + wallet funding + mainnet deployment (FlashloanExecutor at 0x06409bFF450b9feFD6045f4d014DC887cF898a77)
 
-Progress: [======================..] 92% (24/26+ plans -- v1.0: 11 complete, v1.1: 13 complete, Phase 12 in progress)
+Progress: [======================..] 93% (25/27 plans -- v1.0: 11 complete, v1.1: 14 complete, Phase 12 plan 01 complete)
 
 ## Performance Metrics
 
@@ -108,6 +108,9 @@ New for v1.1:
 - [Phase 10-03]: Integration tests skip gracefully when ARBITRUM_MAINNET_RPC_URL not set (follows Phase 09 pattern)
 - [Phase 12-contract-deployment-live-validation]: Throw on zero-address adapter in resolveAdapter() — caught by opportunityFound try/catch, opportunity silently skipped
 - [Phase 12-contract-deployment-live-validation]: EXECUTOR_ADDRESS guard placed after wallet balance check, before executionConfig construction — dry-run mode unaffected
+- [Phase 12-01]: FlashloanExecutor deployed at 0x06409bFF450b9feFD6045f4d014DC887cF898a77 on Arbitrum mainnet (chain 42161), all 11 deployment txns status=0x1
+- [Phase 12-01]: botWallet (0xdC9dAdb34431ee268fE4B13352E1E09B75D799BD) separate from deployer/owner (0x8d7a596F...) — correct role separation in FlashloanExecutor
+- [Phase 12-01]: UniswapV2Adapter skipped on Arbitrum (Uniswap V2 not deployed on Arbitrum — intentional)
 
 ### Roadmap Evolution
 
@@ -127,5 +130,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-25
-Stopped at: Paused at Task 2 checkpoint in 12-01-PLAN.md (checkpoint:human-action). Task 1 complete (commit dad8360).
-Resume: Fund deployer wallet with ETH on Arbitrum, set DEPLOYER_PRIVATE_KEY + ARBISCAN_API_KEY + all env vars, then run forge deploy dry-run and broadcast. See 12-01-PLAN.md Task 2 for exact commands.
+Stopped at: Completed 12-01-PLAN.md (all 3 tasks). Ready for 12-02-PLAN.md (shadow mode validation).
+Resume: Run /gsd:plan-phase 12 to plan 12-02 (shadow mode: 100+ opportunities, profit estimation accuracy within 10%). FlashloanExecutor is live at 0x06409bFF450b9feFD6045f4d014DC887cF898a77. Set EXECUTOR_ADDRESS in 1Password flashloaner-bot .env.arbitrum-mainnet before starting 12-02.
