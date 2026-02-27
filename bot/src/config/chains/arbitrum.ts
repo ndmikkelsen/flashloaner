@@ -72,7 +72,7 @@ export const ARBITRUM_CONFIG: ChainConfig = {
   // Monitor configuration (0.25s blocks = faster polling)
   monitor: {
     deltaThresholdPercent: 0.2, // Lowered from 0.3 — catches WETH/USDT at ~0.27% and ARB/WETH when spread narrows
-    pollIntervalMs: 3_000, // 3s polling (still 12x Arbitrum's 0.25s block time)
+    pollIntervalMs: 6_000, // 6s polling — reduced from 3s to stay under Alchemy CU/s limit
     maxRetries: 3,
     minReserveWeth: 5.0, // Skip V2 pools with < 5 WETH reserve (prevents thin-pool false positives)
     wethAddress: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1",
