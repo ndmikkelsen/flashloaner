@@ -321,8 +321,7 @@ export class FlashloanBot {
         }
 
         // Build the transaction
-        // Note: deployed FlashloanExecutor uses Aave flash loans (Balancer routing not in deployed bytecode)
-        const tx = this.builder.buildArbitrageTransaction(opp, "aave_v3");
+        const tx = this.builder.buildArbitrageTransaction(opp, "balancer");
 
         // Simulate via eth_call (free, no gas cost)
         const simResult = await this.engine.simulateTransaction({
@@ -399,8 +398,7 @@ export class FlashloanBot {
           }
 
           // Build transaction
-          // Note: deployed FlashloanExecutor uses Aave flash loans (Balancer routing not in deployed bytecode)
-          const tx = this.builder.buildArbitrageTransaction(opp, "aave_v3");
+          const tx = this.builder.buildArbitrageTransaction(opp, "balancer");
 
           // Get current gas parameters from provider
           const provider = new JsonRpcProvider(this.config.network.rpcUrl);
