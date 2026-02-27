@@ -398,7 +398,8 @@ export class FlashloanBot {
           }
 
           // Build transaction
-          const tx = this.builder.buildArbitrageTransaction(opp, "balancer");
+          // Note: deployed FlashloanExecutor uses Aave flash loans (Balancer routing not in deployed bytecode)
+          const tx = this.builder.buildArbitrageTransaction(opp, "aave_v3");
 
           // Get current gas parameters from provider
           const provider = new JsonRpcProvider(this.config.network.rpcUrl);
