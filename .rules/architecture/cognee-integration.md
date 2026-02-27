@@ -53,27 +53,37 @@ No Neo4j, no Redis — minimal footprint.
 
 ### Deployment Commands
 
+**ALWAYS use `-c config/deploy.cognee.yml`. NEVER use `-d cognee`.**
+
+Using `-d cognee` appends a destination suffix to the kamal-proxy service name
+(`flashloaner-cognee-web-cognee`), conflicting with the existing registration
+(`flashloaner-cognee-web`). The `-c` flag deploys standalone with consistent naming.
+
 ```bash
-# Deploy (from repo root, requires kamal + op CLI)
-kamal deploy
+# Deploy (from repo root, requires kamal + op CLI signed in)
+kamal deploy -c config/deploy.cognee.yml
 
 # Check status
-kamal details
+kamal details -c config/deploy.cognee.yml
 
 # View logs
-kamal app logs
+kamal app logs -c config/deploy.cognee.yml
 
-# Redeploy after config changes
-kamal deploy
+# Kamal binary location (if not in PATH)
+/opt/homebrew/lib/ruby/gems/4.0.0/bin/kamal deploy -c config/deploy.cognee.yml
 ```
 
 ### Configuration Files
 
 | File | Purpose |
 |------|---------|
-| `config/deploy.yml` | Kamal deployment config |
-| `.kamal/secrets` | 1Password secret references (gitignored) |
+| `config/deploy.cognee.yml` | **Standalone** Kamal config — includes `servers`, `registry`, `ssh` |
+| `.kamal/secrets-common` | Registry + Cognee secrets (1Password refs, gitignored) |
 | `.claude/docker/Dockerfile.cognee` | Thin wrapper (`FROM cognee/cognee:latest`) |
+
+### Proxy Timeout
+
+`config/deploy.cognee.yml` sets `response_timeout: 300` on the kamal-proxy block. This is required — cognify builds a knowledge graph via LLM (OpenAI) and regularly exceeds the default 60s proxy timeout, returning 504 without this setting.
 
 ## Data Sources
 
