@@ -5,9 +5,9 @@
 # Logs:     kamal app logs -c config/deploy.cognee.yml
 # Status:   kamal details -c config/deploy.cognee.yml
 #
-# Standalone config — use -c, never -d cognee. Using -d appends a destination
-# suffix to the kamal-proxy service name (flashloaner-cognee-web-cognee) which
-# conflicts with the existing registration (flashloaner-cognee-web).
+# Use -c, never -d cognee. Using -d appends a destination suffix to the
+# kamal-proxy service name (flashloaner-cognee-web-cognee) which conflicts
+# with the existing registration (flashloaner-cognee-web).
 #
 # This is a per-project Cognee instance (flashloaner).
 # Slimmed down: API + PostgreSQL/pgvector only (no Neo4j, no Redis).
