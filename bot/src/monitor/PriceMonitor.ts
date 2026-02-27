@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { Contract, Interface, WebSocketProvider } from "ethers";
+import { Contract, Interface, WebSocketLike, WebSocketProvider } from "ethers";
 import type {
   PoolConfig,
   PriceDelta,
@@ -70,6 +70,8 @@ export class PriceMonitor extends EventEmitter {
   private _wsReconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private _wsReconnectDelay = 1_000; // Start at 1s, exponential backoff
   private static readonly WS_MAX_RECONNECT_DELAY = 30_000; // Cap at 30s
+  private _lastPolledBlock: number | null = null; // Deduplicate block events
+  private _pollInProgress = false; // Prevent concurrent polls
 
   constructor(config: PriceMonitorConfig) {
     super();
@@ -181,22 +183,28 @@ export class PriceMonitor extends EventEmitter {
       this.pollTimer = null;
     }
 
-    // Subscribe to new blocks
-    this._wsProvider.on("block", (_blockNumber: number) => {
+    // Subscribe to new blocks — deduplicate to prevent triple-polling on reconnect
+    this._wsProvider.on("block", (blockNumber: number) => {
+      if (blockNumber === this._lastPolledBlock) return;
+      this._lastPolledBlock = blockNumber;
       // Reset backoff on successful block receipt (connection is healthy)
       this._wsReconnectDelay = 1_000;
-      void this.poll();
+      // Pass the authoritative WS block number to avoid a redundant HTTP getBlockNumber() call
+      void this.poll(blockNumber);
     });
 
     // Handle WebSocket-level disconnect
+    // WebSocketLike defines onerror but not onclose — extend with intersection type
     if (this._wsProvider.websocket) {
-      this._wsProvider.websocket.on("close", () => {
+      const ws = this._wsProvider.websocket as WebSocketLike & {
+        onclose: null | ((...args: Array<unknown>) => unknown);
+      };
+      ws.onclose = () => {
         this._handleWsDisconnect();
-      });
-
-      this._wsProvider.websocket.on("error", () => {
+      };
+      ws.onerror = () => {
         this._handleWsDisconnect();
-      });
+      };
     }
 
     this.emit("ws:connected");
@@ -261,18 +269,25 @@ export class PriceMonitor extends EventEmitter {
     return [...this.snapshots.values()];
   }
 
-  /** Single poll cycle: fetch all pools, detect deltas */
-  async poll(): Promise<void> {
-    if (this.config.useMulticall) {
-      try {
-        await this.pollMulticall();
-        return;
-      } catch {
-        // Multicall failed entirely — fall back to individual calls
+  /** Single poll cycle: fetch all pools, detect deltas
+   * @param blockNumber - authoritative block number from WS event (skips HTTP getBlockNumber call)
+   */
+  async poll(blockNumber?: number): Promise<void> {
+    if (this._pollInProgress) return;
+    this._pollInProgress = true;
+    try {
+      if (this.config.useMulticall) {
+        try {
+          await this.pollMulticall(blockNumber);
+          return;
+        } catch {
+          // Multicall failed entirely — fall back to individual calls
+        }
       }
+      await this.pollIndividual();
+    } finally {
+      this._pollInProgress = false;
     }
-
-    await this.pollIndividual();
   }
 
   /** Fetch all pools with individual RPC calls (fallback path) */
@@ -304,8 +319,8 @@ export class PriceMonitor extends EventEmitter {
   }
 
   /** Batch all pool reads into a single Multicall3 aggregate3() call */
-  private async pollMulticall(): Promise<void> {
-    const blockNumber = await this.config.provider.getBlockNumber();
+  private async pollMulticall(knownBlock?: number): Promise<void> {
+    const blockNumber = knownBlock ?? await this.config.provider.getBlockNumber();
     const freshPools = new Set<string>();
 
     // Build multicall: price calls (1 per pool) + liquidity calls (1 per V3 pool)

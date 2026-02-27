@@ -71,8 +71,8 @@ export const ARBITRUM_CONFIG: ChainConfig = {
 
   // Monitor configuration (0.25s blocks = faster polling)
   monitor: {
-    deltaThresholdPercent: 0.3, // Same as Ethereum
-    pollIntervalMs: 3_000, // 3s polling (still 12x Arbitrum's 0.25s block time)
+    deltaThresholdPercent: 0.2, // Lowered from 0.3 — catches WETH/USDT at ~0.27% and ARB/WETH when spread narrows
+    pollIntervalMs: 6_000, // 6s polling — reduced from 3s to stay under Alchemy CU/s limit
     maxRetries: 3,
     minReserveWeth: 5.0, // Skip V2 pools with < 5 WETH reserve (prevents thin-pool false positives)
     wethAddress: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1",
@@ -81,7 +81,7 @@ export const ARBITRUM_CONFIG: ChainConfig = {
   // Detector configuration (Arbitrum thresholds — tuned from v1 dry-run analysis)
   // Fee deduction is now handled in OpportunityDetector.calculateGrossProfit()
   detector: {
-    minProfitThreshold: 0.015, // Raised from 0.005 — must exceed worst-case revert gas cost (~0.0098 ETH)
+    minProfitThreshold: 0.012, // Lowered from 0.015 — captures ARB/WETH at ~0.012 ETH; still exceeds worst-case revert gas (~0.0098 ETH)
     maxSlippage: 0.001, // 0.1% — tighter than 0.5% default; V2 pools handle moderate sizes well
     defaultInputAmount: 5, // 5 ETH flash loan (minimum viable for SPELL/WETH profitability)
     gasPriceGwei: 0.1, // Arbitrum typical gas price (L2 only; L1 via gasEstimatorFn)

@@ -30,7 +30,7 @@ See: `.planning/milestones/v1.0-ROADMAP.md` for full details.
 - [ ] **Phase 9: Ramses V2 Adapter** - Add Ramses V3 CL pool monitoring and on-chain swap routing with fee manipulation safeguards
 - [x] **Phase 10: Trader Joe V2.1 LB Adapter** - Add Trader Joe Liquidity Book price reading and on-chain swap routing with variable fee buffers (completed 2026-02-20)
 - [x] **Phase 11: Dry-Run Signal Quality Fixes** - Fix TJ LB slippage underestimation, GMX/WETH V3 reserve cap failure, and TJ LB fee display bug found in 6.5-hour dry-run (completed 2026-02-22)
-- [ ] **Phase 12: Contract Deployment & Live Validation** - Deploy FlashloanExecutor + adapters to Arbitrum mainnet, validate with shadow mode, go live with small capital
+- [ ] **Phase 12: Contract Deployment & Live Validation** - Deploy FlashloanExecutor + adapters to Arbitrum mainnet, validate with shadow mode, go live with small capital (plan 01 complete — contracts deployed)
 
 ## Phase Details
 
@@ -143,7 +143,7 @@ Plans:
 | 9. Ramses V2 Adapter | v1.1 | 2/2 | Complete | 2026-02-20 |
 | 10. Trader Joe V2.1 LB Adapter | v1.1 | 3/3 | Complete | 2026-02-20 |
 | 11. Dry-Run Signal Quality Fixes | 2/2 | Complete   | 2026-02-22 | - |
-| 12. Contract Deployment & Live Validation | v1.1 | 0/3 | Not started | - |
+| 12. Contract Deployment & Live Validation | v1.1 | 1/3 | In progress (plan 01 complete — contracts deployed) | - |
 
 ### Phase 11: Dry-Run Signal Quality Fixes
 **Goal**: Fix three critical signal quality issues found during 6.5-hour dry-run: (1) TJ LB slippage dangerously underestimated (500 ETH with 0.004 ETH slippage), (2) GMX/WETH V3 virtual reserves not passed to optimizer, (3) TJ LB fee display shows 0.00% instead of 0.15%
@@ -171,7 +171,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 12-01-PLAN.md -- Deploy FlashloanExecutor + adapters to Arbitrum mainnet
+- [x] 12-01-PLAN.md -- Deploy FlashloanExecutor + adapters to Arbitrum mainnet (COMPLETE: all 3 tasks done, contracts live at 0x06409bFF450b9feFD6045f4d014DC887cF898a77)
 - [ ] 12-02-PLAN.md -- Shadow mode validation (100+ opportunities, 10% accuracy)
 - [ ] 12-03-PLAN.md -- Go live with small capital, execute first profitable trade
 
