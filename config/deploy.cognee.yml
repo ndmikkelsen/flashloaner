@@ -1,9 +1,13 @@
 # Kamal 2 deployment config for Cognee (semantic search + knowledge layer)
 #
-# Deploy:   kamal setup -d cognee     (first time)
-#           kamal deploy -d cognee    (subsequent)
-# Logs:     kamal app logs -d cognee
-# Status:   kamal details -d cognee
+# Deploy:   kamal setup -c config/deploy.cognee.yml     (first time)
+#           kamal deploy -c config/deploy.cognee.yml    (subsequent)
+# Logs:     kamal app logs -c config/deploy.cognee.yml
+# Status:   kamal details -c config/deploy.cognee.yml
+#
+# Standalone config — use -c, never -d cognee. Using -d appends a destination
+# suffix to the kamal-proxy service name (flashloaner-cognee-web-cognee) which
+# conflicts with the existing registration (flashloaner-cognee-web).
 #
 # This is a per-project Cognee instance (flashloaner).
 # Slimmed down: API + PostgreSQL/pgvector only (no Neo4j, no Redis).
@@ -11,6 +15,24 @@
 service: flashloaner-cognee
 
 image: flashloaner/cognee
+
+servers:
+  - 10.10.20.138
+
+registry:
+  server: harbor.compute.lan
+  username: admin
+  password:
+    - KAMAL_REGISTRY_PASSWORD
+
+ssh:
+  user: compute
+  keys:
+    - ~/.ssh/z3r0Layer-main
+
+builder:
+  arch: amd64
+  dockerfile: .claude/docker/Dockerfile.cognee
 
 proxy:
   host: flashloaner-cognee.apps.compute.lan
@@ -22,9 +44,6 @@ proxy:
     interval: 5
     path: /health
     timeout: 5
-
-builder:
-  dockerfile: .claude/docker/Dockerfile.cognee
 
 env:
   clear:
