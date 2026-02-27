@@ -189,6 +189,14 @@ export class OpportunityDetector extends EventEmitter {
       const reserveCap = this.computeReserveCap(path);
       optimizationResult = this.optimizer.optimize(path, profitFn, reserveCap);
       inputAmount = optimizationResult.optimalAmount;
+
+      // Optimizer exhausted search range without finding any profitable size — skip early.
+      // Computing netProfit at fallbackAmount (outside the searched range) would produce
+      // a misleading large negative value due to uncapped slippage.
+      if (optimizationResult.fallbackReason === "no_profitable_size") {
+        this.emit("opportunityRejected", "No profitable input size found", delta);
+        return null;
+      }
     } else {
       // No reserve data: fall back to fixed amount
       inputAmount = this.config.defaultInputAmount;
@@ -305,6 +313,12 @@ export class OpportunityDetector extends EventEmitter {
       const reserveCap = this.computeReserveCap(path);
       optimizationResult = this.optimizer.optimize(path, profitFn, reserveCap);
       inputAmount = optimizationResult.optimalAmount;
+
+      // Optimizer exhausted search range without finding any profitable size — skip early.
+      if (optimizationResult.fallbackReason === "no_profitable_size") {
+        this.emit("opportunityRejected", "No profitable input size found", delta);
+        return null;
+      }
     } else {
       // No reserve data: fall back to fixed amount
       inputAmount = this.config.defaultInputAmount;

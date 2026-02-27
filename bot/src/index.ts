@@ -209,6 +209,7 @@ export class FlashloanBot {
         this.config.pools.length,
         this.config.network.chainId,
         this.config.monitor.pollIntervalMs,
+        this.mode,
       ),
     );
 
