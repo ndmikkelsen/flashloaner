@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-19)
 
 **Core value:** The bot must never lose funds beyond gas costs -- the 4-layer safety system (off-chain estimate, eth_call simulation, on-chain ProfitValidator, MEV protection) ensures every transaction either profits or reverts.
-**Current focus:** Phase 11 -- Dry-Run Signal Quality Fixes
+**Current focus:** Phase 12 -- Contract Deployment & Live Validation
 
 ## Current Position
 
-Phase: 11 of 12 (Dry-Run Signal Quality Fixes)
-Plan: 0 of ? in current phase
-Status: Phase 11 NOT PLANNED
-Last activity: 2026-02-21 -- Added Phases 11 and 12 to roadmap after 6.5-hour dry-run analysis
+Phase: 12 of 12 (Contract Deployment & Live Validation)
+Plan: 2 of 3 in current phase
+Status: Phase 12 Plan 01 COMPLETE — ready for Plan 02 (shadow mode validation)
+Last activity: 2026-02-25 -- Completed all 3 tasks: code patches + wallet funding + mainnet deployment (FlashloanExecutor at 0x06409bFF450b9feFD6045f4d014DC887cF898a77)
 
-Progress: [======================..] 92% (24/26+ plans -- v1.0: 11 complete, v1.1: 13 complete, 2 phases pending)
+Progress: [======================..] 93% (25/27 plans -- v1.0: 11 complete, v1.1: 14 complete, Phase 12 plan 01 complete)
 
 ## Performance Metrics
 
@@ -106,6 +106,11 @@ New for v1.1:
 - [Phase 10-03]: 1.33x profit threshold for LB opportunities (0.8% if base is 0.6%) provides additional safety margin
 - [Phase 10-03]: LB pool addresses use placeholders pending LBFactory verification via cast
 - [Phase 10-03]: Integration tests skip gracefully when ARBITRUM_MAINNET_RPC_URL not set (follows Phase 09 pattern)
+- [Phase 12-contract-deployment-live-validation]: Throw on zero-address adapter in resolveAdapter() — caught by opportunityFound try/catch, opportunity silently skipped
+- [Phase 12-contract-deployment-live-validation]: EXECUTOR_ADDRESS guard placed after wallet balance check, before executionConfig construction — dry-run mode unaffected
+- [Phase 12-01]: FlashloanExecutor deployed at 0x06409bFF450b9feFD6045f4d014DC887cF898a77 on Arbitrum mainnet (chain 42161), all 11 deployment txns status=0x1
+- [Phase 12-01]: botWallet (0xdC9dAdb34431ee268fE4B13352E1E09B75D799BD) separate from deployer/owner (0x8d7a596F...) — correct role separation in FlashloanExecutor
+- [Phase 12-01]: UniswapV2Adapter skipped on Arbitrum (Uniswap V2 not deployed on Arbitrum — intentional)
 
 ### Roadmap Evolution
 
@@ -124,6 +129,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-21
-Stopped at: Added Phases 11 and 12 to roadmap. Ready to plan and execute Phase 11.
-Resume file: Phase 11 needs planning. 6.5-hour dry-run analysis complete (see plan file).
+Last session: 2026-02-25
+Stopped at: Completed 12-01-PLAN.md (all 3 tasks). Ready for 12-02-PLAN.md (shadow mode validation).
+Resume: Run /gsd:plan-phase 12 to plan 12-02 (shadow mode: 100+ opportunities, profit estimation accuracy within 10%). FlashloanExecutor is live at 0x06409bFF450b9feFD6045f4d014DC887cF898a77. Set EXECUTOR_ADDRESS in 1Password flashloaner-bot .env.arbitrum-mainnet before starting 12-02.

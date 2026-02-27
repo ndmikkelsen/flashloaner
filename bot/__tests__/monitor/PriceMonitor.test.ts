@@ -162,19 +162,15 @@ function encodeGlobalState(
  * Mimics ethers.js v6 WebSocketProvider interface.
  */
 function createMockWsProvider() {
-  const websocketListeners: Record<string, Array<(...args: any[]) => void>> = {};
-
   return {
     on: vi.fn(),
     off: vi.fn(),
     removeAllListeners: vi.fn(),
     destroy: vi.fn(),
     websocket: {
-      on: vi.fn().mockImplementation((event: string, handler: (...args: any[]) => void) => {
-        if (!websocketListeners[event]) websocketListeners[event] = [];
-        websocketListeners[event].push(handler);
-      }),
-      off: vi.fn(),
+      // Implementation uses ws.onclose / ws.onerror property assignment (not .on())
+      onclose: null as null | ((...args: any[]) => void),
+      onerror: null as null | ((...args: any[]) => void),
       readyState: 1, // WebSocket.OPEN
     },
   };
@@ -1044,12 +1040,8 @@ describe("PriceMonitor", () => {
       expect(monitor.wsActive).toBe(true);
       expect((monitor as any).pollTimer).toBeNull();
 
-      // Simulate WebSocket close — trigger the "close" handler on the websocket
-      const wsCloseHandler = mockWsProvider.websocket.on.mock.calls.find(
-        (call: any[]) => call[0] === "close",
-      )![1] as () => void;
-
-      wsCloseHandler();
+      // Simulate WebSocket close — trigger the onclose property handler
+      mockWsProvider.websocket.onclose?.();
 
       // Should fall back to interval polling
       expect(monitor.wsActive).toBe(false);
@@ -1089,10 +1081,7 @@ describe("PriceMonitor", () => {
       monitor.startWebSocket("wss://arb-mainnet.example.com/ws");
 
       // Simulate close
-      const wsCloseHandler = mockWsProvider.websocket.on.mock.calls.find(
-        (call: any[]) => call[0] === "close",
-      )![1] as () => void;
-      wsCloseHandler();
+      mockWsProvider.websocket.onclose?.();
 
       expect(events).toContain("disconnected");
 
@@ -1118,10 +1107,7 @@ describe("PriceMonitor", () => {
       monitor.startWebSocket("wss://arb-mainnet.example.com/ws");
 
       // Simulate close
-      const wsCloseHandler = mockWsProvider.websocket.on.mock.calls.find(
-        (call: any[]) => call[0] === "close",
-      )![1] as () => void;
-      wsCloseHandler();
+      mockWsProvider.websocket.onclose?.();
 
       // Advance past the first reconnect delay (1 second)
       await vi.advanceTimersByTimeAsync(1_100);
@@ -1151,8 +1137,7 @@ describe("PriceMonitor", () => {
       expect(createSpy).toHaveBeenCalledTimes(1);
 
       // Simulate close #1
-      const getCloseHandler = (p: any) =>
-        p.websocket.on.mock.calls.find((call: any[]) => call[0] === "close")![1] as () => void;
+      const getCloseHandler = (p: any) => () => p.websocket.onclose?.();
 
       getCloseHandler(providers[0])();
 
@@ -1198,8 +1183,7 @@ describe("PriceMonitor", () => {
 
       monitor.startWebSocket("wss://arb-mainnet.example.com/ws");
 
-      const getCloseHandler = (p: any) =>
-        p.websocket.on.mock.calls.find((call: any[]) => call[0] === "close")![1] as () => void;
+      const getCloseHandler = (p: any) => () => p.websocket.onclose?.();
 
       // Disconnect
       getCloseHandler(providers[0])();

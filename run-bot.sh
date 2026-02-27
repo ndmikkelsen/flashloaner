@@ -31,7 +31,10 @@ if [[ ! -f "$ENV_FILE" ]]; then
   exit 1
 fi
 
-# ── Set execution mode env vars ──
+# ── Source env ──
+set -a && source "$ENV_FILE" && set +a
+
+# ── Set execution mode env vars (after sourcing env to take precedence) ──
 case "$MODE" in
   dry|dry-run|dryrun)
     export DRY_RUN=true
@@ -59,9 +62,6 @@ case "$MODE" in
     exit 1
     ;;
 esac
-
-# ── Source env ──
-set -a && source "$ENV_FILE" && set +a
 
 # ── Safety gate for live mode ──
 if [[ "$MODE" == "live" ]]; then

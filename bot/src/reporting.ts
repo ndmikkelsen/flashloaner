@@ -96,17 +96,30 @@ export function formatScanHeader(
   poolCount: number,
   chainId: number,
   pollIntervalMs: number,
+  mode: "dry-run" | "shadow" | "live" = "dry-run",
 ): string {
   const intervalSec = (pollIntervalMs / 1000).toFixed(1);
+  const modeLabel =
+    mode === "live"
+      ? "FLASHLOAN ARBITRAGE BOT - LIVE"
+      : mode === "shadow"
+        ? "FLASHLOAN ARBITRAGE BOT - SHADOW"
+        : "FLASHLOAN ARBITRAGE BOT - DRY RUN";
+  const modeDesc =
+    mode === "live"
+      ? "Execute transactions (spending gas)"
+      : mode === "shadow"
+        ? "Simulate via eth_call (zero gas cost)"
+        : "Monitor & Report (no execution)";
   const lines = [
     ``,
     `${"*".repeat(60)}`,
-    `  FLASHLOAN ARBITRAGE BOT - DRY RUN`,
+    `  ${modeLabel}`,
     `${"*".repeat(60)}`,
     `  Chain ID:       ${chainId}`,
     `  Pools:          ${poolCount}`,
     `  Poll interval:  ${intervalSec}s`,
-    `  Mode:           Monitor & Report (no execution)`,
+    `  Mode:           ${modeDesc}`,
     `${"*".repeat(60)}`,
     ``,
   ];

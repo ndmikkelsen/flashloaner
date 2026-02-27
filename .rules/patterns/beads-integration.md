@@ -15,7 +15,49 @@ This project uses [Beads (bd)](https://github.com/steveyegge/beads) for ALL issu
 - **Use `bd create`** to track new issues/tasks/bugs
 - **Git hooks auto-sync** on commit/merge — no manual sync needed
 - **Remote Dolt backend** — issues stored in `beads_flashloaner` DB on compute server
-- **Password required**: set `BEADS_DOLT_PASSWORD` env var (from 1Password `flashloaner-knowledge`)
+- **Password via direnv** — `BEADS_DOLT_PASSWORD` auto-exported from `.envrc` (1Password source)
+
+## Connection Setup
+
+`bd` requires `BEADS_DOLT_PASSWORD` to authenticate as the `beads` user on the Dolt server.
+
+### direnv (interactive terminal — automatic)
+
+The `.envrc` already exports it from 1Password:
+
+```bash
+export BEADS_DOLT_PASSWORD=$(op read "op://Personal/flashloaner-knowledge/DOLT_PASSWORD" 2>/dev/null)
+```
+
+If `bd` commands fail with "Access denied", direnv probably hasn't been allowed yet:
+
+```bash
+direnv allow            # run once in the repo root — persists until .envrc changes
+direnv status           # confirm: "Found RC path" with "Loaded" state
+```
+
+After `direnv allow`, all `bd` commands work automatically in any interactive terminal session in this directory.
+
+### Bash tool / non-interactive shells
+
+direnv does not auto-load in non-interactive contexts (e.g., Claude Code's Bash tool, CI, cron). Use `direnv exec` to inject the environment:
+
+```bash
+direnv exec . bd ready
+direnv exec . bd list --status=open
+direnv exec . bd close flashloaner-abc --reason "Done"
+```
+
+Or for multiple commands, use a subshell:
+```bash
+direnv exec . bash -c 'BEADS_NO_DAEMON=1 bd ready'
+```
+
+### Verify connection
+
+```bash
+direnv exec . bd dolt test   # should print: ✓ Connection successful
+```
 
 ## Quick Reference
 

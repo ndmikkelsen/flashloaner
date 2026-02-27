@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { Interface } from "ethers";
+import { AbiCoder, Interface } from "ethers";
 import type { PreparedTransaction } from "../builder/types.js";
 import type {
   ExecutionEngineConfig,
@@ -374,13 +374,24 @@ export class ExecutionEngine extends EventEmitter {
     // ethers.js v6 wraps revert data in error.data
     const data = err.data as string | undefined;
     if (data && typeof data === "string" && data.startsWith("0x") && data.length >= 10) {
+      // Try to decode as a known FlashloanExecutor custom error first
       try {
         const parsed = executorIface.parseError(data);
         if (parsed) {
           return this.formatParsedError(parsed.name, parsed.args);
         }
       } catch {
-        // Not a known error selector
+        // Not a known custom error selector
+      }
+
+      // Try standard Error(string) — selector 0x08c379a0
+      if (data.startsWith("0x08c379a0") && data.length > 10) {
+        try {
+          const [reason] = AbiCoder.defaultAbiCoder().decode(["string"], "0x" + data.slice(10));
+          if (reason) return String(reason);
+        } catch {
+          // Malformed Error(string) data
+        }
       }
     }
 
