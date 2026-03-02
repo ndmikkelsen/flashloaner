@@ -42,6 +42,10 @@ export class OpportunityDetector extends EventEmitter {
   private monitor: PriceMonitor | null = null;
   private stalePools = new Set<string>();
   private optimizer: InputOptimizer;
+  private readonly cooldownAfterRejections: number;
+  private readonly cooldownDurationMs: number;
+  private readonly minPoolLiquidityEth: number;
+  private readonly rejectionTracker = new Map<string, { count: number; cooldownUntil: number; lastDelta: number }>();
 
   constructor(config: OpportunityDetectorConfig = {}) {
     super();
@@ -66,6 +70,10 @@ export class OpportunityDetector extends EventEmitter {
     // on thin pools where price impact at 1+ ETH wipes out the spread.
     // Convergence threshold of 0.001 matches the sub-ETH search precision needed.
     // 40 iterations: range 1000 * (2/3)^40 ≈ 0.000013 — converges any realistic range.
+    this.cooldownAfterRejections = config.cooldownAfterRejections ?? 10;
+    this.cooldownDurationMs = config.cooldownDurationMs ?? 60_000;
+    this.minPoolLiquidityEth = config.minPoolLiquidityEth ?? 5.0;
+
     this.optimizer = new InputOptimizer({
       maxIterations: 40,
       timeoutMs: 100,
@@ -167,11 +175,18 @@ export class OpportunityDetector extends EventEmitter {
   analyzeDelta(delta: PriceDelta): ArbitrageOpportunity | null {
     // Skip if either pool is stale
     if (this.isPoolStale(delta.buyPool) || this.isPoolStale(delta.sellPool)) {
-      this.emit(
-        "opportunityRejected",
-        "Pool marked as stale",
-        delta,
-      );
+      this.emit("opportunityRejected", "Pool marked as stale", delta);
+      return null;
+    }
+
+    // Skip if pair is in cooldown (too many consecutive rejections)
+    if (this.isInCooldown(delta)) {
+      return null;
+    }
+
+    // Skip thin pools below minimum liquidity threshold
+    if (this.isThinPool(delta)) {
+      this.emit("opportunityRejected", "Thin pool below liquidity threshold", delta);
       return null;
     }
 
@@ -231,6 +246,7 @@ export class OpportunityDetector extends EventEmitter {
     }
 
     if (netProfit < effectiveThreshold) {
+      this.trackRejection(delta);
       this.emit(
         "opportunityRejected",
         `Net profit ${netProfit.toFixed(6)} below threshold ${effectiveThreshold.toFixed(6)}${thresholdLabel}`,
@@ -238,6 +254,9 @@ export class OpportunityDetector extends EventEmitter {
       );
       return null;
     }
+
+    // Profitable — reset cooldown tracker for this pair
+    this.rejectionTracker.delete(delta.pair);
 
     const opportunity: ArbitrageOpportunity = {
       id: randomUUID(),
@@ -291,11 +310,18 @@ export class OpportunityDetector extends EventEmitter {
   private async analyzeDeltaAsync(delta: PriceDelta): Promise<ArbitrageOpportunity | null> {
     // Skip if either pool is stale
     if (this.isPoolStale(delta.buyPool) || this.isPoolStale(delta.sellPool)) {
-      this.emit(
-        "opportunityRejected",
-        "Pool marked as stale",
-        delta,
-      );
+      this.emit("opportunityRejected", "Pool marked as stale", delta);
+      return null;
+    }
+
+    // Skip if pair is in cooldown
+    if (this.isInCooldown(delta)) {
+      return null;
+    }
+
+    // Skip thin pools below minimum liquidity threshold
+    if (this.isThinPool(delta)) {
+      this.emit("opportunityRejected", "Thin pool below liquidity threshold", delta);
       return null;
     }
 
@@ -353,6 +379,7 @@ export class OpportunityDetector extends EventEmitter {
     }
 
     if (netProfit < effectiveThreshold) {
+      this.trackRejection(delta);
       this.emit(
         "opportunityRejected",
         `Net profit ${netProfit.toFixed(6)} below threshold ${effectiveThreshold.toFixed(6)}${thresholdLabel}`,
@@ -360,6 +387,9 @@ export class OpportunityDetector extends EventEmitter {
       );
       return null;
     }
+
+    // Profitable — reset cooldown tracker for this pair
+    this.rejectionTracker.delete(delta.pair);
 
     const opportunity: ArbitrageOpportunity = {
       id: randomUUID(),
@@ -716,5 +746,89 @@ export class OpportunityDetector extends EventEmitter {
     }
 
     return undefined;
+  }
+
+  // ---- Pair Cooldown ----
+
+  /**
+   * Check if a pair is currently in cooldown (too many consecutive rejections).
+   * Cooldown is reset if deltaPercent changes significantly (> 0.5% from last seen).
+   */
+  private isInCooldown(delta: PriceDelta): boolean {
+    const tracker = this.rejectionTracker.get(delta.pair);
+    if (!tracker) return false;
+
+    // Reset cooldown if delta changed significantly (new market conditions)
+    if (Math.abs(delta.deltaPercent - tracker.lastDelta) > 0.5) {
+      this.rejectionTracker.delete(delta.pair);
+      return false;
+    }
+
+    // Only check cooldown if it's been activated (cooldownUntil > 0)
+    if (tracker.cooldownUntil > 0) {
+      if (tracker.cooldownUntil > Date.now()) {
+        return true; // Still in cooldown
+      }
+      // Cooldown expired — reset tracker for fresh counting
+      this.rejectionTracker.delete(delta.pair);
+    }
+
+    return false;
+  }
+
+  /**
+   * Track a rejection for cooldown purposes.
+   * After cooldownAfterRejections consecutive rejections, the pair enters cooldown.
+   */
+  private trackRejection(delta: PriceDelta): void {
+    const tracker = this.rejectionTracker.get(delta.pair) ?? {
+      count: 0,
+      cooldownUntil: 0,
+      lastDelta: delta.deltaPercent,
+    };
+
+    tracker.count++;
+    tracker.lastDelta = delta.deltaPercent;
+
+    if (tracker.count >= this.cooldownAfterRejections) {
+      tracker.cooldownUntil = Date.now() + this.cooldownDurationMs;
+      tracker.count = 0; // Reset count for next cooldown cycle
+    }
+
+    this.rejectionTracker.set(delta.pair, tracker);
+  }
+
+  // ---- Thin Pool Filter ----
+
+  /**
+   * Check if either pool in a delta is below the minimum liquidity threshold.
+   * Only filters V2 pools with actual reserve data.
+   */
+  private isThinPool(delta: PriceDelta): boolean {
+    // Only filter when we have reserve data (V2 pools)
+    const buyReserve = this.getWethReserve(delta.buyPool);
+    const sellReserve = this.getWethReserve(delta.sellPool);
+
+    // If neither pool has reserve data, don't filter (can't determine)
+    if (buyReserve === undefined && sellReserve === undefined) return false;
+
+    // Filter if any pool with reserve data is below threshold
+    if (buyReserve !== undefined && buyReserve < this.minPoolLiquidityEth) return true;
+    if (sellReserve !== undefined && sellReserve < this.minPoolLiquidityEth) return true;
+
+    return false;
+  }
+
+  /**
+   * Extract WETH-equivalent reserve from a pool snapshot.
+   * For V2 pools: uses token0 reserves (assumes WETH is token0 for WETH-based pairs).
+   * Returns undefined if no reserve data available.
+   */
+  private getWethReserve(snapshot: PriceSnapshot): number | undefined {
+    if (!snapshot.reserves || snapshot.reserves.length < 2) return undefined;
+
+    // For WETH-based pairs, token0 is typically WETH (18 decimals)
+    const reserve0 = Number(snapshot.reserves[0]) / 1e18;
+    return reserve0;
   }
 }

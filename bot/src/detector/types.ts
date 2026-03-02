@@ -106,6 +106,12 @@ export interface OpportunityDetectorConfig {
    *  (e.g., Trader Joe LB uses bin-based liquidity with no reserve/depth info).
    *  Key: DEXProtocol string, Value: max input in base token units. */
   maxInputByDex?: Partial<Record<DEXProtocol, number>>;
+  /** Number of consecutive rejections before a pair enters cooldown. Default: 10 */
+  cooldownAfterRejections?: number;
+  /** Duration in ms to cooldown a rejected pair. Default: 60000 (60s) */
+  cooldownDurationMs?: number;
+  /** Minimum pool liquidity in base token (WETH) to analyze. Default: 5.0 */
+  minPoolLiquidityEth?: number;
 }
 
 /** Events emitted by OpportunityDetector */

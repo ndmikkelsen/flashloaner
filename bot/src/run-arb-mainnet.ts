@@ -167,9 +167,14 @@ async function main(): Promise<void> {
 
     const balance = await provider.getBalance(wallet.address);
     const balanceEth = Number(balance) / 1e18;
-    console.log(c.cyan(`            ${balanceEth.toFixed(6)} ETH\n`));
+    const minBalanceEth = parseFloat(process.env.MIN_BALANCE_ETH ?? "0.005");
+    console.log(c.cyan(`            ${balanceEth.toFixed(6)} ETH (min: ${minBalanceEth} ETH)\n`));
 
-    if (balanceEth < 0.01) {
+    if (liveMode && balanceEth < minBalanceEth) {
+      console.error(c.red(`[FATAL] Wallet balance ${balanceEth.toFixed(6)} ETH is below minimum ${minBalanceEth} ETH for LIVE mode.`));
+      console.error(c.red(`[FATAL] Fund the wallet or lower MIN_BALANCE_ETH to proceed.`));
+      process.exit(1);
+    } else if (balanceEth < 0.01) {
       console.warn(c.yellow(`[WARN] Low wallet balance (${balanceEth.toFixed(6)} ETH). Ensure you have enough ETH for gas.`));
     }
 
@@ -398,6 +403,35 @@ async function main(): Promise<void> {
   // ---- Stats intervals ----
   const priceStatsInterval = setInterval(logStats, 60_000); // Existing price/opportunity stats every 60s
 
+  // Periodic wallet balance monitoring (shadow/live modes only, every 5 minutes)
+  let balanceCheckInterval: ReturnType<typeof setInterval> | undefined;
+  if ((shadowMode || liveMode) && wallet) {
+    const minBalanceEth = parseFloat(process.env.MIN_BALANCE_ETH ?? "0.005");
+    const balanceProvider = new JsonRpcProvider(chain.rpcUrl);
+    const walletAddr = wallet.address;
+
+    balanceCheckInterval = setInterval(async () => {
+      try {
+        const bal = await balanceProvider.getBalance(walletAddr);
+        const balEth = Number(bal) / 1e18;
+
+        if (liveMode && balEth < minBalanceEth) {
+          console.error(c.red(`[${ts()}] [BALANCE] CRITICAL: ${balEth.toFixed(6)} ETH < ${minBalanceEth} ETH minimum. Shutting down.`));
+          await shutdown();
+          return;
+        }
+
+        if (balEth < 0.01) {
+          console.warn(c.yellow(`[${ts()}] [BALANCE] Low: ${balEth.toFixed(6)} ETH — consider funding wallet`));
+        } else {
+          console.log(c.dim(`[${ts()}] [BALANCE] ${balEth.toFixed(6)} ETH`));
+        }
+      } catch (err) {
+        console.warn(c.yellow(`[${ts()}] [BALANCE] Check failed: ${err instanceof Error ? err.message : String(err)}`));
+      }
+    }, 300_000); // Every 5 minutes
+  }
+
   const tradeStatsInterval = setInterval(() => {
     const sessionStats = tradeStore.getStats();
     if (sessionStats.totalTrades > 0) {
@@ -419,6 +453,7 @@ async function main(): Promise<void> {
     console.log(c.bold(`\n[${ts()}] [SHUTDOWN] Stopping Arbitrum One monitor...`));
     clearInterval(priceStatsInterval);
     clearInterval(tradeStatsInterval);
+    if (balanceCheckInterval) clearInterval(balanceCheckInterval);
     await bot.stop();
 
     // Display final session stats
