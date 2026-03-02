@@ -62,14 +62,17 @@ export class OpportunityDetector extends EventEmitter {
       ...config.maxInputByDex,
     };
 
-    // Initialize optimizer with conservative defaults
+    // Initialize optimizer — search from 0.01 ETH to allow small profitable trades
+    // on thin pools where price impact at 1+ ETH wipes out the spread.
+    // Convergence threshold of 0.001 matches the sub-ETH search precision needed.
+    // 40 iterations: range 1000 * (2/3)^40 ≈ 0.000013 — converges any realistic range.
     this.optimizer = new InputOptimizer({
-      maxIterations: 20,
+      maxIterations: 40,
       timeoutMs: 100,
       fallbackAmount: this.config.defaultInputAmount,
-      minAmount: 1,
+      minAmount: 0.01,
       maxAmount: Math.min(1000, this.config.defaultInputAmount * 100),
-      convergenceThreshold: 1.0,
+      convergenceThreshold: 0.001,
     });
   }
 

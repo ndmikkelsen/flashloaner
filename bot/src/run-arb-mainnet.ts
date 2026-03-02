@@ -203,6 +203,13 @@ async function main(): Promise<void> {
     },
   } : undefined;
 
+  // Allow env var overrides for key detector parameters
+  const detectorConfig = { ...chain.detector };
+  if (process.env.MIN_PROFIT_THRESHOLD) {
+    detectorConfig.minProfitThreshold = parseFloat(process.env.MIN_PROFIT_THRESHOLD);
+    console.log(c.cyan(`  Threshold: ${detectorConfig.minProfitThreshold} ETH (from MIN_PROFIT_THRESHOLD env)`));
+  }
+
   // Construct FlashloanBot directly with chain config values (NOT fromEnv())
   // This avoids the default config path that hardcodes Ethereum/Sepolia values.
   const bot = new FlashloanBot(
@@ -210,7 +217,7 @@ async function main(): Promise<void> {
       network: { rpcUrl: chain.rpcUrl, chainId: chain.chainId, wsUrl: process.env.WS_URL },
       pools: chain.pools,
       monitor: chain.monitor,
-      detector: chain.detector,
+      detector: detectorConfig,
       logLevel: (process.env.LOG_LEVEL as "debug" | "info" | "warn" | "error") ?? "debug",
     },
     dryRun,
@@ -252,8 +259,12 @@ async function main(): Promise<void> {
       // Fallback: static estimate when NodeInterface fails (e.g., contract not yet verified)
       // Only warn once — subsequent failures use static estimates silently
       if (!nodeInterfaceWarned) {
+        const errMsg = err instanceof Error ? err.message : String(err);
         console.warn(
-          c.yellow(`[${ts()}] [GAS] NodeInterface call failed, using static estimates (this warning won't repeat)`),
+          c.yellow(`[${ts()}] [GAS] NodeInterface call failed: ${errMsg}`),
+        );
+        console.warn(
+          c.yellow(`[${ts()}] [GAS] Using static estimates (L2: ${staticL2.toFixed(6)}, L1: ${staticL1.toFixed(6)} ETH per swap). This warning won't repeat.`),
         );
         nodeInterfaceWarned = true;
       }
