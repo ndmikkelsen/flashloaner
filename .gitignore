@@ -34,11 +34,14 @@ __pycache__/
 # ── Logs ──
 *.log
 
-# ── Data directory (JSONL persistence, pm2 logs) ──
+# ── Data directory (JSONL persistence, pm2 logs, PID files) ──
 .data/*
 !.data/logs/
 .data/logs/*
 !.data/logs/.gitkeep
+!.data/pids/
+.data/pids/*
+!.data/pids/.gitkeep
 
 # ── IDE ──
 .vscode/
