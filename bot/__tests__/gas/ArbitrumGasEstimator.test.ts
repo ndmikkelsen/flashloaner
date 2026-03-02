@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockState = {
   gasEstimateComponents: vi.fn(),
+  gasEstimateL1Component: vi.fn(),
   lastConstructedAddress: "" as string,
 };
 
@@ -19,6 +20,7 @@ vi.mock("ethers", async (importOriginal) => {
     mockState.lastConstructedAddress = address;
     return {
       gasEstimateComponents: mockState.gasEstimateComponents,
+      gasEstimateL1Component: mockState.gasEstimateL1Component,
     };
   }
 
@@ -29,7 +31,7 @@ vi.mock("ethers", async (importOriginal) => {
 });
 
 // Import AFTER mock is set up (vi.mock hoisting ensures this is fine)
-import { estimateArbitrumGas, gasComponentsToEth } from "../../src/gas/ArbitrumGasEstimator.js";
+import { estimateArbitrumGas, estimateL1DataFee, gasComponentsToEth } from "../../src/gas/ArbitrumGasEstimator.js";
 import type { ArbitrumGasComponents } from "../../src/gas/ArbitrumGasEstimator.js";
 
 // ---------------------------------------------------------------------------
@@ -225,5 +227,66 @@ describe("NODE_INTERFACE_ADDRESS", () => {
     expect(mockState.lastConstructedAddress).toBe(
       "0x00000000000000000000000000000000000000C8",
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// estimateL1DataFee — lightweight L1 cost estimation (no tx simulation)
+// ---------------------------------------------------------------------------
+
+describe("estimateL1DataFee", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockState.lastConstructedAddress = "";
+  });
+
+  it("should call gasEstimateL1Component on the NodeInterface contract", async () => {
+    mockState.gasEstimateL1Component.mockResolvedValue({
+      gasEstimateForL1: 475_000n,
+      baseFee: 100_000_000n,
+      l1BaseFeeEstimate: 10_000_000_000n,
+    });
+
+    const mockProvider = {} as Parameters<typeof estimateL1DataFee>[0];
+    await estimateL1DataFee(mockProvider, DUMMY_TO, DUMMY_DATA);
+
+    expect(mockState.gasEstimateL1Component).toHaveBeenCalledWith(DUMMY_TO, false, DUMMY_DATA);
+  });
+
+  it("should return L1DataFeeEstimate with correct structure", async () => {
+    mockState.gasEstimateL1Component.mockResolvedValue({
+      gasEstimateForL1: 475_000n,
+      baseFee: 100_000_000n,           // 0.1 gwei
+      l1BaseFeeEstimate: 10_000_000_000n,
+    });
+
+    const mockProvider = {} as Parameters<typeof estimateL1DataFee>[0];
+    const result = await estimateL1DataFee(mockProvider, DUMMY_TO, DUMMY_DATA);
+
+    expect(result.gasEstimateForL1).toBe(475_000n);
+    expect(result.baseFee).toBe(100_000_000n);
+    expect(result.l1BaseFeeEstimate).toBe(10_000_000_000n);
+    // l1DataFeeEth = 475000 * 1e8 / 1e18 = 0.0000475
+    expect(result.l1DataFeeEth).toBeCloseTo(0.0000475, 8);
+  });
+
+  it("should return zero L1 fee when gasEstimateForL1 is zero", async () => {
+    mockState.gasEstimateL1Component.mockResolvedValue({
+      gasEstimateForL1: 0n,
+      baseFee: 100_000_000n,
+      l1BaseFeeEstimate: 0n,
+    });
+
+    const mockProvider = {} as Parameters<typeof estimateL1DataFee>[0];
+    const result = await estimateL1DataFee(mockProvider, DUMMY_TO, DUMMY_DATA);
+
+    expect(result.l1DataFeeEth).toBe(0);
+  });
+
+  it("should propagate errors from NodeInterface call", async () => {
+    mockState.gasEstimateL1Component.mockRejectedValue(new Error("call revert"));
+
+    const mockProvider = {} as Parameters<typeof estimateL1DataFee>[0];
+    await expect(estimateL1DataFee(mockProvider, DUMMY_TO, DUMMY_DATA)).rejects.toThrow("call revert");
   });
 });

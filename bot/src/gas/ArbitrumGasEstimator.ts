@@ -7,13 +7,16 @@ import { Contract, type Provider } from "ethers";
 const NODE_INTERFACE_ADDRESS = "0x00000000000000000000000000000000000000C8";
 
 /**
- * ABI for the `gasEstimateComponents` function on the NodeInterface precompile.
- * Returns L1 data fee component and L2 execution component separately.
+ * ABI for NodeInterface precompile functions.
+ *
+ * gasEstimateComponents: runs full tx simulation — fails if calldata doesn't match target ABI.
+ * gasEstimateL1Component: computes L1 data fee from calldata size only — no tx simulation.
  *
  * @see https://docs.arbitrum.io/build-decentralized-apps/how-to-estimate-gas
  */
 const NODE_INTERFACE_ABI = [
   "function gasEstimateComponents(address to, bool contractCreation, bytes calldata data) view returns (uint64 gasEstimate, uint64 gasEstimateForL1, uint256 baseFee, uint256 l1BaseFeeEstimate)",
+  "function gasEstimateL1Component(address to, bool contractCreation, bytes calldata data) view returns (uint64 gasEstimateForL1, uint256 baseFee, uint256 l1BaseFeeEstimate)",
 ];
 
 /**
@@ -104,5 +107,55 @@ export function gasComponentsToEth(components: ArbitrumGasComponents): {
     totalCostEth: Number(components.totalCostWei) / 1e18,
     l1CostEth: Number(components.l1Gas * components.baseFee) / 1e18,
     l2CostEth: Number(components.l2Gas * components.baseFee) / 1e18,
+  };
+}
+
+/**
+ * L1 data fee breakdown from gasEstimateL1Component.
+ */
+export interface L1DataFeeEstimate {
+  /** L1 data component in gas units (priced at L2 baseFee for cost calculation) */
+  gasEstimateForL1: bigint;
+  /** Current L2 base fee in wei per gas unit */
+  baseFee: bigint;
+  /** Estimated L1 base fee in wei */
+  l1BaseFeeEstimate: bigint;
+  /** L1 data fee in ETH: gasEstimateForL1 * baseFee / 1e18 */
+  l1DataFeeEth: number;
+}
+
+/**
+ * Estimates only the L1 data posting fee using NodeInterface's gasEstimateL1Component.
+ *
+ * Unlike gasEstimateComponents, this does NOT simulate the full transaction execution.
+ * It computes the L1 data fee purely from calldata size and current L1 pricing.
+ * This makes it reliable even with dummy/approximate calldata.
+ *
+ * Use this for accurate L1 cost estimation; pair with a static L2 gas estimate
+ * (L2 execution is cheap and predictable on Arbitrum).
+ *
+ * @param provider - An ethers.js v6 Provider connected to an Arbitrum chain
+ * @param to       - Target contract address
+ * @param data     - Encoded calldata (hex string) — size matters, content doesn't
+ * @returns L1DataFeeEstimate with L1 data fee in ETH
+ */
+export async function estimateL1DataFee(
+  provider: Provider,
+  to: string,
+  data: string,
+): Promise<L1DataFeeEstimate> {
+  const nodeInterface = new Contract(NODE_INTERFACE_ADDRESS, NODE_INTERFACE_ABI, provider);
+
+  const result = await nodeInterface.gasEstimateL1Component(to, false, data);
+
+  const gasEstimateForL1 = BigInt(result.gasEstimateForL1);
+  const baseFee = BigInt(result.baseFee);
+  const l1BaseFeeEstimate = BigInt(result.l1BaseFeeEstimate);
+
+  return {
+    gasEstimateForL1,
+    baseFee,
+    l1BaseFeeEstimate,
+    l1DataFeeEth: Number(gasEstimateForL1 * baseFee) / 1e18,
   };
 }

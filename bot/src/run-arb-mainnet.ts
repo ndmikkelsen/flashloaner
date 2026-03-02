@@ -23,7 +23,7 @@ import "dotenv/config";
 import { JsonRpcProvider, Wallet } from "ethers";
 import { loadChainConfig } from "./config/index.js";
 import { FlashloanBot, BOT_VERSION } from "./index.js";
-import { estimateArbitrumGas, gasComponentsToEth } from "./gas/index.js";
+import { estimateL1DataFee } from "./gas/index.js";
 import type { ArbitrageOpportunity } from "./detector/types.js";
 import type { PriceSnapshot, PriceDelta } from "./monitor/types.js";
 import { TradeStore } from "./dashboard/TradeStore.js";
@@ -226,42 +226,40 @@ async function main(): Promise<void> {
   );
 
   // ---- Inject Arbitrum gas estimator ----
-  // Uses NodeInterface precompile at 0xC8 for accurate L1+L2 cost breakdown.
-  // In dry-run mode (no executor deployed), use static estimates silently.
-  // In shadow/live mode, use NodeInterface with fallback on failure.
+  // Uses NodeInterface precompile at 0xC8 for L1 data fee estimation.
+  // gasEstimateL1Component computes L1 costs from calldata SIZE (no tx simulation).
+  // L2 execution costs use static estimates (cheap and predictable on Arbitrum).
   const executorAddr = process.env.EXECUTOR_ADDRESS;
   const hasExecutor = executorAddr && executorAddr !== "0x0000000000000000000000000000000000000000";
 
+  // Cache provider for gas estimation — avoids creating new connection per call
+  let gasProvider: JsonRpcProvider | null = null;
   let nodeInterfaceWarned = false;
 
   const arbGasEstimator = async (numSwaps: number): Promise<{ gasCost: number; l1DataFee?: number }> => {
-    // Static L1+L2 estimate based on typical Arbitrum conditions:
-    // L1 data ~90% of cost, L2 execution ~10%. Total ~0.0002 ETH per swap step.
-    const staticL2 = 0.00002 * numSwaps;
+    // Static L2 estimate: ~150k gas per swap at ~0.1 gwei = ~0.000015 ETH per swap
+    const staticL2 = chain.gas.gasPerSwap * numSwaps * (chain.gas.maxGasPriceGwei * 1e-9);
+    // Static L1 estimate: ~256 bytes per swap at ~0.7 gwei/byte = ~0.00018 ETH per swap
     const staticL1 = 0.00018 * numSwaps;
 
     if (!hasExecutor) {
-      // No executor deployed (dry-run) — skip NodeInterface, use static estimates
       return { gasCost: staticL2, l1DataFee: staticL1 };
     }
 
-    // Build approximate calldata size for a swap transaction
-    // Each swap step ~= 256 bytes calldata (conservative estimate)
-    const estimatedCalldataSize = 4 + 32 * 8 * numSwaps; // function selector + args per swap
-    const dummyData = "0x" + "00".repeat(estimatedCalldataSize);
+    // Build representative calldata size for NodeInterface L1 estimation
+    // Each swap step ≈ 256 bytes (function selector + encoded args)
+    const estimatedCalldataSize = 4 + 32 * 8 * numSwaps;
+    const dummyData = "0x" + "ff".repeat(estimatedCalldataSize);
 
     try {
-      const provider = new JsonRpcProvider(chain.rpcUrl);
-      const components = await estimateArbitrumGas(provider, executorAddr, dummyData);
-      const ethCosts = gasComponentsToEth(components);
-      return { gasCost: ethCosts.l2CostEth, l1DataFee: ethCosts.l1CostEth };
+      if (!gasProvider) gasProvider = new JsonRpcProvider(chain.rpcUrl);
+      const l1Estimate = await estimateL1DataFee(gasProvider, executorAddr, dummyData);
+      return { gasCost: staticL2, l1DataFee: l1Estimate.l1DataFeeEth };
     } catch (err) {
-      // Fallback: static estimate when NodeInterface fails (e.g., contract not yet verified)
-      // Only warn once — subsequent failures use static estimates silently
       if (!nodeInterfaceWarned) {
         const errMsg = err instanceof Error ? err.message : String(err);
         console.warn(
-          c.yellow(`[${ts()}] [GAS] NodeInterface call failed: ${errMsg}`),
+          c.yellow(`[${ts()}] [GAS] NodeInterface L1 estimate failed: ${errMsg}`),
         );
         console.warn(
           c.yellow(`[${ts()}] [GAS] Using static estimates (L2: ${staticL2.toFixed(6)}, L1: ${staticL1.toFixed(6)} ETH per swap). This warning won't repeat.`),

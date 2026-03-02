@@ -1,2 +1,2 @@
-export { estimateArbitrumGas, gasComponentsToEth } from "./ArbitrumGasEstimator.js";
-export type { ArbitrumGasComponents } from "./ArbitrumGasEstimator.js";
+export { estimateArbitrumGas, estimateL1DataFee, gasComponentsToEth } from "./ArbitrumGasEstimator.js";
+export type { ArbitrumGasComponents, L1DataFeeEstimate } from "./ArbitrumGasEstimator.js";
