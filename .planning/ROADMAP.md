@@ -4,7 +4,7 @@
 
 - v1.0 **Multi-Chain Expansion** -- Phases 1-4 (shipped 2026-02-19)
 - v1.1 **Mainnet Profitability** -- Phases 5-12 (in progress)
-- v2.0 **Live Optimization** -- Phases 13-16 (planned)
+- v2.0 **Live Optimization** -- Phases 13-16 (shipped 2026-03-02)
 
 ## Phases
 
@@ -129,7 +129,7 @@ Plans:
 
 ## Progress
 
-**Execution Order:** Phases execute in numeric order: 5 -> 6 -> 7 -> 8 -> 9 -> 10 -> 11 -> 12
+**Execution Order:** Phases execute in numeric order: 5 -> 6 -> 7 -> 8 -> 9 -> 10 -> 11 -> 12 -> 13 -> 14 -> 15 -> 16
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -143,8 +143,12 @@ Plans:
 | 8. P&L Dashboard + Operations | v1.1 | 3/3 | Complete | 2026-02-20 |
 | 9. Ramses V2 Adapter | v1.1 | 2/2 | Complete | 2026-02-20 |
 | 10. Trader Joe V2.1 LB Adapter | v1.1 | 3/3 | Complete | 2026-02-20 |
-| 11. Dry-Run Signal Quality Fixes | 2/2 | Complete   | 2026-02-22 | - |
+| 11. Dry-Run Signal Quality Fixes | v1.1 | 2/2 | Complete | 2026-02-22 |
 | 12. Contract Deployment & Live Validation | v1.1 | 1/3 | In progress (plan 01 complete — contracts deployed) | - |
+| 13. Ops Cleanup | v2.0 | 2/2 | Complete (via Beads) | 2026-03-02 |
+| 14. Gas Estimation Fix | v2.0 | 2/2 | Complete (via Beads) | 2026-03-02 |
+| 15. Profitability Pipeline | v2.0 | 3/3 | Complete (via Beads) | 2026-03-02 |
+| 16. Bot Resilience | v2.0 | 4/4 | Complete (via Beads) | 2026-03-02 |
 
 ### Phase 11: Dry-Run Signal Quality Fixes
 **Goal**: Fix three critical signal quality issues found during 6.5-hour dry-run: (1) TJ LB slippage dangerously underestimated (500 ETH with 0.004 ETH slippage), (2) GMX/WETH V3 virtual reserves not passed to optimizer, (3) TJ LB fee display shows 0.00% instead of 0.15%
@@ -176,11 +180,16 @@ Plans:
 - [ ] 12-02-PLAN.md -- Shadow mode validation (100+ opportunities, 10% accuracy)
 - [ ] 12-03-PLAN.md -- Go live with small capital, execute first profitable trade
 
-### v2.0 Live Optimization
+### v2.0 Live Optimization -- SHIPPED 2026-03-02
 
 **Milestone Goal:** Fix 10 critical issues identified from live bot log analysis to make the Arbitrum mainnet bot consistently profitable. Address broken gas estimation, unprofitable input sizing, over-conservative thresholds, zombie processes, log explosion, and reliability gaps.
 
-**Epic:** flashloaner-l4f (beads)
+**Epic:** flashloaner-l4f (beads) -- CLOSED
+
+- [x] **Phase 13: Ops Cleanup** - Kill zombie processes, PID management, log rotation (completed 2026-03-02)
+- [x] **Phase 14: Gas Estimation Fix** - NodeInterface L1+L2 accuracy for Arbitrum (completed 2026-03-02)
+- [x] **Phase 15: Profitability Pipeline** - Optimizer search range, lower threshold, profit function fixes (completed 2026-03-02)
+- [x] **Phase 16: Bot Resilience** - Balance guard, pair cooldown, circuit breaker, thin pool filter (completed 2026-03-02)
 
 ### Phase 13: Ops Cleanup — Zombie Processes & Log Management
 **Goal**: Kill zombie shadow processes, add process lifecycle management to run-bot.sh, implement log rotation, and clean up 1GB of stale /tmp logs
@@ -193,11 +202,11 @@ Plans:
   3. run-bot.sh has a `stop` subcommand that cleanly shuts down the running bot
   4. Logs rotate at 50MB with 3 retained files, old logs >24h cleaned on startup
   5. All existing tests pass (`forge test` and `pnpm test`)
-**Plans**: TBD
+**Plans**: 2 plans (executed directly via Beads)
 
 Plans:
-- [ ] 13-01-PLAN.md -- Kill zombies + PID file management + stop subcommand
-- [ ] 13-02-PLAN.md -- Log rotation + cleanup + production log level
+- [x] 13-01-PLAN.md -- Kill zombies + PID file management + stop subcommand
+- [x] 13-02-PLAN.md -- Log rotation + cleanup + production log level
 
 ### Phase 14: Gas Estimation Fix — NodeInterface L1+L2 Accuracy
 **Goal**: Fix the broken NodeInterface gas estimation so the bot has accurate L1 data fee + L2 execution cost for Arbitrum, replacing the static fallback that makes all profit calculations unreliable
@@ -209,11 +218,11 @@ Plans:
   2. Gas estimates include both L2 execution cost and L1 data posting fee as separate components
   3. Estimated gas costs are within 20% of actual transaction costs (validated against historical txns)
   4. All existing tests pass, new tests cover NodeInterface integration
-**Plans**: TBD
+**Plans**: 2 plans (executed directly via Beads)
 
 Plans:
-- [ ] 14-01-PLAN.md -- Debug NodeInterface failure + fix call parameters
-- [ ] 14-02-PLAN.md -- Validate gas estimates against on-chain reality
+- [x] 14-01-PLAN.md -- Debug NodeInterface failure + fix call parameters
+- [x] 14-02-PLAN.md -- Validate gas estimates against on-chain reality
 
 ### Phase 15: Profitability Pipeline — Optimizer, Threshold & Profit Function
 **Goal**: Fix the three interconnected profitability issues: input optimizer finding no profitable sizes, profit threshold 7.5x above reality, and profit function returning zero for some paths
@@ -226,12 +235,12 @@ Plans:
   3. Zero "Gross: 0.000000" entries in a 1-hour shadow run (profit function always computes a value)
   4. At least one opportunity passes threshold gate in a 1-hour live session
   5. All existing tests pass, new tests cover optimizer edge cases
-**Plans**: TBD
+**Plans**: 3 plans (executed directly via Beads)
 
 Plans:
-- [ ] 15-01-PLAN.md -- Fix zero-profit bug + optimizer profit function debugging
-- [ ] 15-02-PLAN.md -- Lower threshold + env var override + dynamic threshold consideration
-- [ ] 15-03-PLAN.md -- End-to-end shadow validation (1-hour run with improved pipeline)
+- [x] 15-01-PLAN.md -- Fix zero-profit bug + optimizer profit function debugging
+- [x] 15-02-PLAN.md -- Lower threshold + env var override + dynamic threshold consideration
+- [x] 15-03-PLAN.md -- End-to-end shadow validation (1-hour run with improved pipeline)
 
 ### Phase 16: Bot Resilience — Balance Guard, Cooldown, RPC Circuit Breaker, Thin Pool Filter
 **Goal**: Improve bot reliability with wallet balance safety guard, pair cooldown for persistently unprofitable pairs, RPC circuit breaker with exponential backoff, and thin-liquidity pool filtering
@@ -244,11 +253,11 @@ Plans:
   3. After 3 consecutive RPC failures, bot pauses polling with exponential backoff (2s, 4s, 8s, max 30s)
   4. Pools with WETH reserve < 10 ETH (V2) or virtual reserve < 10 ETH (V3) are skipped with periodic recheck
   5. All existing tests pass, new tests cover each resilience feature
-**Plans**: TBD
+**Plans**: 4 plans (executed directly via Beads)
 
 Plans:
-- [ ] 16-01-PLAN.md -- Balance safety guard + periodic balance monitoring
-- [ ] 16-02-PLAN.md -- Pair cooldown mechanism for persistent rejections
-- [ ] 16-03-PLAN.md -- RPC circuit breaker with exponential backoff
-- [ ] 16-04-PLAN.md -- Thin pool liquidity filter with periodic recheck
+- [x] 16-01-PLAN.md -- Balance safety guard + periodic balance monitoring
+- [x] 16-02-PLAN.md -- Pair cooldown mechanism for persistent rejections
+- [x] 16-03-PLAN.md -- RPC circuit breaker with exponential backoff
+- [x] 16-04-PLAN.md -- Thin pool liquidity filter with periodic recheck
 

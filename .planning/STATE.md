@@ -5,24 +5,24 @@
 See: .planning/PROJECT.md (updated 2026-02-19)
 
 **Core value:** The bot must never lose funds beyond gas costs -- the 4-layer safety system (off-chain estimate, eth_call simulation, on-chain ProfitValidator, MEV protection) ensures every transaction either profits or reverts.
-**Current focus:** v2.0 Live Optimization -- Phases 13-16 (fixing 10 live bot issues)
+**Current focus:** v1.1 Phase 12 plans 02-03 (shadow validation + go live) — v2.0 complete
 
 ## Current Position
 
-Milestone: v2.0 Live Optimization (epic: flashloaner-l4f)
-Phase: 13-16 planned (4 phases, 11 plans)
-Status: Planning complete — ready for execution
-Last activity: 2026-03-02 -- Analyzed live bot logs, created epic + 10 beads issues, designed 4 phases
-Note: v1.1 Phase 12 plans 02-03 deferred — live bot issues must be fixed before shadow validation is meaningful
+Milestone: v2.0 Live Optimization — COMPLETE (epic: flashloaner-l4f CLOSED)
+Phase: All 4 phases (13-16) complete, executed directly via Beads
+Status: v2.0 shipped. Next: v1.1 Phase 12 plans 02-03 (shadow validation, go live)
+Last activity: 2026-03-02 -- Executed Phases 13-16 via Beads, all 10 issues closed, 604 TS tests pass (3 skipped)
+Note: v1.1 Phase 12 plans 02-03 are next — live bot issues are now fixed, shadow validation is meaningful
 
-Progress: [======================..] 93% (25/27 plans -- v1.0: 11 complete, v1.1: 14 complete, Phase 12 plan 01 complete)
+Progress: [==========================..] 95% (36/38 plans -- v1.0: 11 complete, v1.1: 14 complete, v2.0: 11 complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 24 (v1.0: 11, v1.1: 13)
-- Average duration: ~20 min (weighted)
-- Total execution time: ~9h 2m (v1.0: 8h, v1.1: 62m)
+- Total plans completed: 36 (v1.0: 11, v1.1: 14, v2.0: 11)
+- v2.0 phases executed directly via Beads (no GSD plan timing data)
+- Total execution time: ~9h 2m (v1.0: 8h, v1.1: 62m, v2.0: via Beads)
 
 **By Phase:**
 
@@ -59,7 +59,8 @@ Progress: [======================..] 93% (25/27 plans -- v1.0: 11 complete, v1.1
 - v1.1 Phase 8 (COMPLETE): ~2.4m per plan (persistence layer, PM2 setup, runtime stats/reporting)
 - v1.1 Phase 9 (COMPLETE): ~5.2m per plan (Ramses DEX adapter with on-chain integration + testing)
 - v1.1 Phase 10 (COMPLETE): ~3.7m per plan (Trader Joe LB adapter with fee buffer and integration testing)
-- Trend: v1.1 maintaining fast velocity as infrastructure is well-scoped and testable
+- v2.0 Phases 13-16 (COMPLETE): Executed directly via Beads, bypassing GSD plan files
+- Trend: v2.0 completed in a single session via Beads direct execution (all 10 issues closed)
 
 ## Accumulated Context
 
@@ -113,10 +114,17 @@ New for v1.1:
 - [Phase 12-01]: botWallet (0xdC9dAdb34431ee268fE4B13352E1E09B75D799BD) separate from deployer/owner (0x8d7a596F...) — correct role separation in FlashloanExecutor
 - [Phase 12-01]: UniswapV2Adapter skipped on Arbitrum (Uniswap V2 not deployed on Arbitrum — intentional)
 
+New for v2.0:
+- [Phase 13]: PID file management in run-bot.sh with stop subcommand, log rotation at 50MB with 3 retained files
+- [Phase 14]: gasEstimateL1Component used for reliable Arbitrum L1 data fee estimation (replaces broken NodeInterface approach)
+- [Phase 15]: Lower profit threshold from 0.01 ETH to 0.003 ETH, fix optimizer search range for thin pools
+- [Phase 16]: Pair cooldown (10 rejections → 60s skip), circuit breaker (3 failures → exponential backoff), thin pool filter (<10 ETH → skip), balance guard (<0.005 ETH → hard stop)
+
 ### Roadmap Evolution
 
 - Phase 11 added: Dry-Run Signal Quality Fixes (TJ LB slippage, V3 reserve cap, fee display)
 - Phase 12 added: Contract Deployment & Live Validation (deploy, shadow mode, go live)
+- Phases 13-16 added: v2.0 Live Optimization (10 live bot issues from log analysis)
 
 ### Pending Todos
 
@@ -131,7 +139,7 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-02
-Stopped at: v2.0 milestone planned. Phases 13-16 ready for execution.
-Resume: Execute Phases 13, 14, 16 in parallel (independent), then Phase 15 after Phase 14 completes (depends on gas estimation fix).
-Execution order: Wave A (parallel): Phase 13 (ops cleanup), Phase 14 (gas fix), Phase 16 (resilience). Wave B (after 14): Phase 15 (profitability pipeline).
-Note: FlashloanExecutor live at 0x06409bFF450b9feFD6045f4d014DC887cF898a77 (Arbitrum mainnet). v1.1 Phase 12 plans 02-03 resume after v2.0.
+Stopped at: v2.0 Live Optimization milestone COMPLETE. All 4 phases (13-16) shipped in single session.
+Resume: v1.1 Phase 12 plans 02-03 (shadow validation + go live). Live bot issues are now fixed, making shadow validation meaningful.
+Commits: 7bcea2f (Phase 13), 76c6f12 (Phase 14), 0f8b393 (Phase 15), a97c5ed (Phase 16)
+Note: FlashloanExecutor live at 0x06409bFF450b9feFD6045f4d014DC887cF898a77 (Arbitrum mainnet). Phases 13-16 executed directly via Beads (bypassing GSD plan files).
