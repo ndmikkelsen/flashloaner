@@ -5,14 +5,15 @@
 See: .planning/PROJECT.md (updated 2026-02-19)
 
 **Core value:** The bot must never lose funds beyond gas costs -- the 4-layer safety system (off-chain estimate, eth_call simulation, on-chain ProfitValidator, MEV protection) ensures every transaction either profits or reverts.
-**Current focus:** Phase 12 -- Contract Deployment & Live Validation
+**Current focus:** v2.0 Live Optimization -- Phases 13-16 (fixing 10 live bot issues)
 
 ## Current Position
 
-Phase: 12 of 12 (Contract Deployment & Live Validation)
-Plan: 2 of 3 in current phase
-Status: Phase 12 Plan 01 COMPLETE — ready for Plan 02 (shadow mode validation)
-Last activity: 2026-02-25 -- Completed all 3 tasks: code patches + wallet funding + mainnet deployment (FlashloanExecutor at 0x06409bFF450b9feFD6045f4d014DC887cF898a77)
+Milestone: v2.0 Live Optimization (epic: flashloaner-l4f)
+Phase: 13-16 planned (4 phases, 11 plans)
+Status: Planning complete — ready for execution
+Last activity: 2026-03-02 -- Analyzed live bot logs, created epic + 10 beads issues, designed 4 phases
+Note: v1.1 Phase 12 plans 02-03 deferred — live bot issues must be fixed before shadow validation is meaningful
 
 Progress: [======================..] 93% (25/27 plans -- v1.0: 11 complete, v1.1: 14 complete, Phase 12 plan 01 complete)
 
@@ -129,6 +130,8 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-25
-Stopped at: Completed 12-01-PLAN.md (all 3 tasks). Ready for 12-02-PLAN.md (shadow mode validation).
-Resume: Run /gsd:plan-phase 12 to plan 12-02 (shadow mode: 100+ opportunities, profit estimation accuracy within 10%). FlashloanExecutor is live at 0x06409bFF450b9feFD6045f4d014DC887cF898a77. Set EXECUTOR_ADDRESS in 1Password flashloaner-bot .env.arbitrum-mainnet before starting 12-02.
+Last session: 2026-03-02
+Stopped at: v2.0 milestone planned. Phases 13-16 ready for execution.
+Resume: Execute Phases 13, 14, 16 in parallel (independent), then Phase 15 after Phase 14 completes (depends on gas estimation fix).
+Execution order: Wave A (parallel): Phase 13 (ops cleanup), Phase 14 (gas fix), Phase 16 (resilience). Wave B (after 14): Phase 15 (profitability pipeline).
+Note: FlashloanExecutor live at 0x06409bFF450b9feFD6045f4d014DC887cF898a77 (Arbitrum mainnet). v1.1 Phase 12 plans 02-03 resume after v2.0.

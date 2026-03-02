@@ -4,6 +4,7 @@
 
 - v1.0 **Multi-Chain Expansion** -- Phases 1-4 (shipped 2026-02-19)
 - v1.1 **Mainnet Profitability** -- Phases 5-12 (in progress)
+- v2.0 **Live Optimization** -- Phases 13-16 (planned)
 
 ## Phases
 
@@ -174,4 +175,80 @@ Plans:
 - [x] 12-01-PLAN.md -- Deploy FlashloanExecutor + adapters to Arbitrum mainnet (COMPLETE: all 3 tasks done, contracts live at 0x06409bFF450b9feFD6045f4d014DC887cF898a77)
 - [ ] 12-02-PLAN.md -- Shadow mode validation (100+ opportunities, 10% accuracy)
 - [ ] 12-03-PLAN.md -- Go live with small capital, execute first profitable trade
+
+### v2.0 Live Optimization
+
+**Milestone Goal:** Fix 10 critical issues identified from live bot log analysis to make the Arbitrum mainnet bot consistently profitable. Address broken gas estimation, unprofitable input sizing, over-conservative thresholds, zombie processes, log explosion, and reliability gaps.
+
+**Epic:** flashloaner-l4f (beads)
+
+### Phase 13: Ops Cleanup — Zombie Processes & Log Management
+**Goal**: Kill zombie shadow processes, add process lifecycle management to run-bot.sh, implement log rotation, and clean up 1GB of stale /tmp logs
+**Depends on**: None (independent, can start immediately)
+**Beads Issues**: flashloaner-i9g (zombies), flashloaner-6c7 (log rotation)
+**Requirements**: OPS-01, OPS-02
+**Success Criteria** (what must be TRUE):
+  1. No stale bot processes remain running after cleanup (verify with `ps aux | grep flashbot`)
+  2. run-bot.sh writes a PID file and kills previous instance on startup
+  3. run-bot.sh has a `stop` subcommand that cleanly shuts down the running bot
+  4. Logs rotate at 50MB with 3 retained files, old logs >24h cleaned on startup
+  5. All existing tests pass (`forge test` and `pnpm test`)
+**Plans**: TBD
+
+Plans:
+- [ ] 13-01-PLAN.md -- Kill zombies + PID file management + stop subcommand
+- [ ] 13-02-PLAN.md -- Log rotation + cleanup + production log level
+
+### Phase 14: Gas Estimation Fix — NodeInterface L1+L2 Accuracy
+**Goal**: Fix the broken NodeInterface gas estimation so the bot has accurate L1 data fee + L2 execution cost for Arbitrum, replacing the static fallback that makes all profit calculations unreliable
+**Depends on**: None (independent, can start immediately)
+**Beads Issues**: flashloaner-qef (gas estimation)
+**Requirements**: GAS-01
+**Success Criteria** (what must be TRUE):
+  1. NodeInterface call succeeds on bot startup (no "using static estimates" warning in logs)
+  2. Gas estimates include both L2 execution cost and L1 data posting fee as separate components
+  3. Estimated gas costs are within 20% of actual transaction costs (validated against historical txns)
+  4. All existing tests pass, new tests cover NodeInterface integration
+**Plans**: TBD
+
+Plans:
+- [ ] 14-01-PLAN.md -- Debug NodeInterface failure + fix call parameters
+- [ ] 14-02-PLAN.md -- Validate gas estimates against on-chain reality
+
+### Phase 15: Profitability Pipeline — Optimizer, Threshold & Profit Function
+**Goal**: Fix the three interconnected profitability issues: input optimizer finding no profitable sizes, profit threshold 7.5x above reality, and profit function returning zero for some paths
+**Depends on**: Phase 14 (accurate gas estimation needed for optimizer validation)
+**Beads Issues**: flashloaner-eh6 (optimizer), flashloaner-dej (threshold), flashloaner-4wo (zero profit)
+**Requirements**: PROFIT-01, PROFIT-02, PROFIT-03
+**Success Criteria** (what must be TRUE):
+  1. Optimizer finds profitable input sizes for at least 30% of opportunities with delta > 0.3%
+  2. Profit threshold lowered to ~0.003 ETH with env var override (MIN_PROFIT_THRESHOLD)
+  3. Zero "Gross: 0.000000" entries in a 1-hour shadow run (profit function always computes a value)
+  4. At least one opportunity passes threshold gate in a 1-hour live session
+  5. All existing tests pass, new tests cover optimizer edge cases
+**Plans**: TBD
+
+Plans:
+- [ ] 15-01-PLAN.md -- Fix zero-profit bug + optimizer profit function debugging
+- [ ] 15-02-PLAN.md -- Lower threshold + env var override + dynamic threshold consideration
+- [ ] 15-03-PLAN.md -- End-to-end shadow validation (1-hour run with improved pipeline)
+
+### Phase 16: Bot Resilience — Balance Guard, Cooldown, RPC Circuit Breaker, Thin Pool Filter
+**Goal**: Improve bot reliability with wallet balance safety guard, pair cooldown for persistently unprofitable pairs, RPC circuit breaker with exponential backoff, and thin-liquidity pool filtering
+**Depends on**: None (independent, can start immediately)
+**Beads Issues**: flashloaner-aca (balance), flashloaner-31u (cooldown), flashloaner-k4g (circuit breaker), flashloaner-pvr (thin pools)
+**Requirements**: RESIL-01, RESIL-02, RESIL-03, RESIL-04
+**Success Criteria** (what must be TRUE):
+  1. Bot refuses to enter LIVE mode when balance < 0.005 ETH (hard stop with clear error message)
+  2. After 10 consecutive rejections for a pair, that pair is skipped for 60 seconds (visible in logs)
+  3. After 3 consecutive RPC failures, bot pauses polling with exponential backoff (2s, 4s, 8s, max 30s)
+  4. Pools with WETH reserve < 10 ETH (V2) or virtual reserve < 10 ETH (V3) are skipped with periodic recheck
+  5. All existing tests pass, new tests cover each resilience feature
+**Plans**: TBD
+
+Plans:
+- [ ] 16-01-PLAN.md -- Balance safety guard + periodic balance monitoring
+- [ ] 16-02-PLAN.md -- Pair cooldown mechanism for persistent rejections
+- [ ] 16-03-PLAN.md -- RPC circuit breaker with exponential backoff
+- [ ] 16-04-PLAN.md -- Thin pool liquidity filter with periodic recheck
 
