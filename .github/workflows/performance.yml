@@ -85,7 +85,7 @@ jobs:
           FOUNDRY_PROFILE: ci
 
       - name: Upload gas report
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: gas-report
           path: gas-report.txt
